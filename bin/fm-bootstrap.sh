@@ -843,7 +843,16 @@ fi
 if command -v tasks-axi >/dev/null 2>&1 && ! fm_tasks_axi_compatible; then
   echo "MISSING: tasks-axi (install: $(install_cmd tasks-axi))"
 fi
-gh auth status >/dev/null 2>&1 || echo "NEEDS_GH_AUTH"
+gh_auth_available() {
+  gh auth status >/dev/null 2>&1 && return 0
+  # A Codex tool sandbox may have valid local gh credentials but no network to
+  # validate them.
+  # Treat a locally configured token as enough for bootstrap; real GitHub calls
+  # still fail closed at their call site if the token is bad.
+  [ "${CODEX_SANDBOX_NETWORK_DISABLED:-}" = 1 ] || return 1
+  [ -n "$(gh auth token 2>/dev/null || true)" ]
+}
+gh_auth_available || echo "NEEDS_GH_AUTH"
 # Worktree-tangle check: the firstmate primary checkout (FM_ROOT) must sit on its
 # default branch, not a feature branch (see fm-tangle-lib.sh). Scoped to the
 # primary only; detached-HEAD worktrees and secondmate homes never trip it.

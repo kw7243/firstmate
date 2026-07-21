@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # Acquire or inspect the per-home firstmate session lock.
-# Writes the harness (agent) process PID found by walking the shell's ancestry,
-# which lives as long as the firstmate session - unlike the transient subshell
-# PID of any one tool call, which is dead moments after it is written.
+# Writes the harness (agent) process PID found by walking the shell's ancestry
+# when that ancestry is visible.
+# Codex tool sandboxes may hide the real parent process behind a bwrap pid
+# namespace; in that case a CODEX_THREAD_ID-backed opaque owner is used instead.
+# Foreign opaque owners fail closed because their liveness cannot be proved from
+# inside the sandbox.
 # Usage: fm-lock.sh           acquire; exit 1 if another live session holds it
 #        fm-lock.sh status    print holder and liveness; always exits 0
 set -u
@@ -42,20 +45,69 @@ holder_alive() {  # true if $1 is a live process that looks like a harness
   printf '%s' "$(basename "$comm") $(ps -o args= -p "$pid" 2>/dev/null)" | grep -qE "$HARNESS_RE"
 }
 
+codex_sandbox_owner() {
+  local thread=${CODEX_THREAD_ID:-}
+  [ -n "$thread" ] || return 1
+  case "$thread" in
+    *[!A-Za-z0-9._:-]*|*/*) return 1 ;;
+  esac
+  [ "${CODEX_SANDBOX_NETWORK_DISABLED:-}" = 1 ] || [ -n "${CODEX_SQLITE_HOME:-}" ] || return 1
+  printf 'codex-thread:%s\n' "$thread"
+}
+
+current_owner() {
+  local pid
+  if pid=$(harness_pid); then
+    printf '%s\n' "$pid"
+    return 0
+  fi
+  codex_sandbox_owner
+}
+
+owner_is_opaque() {
+  case "$1" in
+    codex-thread:*) return 0 ;;
+  esac
+  return 1
+}
+
+owner_blocks_acquire() {
+  local old=$1 current=${2:-}
+  [ "$old" = "$current" ] && return 1
+  if owner_is_opaque "$old"; then
+    return 0
+  fi
+  holder_alive "$old"
+}
+
 if [ "${1:-}" = "status" ]; then
   if [ ! -f "$LOCK" ]; then echo "lock: free"; exit 0; fi
   old=$(cat "$LOCK")
-  if holder_alive "$old"; then echo "lock: held by live harness pid $old"; else echo "lock: stale (pid $old dead or not a harness)"; fi
+  if owner_is_opaque "$old"; then
+    if [ "$(codex_sandbox_owner 2>/dev/null || true)" = "$old" ]; then
+      echo "lock: held by this sandboxed codex session"
+    else
+      echo "lock: held by opaque sandbox owner (liveness unavailable)"
+    fi
+  elif holder_alive "$old"; then
+    echo "lock: held by live harness pid $old"
+  else
+    echo "lock: stale (pid $old dead or not a harness)"
+  fi
   exit 0
 fi
 
-me=$(harness_pid) || { echo "error: cannot locate harness process in ancestry" >&2; exit 1; }
+me=$(current_owner) || { echo "error: cannot locate harness process in ancestry or sandbox session identity" >&2; exit 1; }
 if [ -f "$LOCK" ]; then
   old=$(cat "$LOCK")
-  if [ "$old" != "$me" ] && holder_alive "$old"; then
-    echo "error: another live firstmate session holds the lock (pid $old); operate read-only until resolved" >&2
+  if owner_blocks_acquire "$old" "$me"; then
+    echo "error: another live or unverifiable firstmate session holds the lock ($old); operate read-only until resolved" >&2
     exit 1
   fi
 fi
 echo "$me" > "$LOCK"
-echo "lock acquired: harness pid $me"
+if owner_is_opaque "$me"; then
+  echo "lock acquired: sandbox codex session"
+else
+  echo "lock acquired: harness pid $me"
+fi
