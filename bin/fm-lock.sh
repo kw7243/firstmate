@@ -5,7 +5,8 @@
 # Codex tool sandboxes may hide the real parent process behind a bwrap pid
 # namespace; in that case a CODEX_THREAD_ID-backed opaque owner is used instead.
 # Foreign opaque owners fail closed because their liveness cannot be proved from
-# inside the sandbox.
+# inside the sandbox until the marker is old enough to prove it is not a
+# concurrent acquisition.
 # Usage: fm-lock.sh           acquire; exit 1 if another live session holds it
 #        fm-lock.sh status    print holder and liveness; always exits 0
 set -u
@@ -17,8 +18,15 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 LOCK="$STATE/.lock"
 mkdir -p "$STATE"
 
+# shellcheck source=bin/fm-lock-lib.sh
+. "$SCRIPT_DIR/fm-lock-lib.sh"
+
 # Known harness command names; extend when a new adapter is verified.
 HARNESS_RE='claude|codex|opencode|grok|^pi$'
+LOCK_STALE_AFTER=${FM_LOCK_STALE_AFTER:-2}
+case "$LOCK_STALE_AFTER" in
+  ''|*[!0-9]*) LOCK_STALE_AFTER=2 ;;
+esac
 
 harness_pid() {
   local pid=$$ comm args
@@ -71,10 +79,18 @@ owner_is_opaque() {
   return 1
 }
 
+opaque_owner_stale() {
+  local old=$1 age
+  owner_is_opaque "$old" || return 1
+  age=$(fm_lock_age "$LOCK") || return 1
+  [ "$age" -ge "$LOCK_STALE_AFTER" ]
+}
+
 owner_blocks_acquire() {
   local old=$1 current=${2:-}
   [ "$old" = "$current" ] && return 1
   if owner_is_opaque "$old"; then
+    opaque_owner_stale "$old" && return 1
     return 0
   fi
   holder_alive "$old"
@@ -86,6 +102,8 @@ if [ "${1:-}" = "status" ]; then
   if owner_is_opaque "$old"; then
     if [ "$(codex_sandbox_owner 2>/dev/null || true)" = "$old" ]; then
       echo "lock: held by this sandboxed codex session"
+    elif opaque_owner_stale "$old"; then
+      echo "lock: stale (opaque sandbox owner older than ${LOCK_STALE_AFTER}s)"
     else
       echo "lock: held by opaque sandbox owner (liveness unavailable)"
     fi
