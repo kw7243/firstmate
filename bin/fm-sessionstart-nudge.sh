@@ -34,6 +34,15 @@ lock_is_in_ancestry() {
   return 1
 }
 
+lock_is_current_sandbox_owner() {
+  local lock_owner thread=${CODEX_THREAD_ID:-}
+  [ -n "$thread" ] || return 1
+  [ -f "$STATE/.lock" ] || return 1
+  IFS= read -r lock_owner < "$STATE/.lock" 2>/dev/null || return 1
+  [ "$lock_owner" = "codex-thread:$thread" ]
+}
+
 lock_is_in_ancestry && exit 0
+lock_is_current_sandbox_owner && exit 0
 printf '%s\n' "Run \`bin/fm-session-start.sh\` now, exactly once, before executing any other instructions."
 exit 0

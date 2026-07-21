@@ -291,6 +291,31 @@ ROWS
   pass "bootstrap reports treehouse lease + tasks-axi/quota-axi bootstrap contracts"
 }
 
+test_network_sandbox_accepts_local_gh_token() {
+  local case_dir fakebin out
+  case_dir="$TMP_ROOT/gh-sandbox-token"
+  mkdir -p "$case_dir/home"
+  fakebin=$(make_fake_toolchain "$case_dir")
+  cat > "$fakebin/gh" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = auth ] && [ "${2:-}" = status ]; then
+  exit 1
+fi
+if [ "${1:-}" = auth ] && [ "${2:-}" = token ]; then
+  printf '%s\n' 'gho_fake'
+  exit 0
+fi
+exit 1
+SH
+  chmod +x "$fakebin/gh"
+
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+    CODEX_SANDBOX_NETWORK_DISABLED=1 FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
+
+  assert_not_contains "$out" "NEEDS_GH_AUTH" "network-disabled sandbox with local gh token should not report auth missing"
+  pass "bootstrap accepts local gh token when codex sandbox disables network validation"
+}
+
 test_no_mistakes_min_version() {
   local label version mode case_dir fakebin out missing n
   missing='MISSING: no-mistakes (install: curl -fsSL https://raw.githubusercontent.com/kunchenguid/no-mistakes/main/docs/install.sh | sh)'
@@ -787,6 +812,7 @@ ROWS
 }
 
 test_bootstrap_reporting
+test_network_sandbox_accepts_local_gh_token
 test_no_mistakes_min_version
 test_git_is_required_with_supported_install_instruction
 test_orca_backend_gates_orca_tool_only_when_selected

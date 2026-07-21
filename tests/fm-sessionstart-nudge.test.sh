@@ -103,6 +103,15 @@ test_owned_lock_is_silent() {
   pass "fm-sessionstart-nudge: a lock holder in process ancestry is already run"
 }
 
+test_codex_sandbox_lock_is_silent() {
+  local root="$TMP_ROOT/codex-sandbox-already-ran"
+  make_primary "$root"
+  printf '%s\n' "codex-thread:thread-123" > "$root/state/.lock"
+  expect_silent_zero "codex sandbox lock nudge" env CODEX_THREAD_ID=thread-123 \
+    FM_GATE_REFUSE_BYPASS=0 FM_ROOT_OVERRIDE="$root" FM_HOME="$root" "$NUDGE"
+  pass "fm-sessionstart-nudge: a matching codex sandbox lock is already run"
+}
+
 test_opencode_plugin_delivers_exact_nudge_once() {
   local root="$TMP_ROOT/opencode-primary" out status=0
   make_primary "$root"
@@ -186,5 +195,6 @@ test_unmarked_linked_worktree_is_silent
 test_linked_secondmate_primary_nudges
 test_missing_state_is_silent
 test_owned_lock_is_silent
+test_codex_sandbox_lock_is_silent
 test_opencode_plugin_delivers_exact_nudge_once
 test_tracked_harness_registration
