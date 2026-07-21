@@ -75,6 +75,27 @@ test_foreign_codex_sandbox_identity_fails_closed() {
   pass "foreign codex sandbox identity fails closed"
 }
 
+test_stale_foreign_codex_sandbox_identity_reclaims() {
+  local dir home fakebin out status
+  dir="$TMP_ROOT/codex-stale-foreign"
+  home="$dir/home"
+  mkdir -p "$home/state"
+  printf '%s\n' "codex-thread:old-thread" > "$home/state/.lock"
+  touch -t 202001010000 "$home/state/.lock"
+  fakebin=$(make_hidden_harness_fakebin "$dir/fake")
+
+  status=0
+  out=$(FM_HOME="$home" FM_LOCK_STALE_AFTER=1 CODEX_THREAD_ID=new-thread CODEX_SANDBOX_NETWORK_DISABLED=1 \
+    PATH="$fakebin:$BASE_PATH" "$LOCK" 2>&1) || status=$?
+
+  expect_code 0 "$status" "stale foreign codex sandbox owner should be reclaimable"
+  assert_contains "$out" "lock acquired: sandbox codex session" \
+    "stale foreign sandbox owner did not acquire cleanly"
+  [ "$(cat "$home/state/.lock")" = "codex-thread:new-thread" ] \
+    || fail "stale foreign sandbox owner was not overwritten by the current owner"
+  pass "stale foreign codex sandbox identity can be reclaimed"
+}
+
 test_status_reports_current_sandbox_owner() {
   local dir home fakebin out
   dir="$TMP_ROOT/codex-status"
@@ -90,7 +111,25 @@ test_status_reports_current_sandbox_owner() {
   pass "status recognizes the current sandboxed codex owner"
 }
 
+test_status_reports_stale_opaque_sandbox_owner() {
+  local dir home fakebin out
+  dir="$TMP_ROOT/codex-status-stale"
+  home="$dir/home"
+  mkdir -p "$home/state"
+  printf '%s\n' "codex-thread:old-status-thread" > "$home/state/.lock"
+  touch -t 202001010000 "$home/state/.lock"
+  fakebin=$(make_hidden_harness_fakebin "$dir/fake")
+
+  out=$(FM_HOME="$home" FM_LOCK_STALE_AFTER=1 CODEX_THREAD_ID=current-status-thread CODEX_SANDBOX_NETWORK_DISABLED=1 \
+    PATH="$fakebin:$BASE_PATH" "$LOCK" status)
+  assert_contains "$out" "lock: stale (opaque sandbox owner older than 1s)" \
+    "status did not report a stale opaque sandbox owner"
+  pass "status reports stale opaque sandbox owners"
+}
+
 test_codex_sandbox_identity_acquires_without_visible_parent
 test_same_codex_sandbox_identity_reacquires
 test_foreign_codex_sandbox_identity_fails_closed
+test_stale_foreign_codex_sandbox_identity_reclaims
 test_status_reports_current_sandbox_owner
+test_status_reports_stale_opaque_sandbox_owner
