@@ -4,7 +4,7 @@
 #          Detect: prints one line per actionable problem, or an explicit
 #          BOOTSTRAP_INFO no-action fact for completed benign bootstrap work, and
 #          exits 0.
-#          Silent = all good.
+#          Silent = no actionable bootstrap problem detected.
 #          Lines: "MISSING: <tool> (install: <command>)",
 #                 "MISSING_MANUAL: <tool> (instructions: <url>)", "NEEDS_GH_AUTH",
 #                 "BACKEND_INVALID: <name> (known: <names>)",
