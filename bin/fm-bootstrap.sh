@@ -4,7 +4,7 @@
 #          Detect: prints one line per actionable problem, or an explicit
 #          BOOTSTRAP_INFO no-action fact for completed benign bootstrap work, and
 #          exits 0.
-#          Silent = all good.
+#          Silent = no actionable bootstrap problem detected.
 #          Lines: "MISSING: <tool> (install: <command>)",
 #                 "MISSING_MANUAL: <tool> (instructions: <url>)", "NEEDS_GH_AUTH",
 #                 "BACKEND_INVALID: <name> (known: <names>)",
@@ -850,7 +850,11 @@ gh_auth_available() {
   # Treat a locally configured token as enough for bootstrap; real GitHub calls
   # still fail closed at their call site if the token is bad.
   [ "${CODEX_SANDBOX_NETWORK_DISABLED:-}" = 1 ] || return 1
-  [ -n "$(gh auth token 2>/dev/null || true)" ]
+  [ -n "$(gh auth token 2>/dev/null || true)" ] && return 0
+  # macOS keyring-backed gh credentials may also be hidden from the Codex
+  # seatbelt sandbox, leaving bootstrap unable to prove auth either way.
+  # Do not ask for a login from an environment that cannot validate or read it.
+  [ -n "${CODEX_SANDBOX:-}" ]
 }
 gh_auth_available || echo "NEEDS_GH_AUTH"
 # Worktree-tangle check: the firstmate primary checkout (FM_ROOT) must sit on its
