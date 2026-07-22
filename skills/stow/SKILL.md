@@ -1,6 +1,6 @@
 ---
 name: stow
-description: Sweep the current conversation for durable knowledge - user preferences, project facts, operational gotchas, and unfinished next steps - and file each through explicit instructions, existing local conventions, or the private `.stow-notes.md` fallback, so nothing is lost when the session ends. Use when the user invokes /stow, asks to save or write down what was learned this session, or before a context reset or long break.
+description: Sweep the current conversation for durable knowledge - user preferences, project facts, operational gotchas, and unfinished next steps - and file each through explicit instructions, existing local conventions, or the private `.stow-notes.md` fallback, so nothing is lost when the session ends. Use when the user invokes stow or $stow, asks to save or write down what was learned this session, or before a context reset or long break.
 user-invocable: true
 ---
 
@@ -11,6 +11,7 @@ user-invocable: true
 Sweep this conversation for durable knowledge that only exists in chat right now, and write it through the user's explicit instructions, this project's existing local conventions, or the private `.stow-notes.md` fallback in the current directory.
 The goal is a conversation that is safe to end, reset, or hand off because everything durable has already been captured on disk, not left stranded in the transcript.
 Everything this skill files goes to a local file by default; it only ever reaches an external system such as an issue tracker when you have explicitly said to use one.
+If this skill is installed in Codex, invoke it as `$stow`; native `/stow` is not a repo-provided Codex slash command.
 
 ## What it does
 
