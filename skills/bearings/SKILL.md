@@ -1,6 +1,6 @@
 ---
 name: bearings
-description: Generate a concise "where did I leave off" status report for the current conversation and workspace, using explicit user instructions, existing local project conventions, and observable local state. Use when the user invokes bearings, asks for a status report, catch-up, morning brief, "where did I leave off", or "what's in the works".
+description: Generate a concise "where did I leave off" status report for the current conversation and workspace, using explicit user instructions, existing local project conventions, and observable local state. Use when the user invokes bearings or $bearings, asks for a status report, catch-up, morning brief, "where did I leave off", or "what's in the works".
 user-invocable: true
 ---
 
