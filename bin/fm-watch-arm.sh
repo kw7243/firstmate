@@ -336,6 +336,13 @@ if [ "$mode" = restart ]; then
         sleep 0.1
         i=$((i + 1))
       done
+      if healthy_watcher; then
+        cycle_mark_predecessor_successor "attached:$HEALTHY_PID"
+        report_attached
+        cycle_begin "$HEALTHY_PID" attached
+        attach_and_wait "$HEALTHY_PID"
+        exit $?
+      fi
     else
       clear_stale_recorded_watcher_lock
     fi

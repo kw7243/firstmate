@@ -1211,6 +1211,7 @@ fi
 
 META_WINDOW=$T
 [ "$BACKEND" = orca ] && META_WINDOW=$W
+META_WRITE_STATUS=0
 {
   echo "window=$META_WINDOW"
   echo "worktree=$WT"
@@ -1249,7 +1250,11 @@ META_WINDOW=$T
     echo "home=$PROJ_ABS"
     echo "projects=$SECONDMATE_PROJECTS"
   fi
-} > "$STATE/$ID.meta"
+} > "$STATE/$ID.meta" || META_WRITE_STATUS=$?
+if [ "$META_WRITE_STATUS" -ne 0 ]; then
+  echo "error: failed to write task metadata: $STATE/$ID.meta" >&2
+  exit 1
+fi
 [ "$BACKEND" = orca ] && ORCA_ABORT_CLEANUP=0
 
 sq_brief=$(shell_quote "$BRIEF")
