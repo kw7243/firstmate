@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Static tests for the captain-facing skill invocation surface.
+# shellcheck disable=SC2016
 set -u
 
 # shellcheck source=tests/lib.sh disable=SC1091
