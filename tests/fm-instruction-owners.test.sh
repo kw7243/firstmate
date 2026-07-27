@@ -13,7 +13,6 @@ HARNESS="$ROOT/.agents/skills/harness-adapters/SKILL.md"
 CODING="$ROOT/.agents/skills/firstmate-coding-guidelines/SKILL.md"
 RECOVERY="$ROOT/.agents/skills/stuck-crewmate-recovery/SKILL.md"
 SECONDMATE="$ROOT/.agents/skills/secondmate-provisioning/SKILL.md"
-NOTEBOOK="$ROOT/.agents/skills/research-notebook-reminder/SKILL.md"
 CONFIG="$ROOT/docs/configuration.md"
 AGENTS="$ROOT/AGENTS.md"
 BRIEF="$ROOT/bin/fm-brief.sh"
@@ -38,36 +37,7 @@ test_new_skill_metadata_and_triggers() {
     "project-management skill metadata lost its precise load trigger"
   assert_grep '`project-management` - load before adding, creating, removing, or initializing a project.' "$ROOT/AGENTS.md" \
     "AGENTS.md lost the project-management trigger"
-  assert_present "$NOTEBOOK" "research-notebook-reminder skill is missing"
-  assert_grep "name: research-notebook-reminder" "$NOTEBOOK" \
-    "research-notebook-reminder skill metadata has the wrong name"
-  assert_grep "user-invocable: false" "$NOTEBOOK" \
-    "research-notebook-reminder skill must not be user-invocable"
-  assert_grep "  internal: true" "$NOTEBOOK" \
-    "research-notebook-reminder skill must be internal"
-  count=$(grep -Fc -- "- \`research-notebook-reminder\` -" "$ROOT/AGENTS.md")
-  [ "$count" -eq 1 ] || fail "research-notebook-reminder must have exactly one AGENTS.md trigger entry, found $count"
-  assert_grep 'Use before routing, briefing, starting, or placing artifacts for non-Firstmate work' "$NOTEBOOK" \
-    "research-notebook-reminder skill metadata lost its precise load trigger"
-  assert_grep '`research-notebook-reminder` - load before routing, briefing, starting, or placing artifacts for research, experiments, scaffolds, reports, or other non-Firstmate project work.' "$ROOT/AGENTS.md" \
-    "AGENTS.md lost the research-notebook-reminder trigger"
   pass "new internal skills have one precise AGENTS.md trigger each"
-}
-
-test_research_notebook_reminder_owns_repo_and_notebook_boundaries() {
-  assert_grep "single owner of Firstmate's repo-local research notebook reminder" "$NOTEBOOK" \
-    "research-notebook-reminder skill does not declare ownership"
-  for phrase in \
-    'Keep the Firstmate repo for Firstmate itself.' \
-    'Do not put unrelated project work, research experiments, scaffolds, reports, or artifacts inside the Firstmate repo.' \
-    'Use or create a separate repository under `/data/scratch-fast/kwen1` for every non-Firstmate project.' \
-    'Delegate project writes to crewmates through the normal Firstmate task lifecycle.' \
-    'Maintain one repo-local `notebook.md` per active research project or research repo.' \
-    'Do not use one global notebook for all research projects.' \
-    'reports, progress, ideas that worked, ideas that failed, experiment outcomes, decisions, and useful scientific context'; do
-    assert_grep "$phrase" "$NOTEBOOK" "research-notebook-reminder owner is missing '$phrase'"
-  done
-  pass "research-notebook-reminder owns repo and per-project notebook boundaries"
 }
 
 test_diagnostic_owner_covers_causal_procedure() {
@@ -252,7 +222,6 @@ test_compressed_agents_retains_authority_and_supervision_safety() {
 }
 
 test_new_skill_metadata_and_triggers
-test_research_notebook_reminder_owns_repo_and_notebook_boundaries
 test_diagnostic_owner_covers_causal_procedure
 test_project_management_owner_covers_guarded_operations
 test_generic_effort_fallback_respects_precedence
