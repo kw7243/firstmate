@@ -41,6 +41,8 @@ test_new_skill_metadata_and_triggers() {
   assert_present "$NOTEBOOK" "research-notebook-reminder skill is missing"
   assert_grep "name: research-notebook-reminder" "$NOTEBOOK" \
     "research-notebook-reminder skill metadata has the wrong name"
+  assert_grep "user-invocable: false" "$NOTEBOOK" \
+    "research-notebook-reminder skill must not be user-invocable"
   assert_grep "  internal: true" "$NOTEBOOK" \
     "research-notebook-reminder skill must be internal"
   count=$(grep -Fc -- "- \`research-notebook-reminder\` -" "$ROOT/AGENTS.md")

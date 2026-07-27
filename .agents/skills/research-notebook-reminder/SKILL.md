@@ -3,6 +3,7 @@ name: research-notebook-reminder
 description: >-
   Agent-only reminder for research, experiments, scaffolds, reports, artifacts, and other non-Firstmate project work.
   Use before routing, briefing, starting, or placing artifacts for non-Firstmate work so each active project uses its own repository under /data/scratch-fast/kwen1 and its own repo-local notebook.md.
+user-invocable: false
 metadata:
   internal: true
 ---
