@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Static tests for the captain-facing skill invocation surface.
+# The assertions deliberately match literal dollar-prefixed Codex skill examples.
+# shellcheck disable=SC2016
 set -u
 
 # shellcheck source=tests/lib.sh disable=SC1091
