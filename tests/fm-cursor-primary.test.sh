@@ -33,9 +33,11 @@ FAKEBIN=$(fm_fakebin "$TMP_ROOT/fakebin")
 # Use a real executable whose own canonical basename is cursor-agent. A symlink
 # to bash is not sufficient on Linux: /proc resolves it to bash, so the real
 # Cursor ancestry classifier correctly rejects that process as an impostor.
+# A copied bash binary preserves both the required process identity and the -c
+# fixture contract on minimal hosts that do not carry a C compiler.
 CC_BIN=$(command -v cc 2>/dev/null || command -v gcc 2>/dev/null || true)
-[ -n "$CC_BIN" ] || fail "a C compiler is required to build the fake Cursor process"
-cat > "$TMP_ROOT/fake-cursor.c" <<'C'
+if [ -n "$CC_BIN" ]; then
+  cat > "$TMP_ROOT/fake-cursor.c" <<'C'
 #include <errno.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -59,8 +61,12 @@ int main(int argc, char **argv) {
   return 72;
 }
 C
-"$CC_BIN" -o "$FAKEBIN/cursor-agent" "$TMP_ROOT/fake-cursor.c" \
-  || fail "could not build the fake Cursor process"
+  "$CC_BIN" -o "$FAKEBIN/cursor-agent" "$TMP_ROOT/fake-cursor.c" \
+    || fail "could not build the fake Cursor process"
+else
+  cp /bin/bash "$FAKEBIN/cursor-agent" \
+    || fail "could not copy bash for the fake Cursor process"
+fi
 FAKE_CURSOR="$FAKEBIN/cursor-agent"
 
 CURSOR_PAYLOAD='{"session_id":"sess-cursor","generation_id":"gen-1","loop_count":0,"status":"completed","hook_event_name":"stop","cursor_version":"2026.08.11-e8db854"}'

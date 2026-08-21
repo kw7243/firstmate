@@ -180,6 +180,8 @@ In Codex, type `$bearings` or `$stow`; native `/bearings` and `/stow` are not re
 
 Bearings invocation examples:
 
+The examples below use Claude and Grok syntax; in Codex, replace the leading `/` with `$` as mapped above.
+
 - `/bearings` returns the fresh four-section digest in chat only.
 - `/bearings include PRs` keeps chat-only mode and opts into live PR enrichment.
 - `/bearings file` replaces today's `data/status-report-<YYYY-MM-DD>.md` from scratch and links it from the four-section chat digest.
