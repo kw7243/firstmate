@@ -291,6 +291,27 @@ EOF
   pass "fm-startup-network: manual callers cannot forge mutation authority"
 }
 
+test_sandboxed_codex_owner_runs_the_mutating_stage() {
+  local rec home root log
+  rec=$(new_world codex-opaque-lock)
+  IFS='|' read -r home root log <<EOF
+$rec
+EOF
+  printf '%s\n' 'codex-thread:network-thread-1' > "$home/state/.lock"
+
+  CODEX_THREAD_ID=network-thread-1 CODEX_SQLITE_HOME="$home/codex-sqlite" \
+    FM_FAKE_BOOTSTRAP_LOG="$log" run_stage "$home" "$root" \
+    start --locked 1 --harvest-pid $$
+  run_stage "$home" "$root" wait 30 >/dev/null \
+    || fail "the opaque-lock worker never published"
+  run_stage "$home" "$root" harvest --pid $$ >/dev/null
+  assert_grep 'network=only detect_only=0' "$log" \
+    "the sandboxed Codex worker lost mutation authority"
+  assert_grep 'lock_pid=codex-thread:network-thread-1' "$home/state/.startup-network.status" \
+    "the detached stage did not retain its opaque lock owner"
+  pass "fm-startup-network: a validated Codex owner retains deferred mutation authority"
+}
+
 # The unbounded per-call network work is exactly what could wedge a startup. The
 # stage carries one aggregate bound, and hitting it is an actionable line.
 test_the_stage_bound_is_reported_not_swallowed() {
@@ -617,6 +638,7 @@ test_harvest_acknowledgement_suppresses_the_wake_and_no_claim_produces_it
 test_a_claimant_crash_after_publish_still_queues_the_wake
 test_a_report_publication_failure_is_failed_and_still_wakes
 test_mutating_sweeps_are_refused_when_the_lock_changed_hands
+test_sandboxed_codex_owner_runs_the_mutating_stage
 test_the_stage_bound_is_reported_not_swallowed
 test_an_abandoned_run_reads_as_needing_a_rerun
 test_start_is_single_flight

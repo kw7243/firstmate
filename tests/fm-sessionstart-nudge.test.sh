@@ -135,7 +135,7 @@ test_codex_sandbox_lock_is_silent() {
   local root="$TMP_ROOT/codex-sandbox-already-ran"
   make_primary "$root"
   printf '%s\n' "codex-thread:thread-123" > "$root/state/.lock"
-  expect_silent_zero "codex sandbox lock nudge" env CODEX_THREAD_ID=thread-123 \
+  expect_silent_zero "codex sandbox lock nudge" env CODEX_THREAD_ID=thread-123 CODEX_SQLITE_HOME="$root/codex-sqlite" \
     FM_GATE_REFUSE_BYPASS=0 FM_ROOT_OVERRIDE="$root" FM_HOME="$root" "$NUDGE"
   pass "fm-sessionstart-nudge: a matching codex sandbox lock is already run"
 }
@@ -144,7 +144,8 @@ test_opencode_plugin_delivers_exact_nudge_once() {
   local root="$TMP_ROOT/opencode-primary" out status=0
   make_primary "$root"
   cp "$ROOT/bin/fm-sessionstart-nudge.sh" "$ROOT/bin/fm-primary-scope-lib.sh" \
-    "$ROOT/bin/fm-gate-refuse-lib.sh" "$ROOT/bin/fm-operational-input.sh" "$root/bin/"
+    "$ROOT/bin/fm-gate-refuse-lib.sh" "$ROOT/bin/fm-operational-input.sh" \
+    "$ROOT/bin/fm-lock-owner-lib.sh" "$root/bin/"
   chmod +x "$root/bin/fm-sessionstart-nudge.sh"
   out=$(PLUGIN="$ROOT/.opencode/plugins/fm-primary-sessionstart-nudge.js" \
     WORKTREE="$root" EXPECTED="$NUDGE_LINE" node --input-type=module 2>&1 <<'EOF'
@@ -199,15 +200,36 @@ make_run_primary() {
 run_hook() {  # <root> [args...]
   local root=$1
   shift
-  env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
+  env -u CLAUDECODE -u CODEX_THREAD_ID -u CODEX_SQLITE_HOME \
+    -u CODEX_SANDBOX_NETWORK_DISABLED -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
     FM_GATE_REFUSE_BYPASS=0 FM_ROOT_OVERRIDE="$root" FM_HOME="$root" PATH="$RUN_PATH" "$RUN" "$@"
 }
 
 run_hook_pi() {  # <root> [args...]
   local root=$1
   shift
-  env -u CLAUDECODE -u GROK_AGENT PI_CODING_AGENT=true FM_PI_HARNESS=pi \
+  env -u CLAUDECODE -u CODEX_THREAD_ID -u CODEX_SQLITE_HOME \
+    -u CODEX_SANDBOX_NETWORK_DISABLED -u GROK_AGENT PI_CODING_AGENT=true FM_PI_HARNESS=pi \
     FM_GATE_REFUSE_BYPASS=0 FM_ROOT_OVERRIDE="$root" FM_HOME="$root" PATH="$RUN_PATH" "$RUN" "$@"
+}
+
+run_hook_codex_sandbox() {  # <root> [args...]
+  local root=$1 fakebin="$1/fakebin"
+  shift
+  mkdir -p "$fakebin"
+  cat > "$fakebin/ps" <<'SH'
+#!/usr/bin/env bash
+case "$*" in
+  *comm=*) printf '%s\n' bash ;;
+  *args=*) printf '%s\n' bash ;;
+  *) /bin/ps "$@" ;;
+esac
+SH
+  chmod +x "$fakebin/ps"
+  env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
+    CODEX_THREAD_ID=sessionstart-thread-1 CODEX_SQLITE_HOME="$root/codex-sqlite" \
+    FM_GATE_REFUSE_BYPASS=0 FM_ROOT_OVERRIDE="$root" FM_HOME="$root" \
+    PATH="$fakebin:$RUN_PATH" "$RUN" "$@"
 }
 
 # Every run-tier assertion keys off the digest banner, which fm-session-start.sh
@@ -247,6 +269,26 @@ test_run_clear_and_compact_reemit() {
     assert_not_contains "$out" "FIRSTMATE_OP" "a $source open also emitted the nudge instruction"
   done
   pass "run wrapper: clear and compact re-emit the digest without repeating startup sweeps"
+}
+
+test_sandboxed_codex_startup_completes_and_reemits() {
+  local root="$TMP_ROOT/run-codex-sandbox" startup_out clear_out status=0
+  make_run_primary "$root"
+  startup_out=$(run_hook_codex_sandbox "$root" --source startup </dev/null) || status=$?
+  expect_code 0 "$status" "sandboxed Codex startup"
+  assert_contains "$startup_out" "lock acquired: sandbox codex session" \
+    "sandboxed Codex did not retain its opaque session lock"
+  [ "$(cat "$root/state/.lock")" = 'codex-thread:sessionstart-thread-1' ] \
+    || fail "sandboxed Codex published the wrong lock owner"
+  [ "$(cat "$root/state/.session-start-complete")" = 'codex-thread:sessionstart-thread-1' ] \
+    || fail "sandboxed Codex did not publish completion for its opaque owner"
+
+  status=0
+  clear_out=$(run_hook_codex_sandbox "$root" --source clear </dev/null) || status=$?
+  expect_code 0 "$status" "sandboxed Codex clear"
+  assert_contains "$clear_out" "$REEMIT_BANNER$root" \
+    "sandboxed Codex clear rejected its opaque completion owner"
+  pass "run wrapper: sandboxed Codex startup completes and clear re-emits"
 }
 
 test_run_rebuild_forwards_source_to_drifted_instruction_refresh() {
@@ -429,7 +471,7 @@ test_pi_large_sessionstart_digest_is_delivered_loudly() {
   cp "$ROOT/bin/fm-sessionstart-run.sh" "$ROOT/bin/fm-sessionstart-nudge.sh" \
     "$ROOT/bin/fm-primary-scope-lib.sh" "$ROOT/bin/fm-gate-refuse-lib.sh" \
     "$ROOT/bin/fm-hook-host-lib.sh" \
-    "$ROOT/bin/fm-operational-input.sh" "$fixture/bin/"
+    "$ROOT/bin/fm-operational-input.sh" "$ROOT/bin/fm-lock-owner-lib.sh" "$fixture/bin/"
   cat > "$fixture/bin/fm-session-start.sh" <<'SH'
 #!/usr/bin/env bash
 printf 'PI_LARGE_DIGEST_PREFIX\n'
@@ -553,6 +595,7 @@ test_codex_sandbox_lock_is_silent
 test_opencode_plugin_delivers_exact_nudge_once
 test_run_startup_runs_the_full_digest
 test_run_clear_and_compact_reemit
+test_sandboxed_codex_startup_completes_and_reemits
 test_run_rebuild_forwards_source_to_drifted_instruction_refresh
 test_run_compact_without_completion_refreshes_before_finishing_startup
 test_run_clear_without_completion_finishes_startup

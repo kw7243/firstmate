@@ -16,6 +16,8 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Install Herdr Windows preview and jq
         shell: pwsh
@@ -23,10 +25,27 @@ jobs:
           $ErrorActionPreference = 'Continue'
           $ProgressPreference = 'SilentlyContinue'
           $installLog = Join-Path $env:RUNNER_TEMP 'herdr-windows-install.log'
-          "Installing the Herdr Windows preview with the official installer." | Tee-Object -FilePath $installLog
+          $installerUri = 'https://herdr.dev/install.ps1'
+          $installerSha256 = '6a85f6f5bf688a298541a050072e127d2b4a0bc70a4f846a15f0c3453d5c393c'
+          $packageIdentity = '0.8.0-preview.2026-08-04-d78e3d3b5126'
+          $packageUri = 'https://github.com/herdrdev/herdr/releases/download/preview-2026-08-04-d78e3d3b5126/herdr-windows-x86_64.zip'
+          $packageSha256 = 'b1d288118848ecd3ef33532a34506edc53a38a416057aee5b7fe1de4188a16fc'
+          $installerPath = Join-Path $env:RUNNER_TEMP 'herdr-install.ps1'
+          $packagePath = Join-Path $env:RUNNER_TEMP 'herdr-windows-x86_64.zip'
+          "Installing pinned Herdr Windows preview $packageIdentity with a verified installer." | Tee-Object -FilePath $installLog
           try {
             $ErrorActionPreference = 'Stop'
-            Invoke-RestMethod https://herdr.dev/install.ps1 | Invoke-Expression
+            Invoke-WebRequest -Uri $installerUri -OutFile $installerPath
+            $actualInstallerSha256 = (Get-FileHash -Path $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actualInstallerSha256 -ne $installerSha256) {
+              throw "Herdr installer SHA256 mismatch: expected $installerSha256, got $actualInstallerSha256"
+            }
+            Invoke-WebRequest -Uri $packageUri -OutFile $packagePath
+            $actualPackageSha256 = (Get-FileHash -Path $packagePath -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actualPackageSha256 -ne $packageSha256) {
+              throw "Herdr package SHA256 mismatch: expected $packageSha256, got $actualPackageSha256"
+            }
+            & $installerPath -Channel preview -LocalPackagePath $packagePath -LocalPackageFormat zip -LocalPackageIdentity $packageIdentity -LocalPackageSha256 $packageSha256
           } catch {
             "HERDR_INSTALL_ERROR: $($_.Exception.Message)" | Tee-Object -FilePath $installLog -Append
           } finally {

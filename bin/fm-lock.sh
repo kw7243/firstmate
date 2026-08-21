@@ -36,35 +36,9 @@ esac
 # shellcheck source=bin/fm-session-lock-lib.sh
 . "$SCRIPT_DIR/fm-session-lock-lib.sh"
 
-codex_sandbox_owner() {
-  local thread=${CODEX_THREAD_ID:-}
-  [ -n "$thread" ] || return 1
-  case "$thread" in
-    *[!A-Za-z0-9._:-]*|*/*) return 1 ;;
-  esac
-  [ "${CODEX_SANDBOX_NETWORK_DISABLED:-}" = 1 ] || [ -n "${CODEX_SQLITE_HOME:-}" ] || return 1
-  printf 'codex-thread:%s\n' "$thread"
-}
-
-current_owner() {
-  local pid
-  if pid=$(fm_harness_ancestry_pid); then
-    printf '%s\n' "$pid"
-    return 0
-  fi
-  codex_sandbox_owner
-}
-
-owner_is_opaque() {
-  case "$1" in
-    codex-thread:*) return 0 ;;
-  esac
-  return 1
-}
-
 opaque_owner_stale() {
   local old=$1 age
-  owner_is_opaque "$old" || return 1
+  fm_session_lock_owner_is_opaque "$old" || return 1
   age=$(fm_lock_age "$LOCK") || return 1
   [ "$age" -ge "$LOCK_STALE_AFTER" ]
 }
@@ -72,7 +46,7 @@ opaque_owner_stale() {
 owner_blocks_acquire() {
   local old=$1 current=${2:-}
   [ "$old" = "$current" ] && return 1
-  if owner_is_opaque "$old"; then
+  if fm_session_lock_owner_is_opaque "$old"; then
     opaque_owner_stale "$old" && return 1
     return 0
   fi
@@ -85,8 +59,8 @@ if [ "${1:-}" = "status" ]; then
     echo "lock: unreadable"
     exit 0
   }
-  if owner_is_opaque "$old"; then
-    if [ "$(codex_sandbox_owner 2>/dev/null || true)" = "$old" ]; then
+  if fm_session_lock_owner_is_opaque "$old"; then
+    if [ "$(fm_codex_sandbox_owner 2>/dev/null || true)" = "$old" ]; then
       echo "lock: held by this sandboxed codex session"
     elif opaque_owner_stale "$old"; then
       echo "lock: stale (opaque sandbox owner older than ${LOCK_STALE_AFTER}s)"
@@ -101,7 +75,7 @@ if [ "${1:-}" = "status" ]; then
   exit 0
 fi
 
-me=$(current_owner) || { echo "error: cannot locate harness process in ancestry or sandbox session identity" >&2; exit 1; }
+me=$(fm_session_lock_current_owner) || { echo "error: cannot locate harness process in ancestry or sandbox session identity" >&2; exit 1; }
 probe=$(mktemp "$STATE/.lock-write.XXXXXX" 2>/dev/null) || {
   echo "error: cannot write session lock; operate read-only until resolved" >&2
   exit 1
@@ -126,7 +100,7 @@ trap 'exit 1' HUP INT TERM
 if [ -f "$LOCK" ] && [ ! -L "$LOCK" ]; then
   old=$(cat "$LOCK" 2>/dev/null || true)
   if [ "$old" = "$me" ]; then
-    if owner_is_opaque "$me"; then
+    if fm_session_lock_owner_is_opaque "$me"; then
       echo "lock acquired: sandbox codex session"
     else
       echo "lock acquired: harness pid $me"
@@ -176,7 +150,7 @@ if [ ! -f "$LOCK" ] || [ -L "$LOCK" ] || [ "$written" != "$me" ]; then
   exit 1
 fi
 release_claim_lock
-if owner_is_opaque "$me"; then
+if fm_session_lock_owner_is_opaque "$me"; then
   echo "lock acquired: sandbox codex session"
 else
   echo "lock acquired: harness pid $me"

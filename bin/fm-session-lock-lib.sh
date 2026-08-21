@@ -15,6 +15,8 @@
 # decision, so this file delegates to it rather than widening the name match.
 # shellcheck source=bin/fm-cursor-lib.sh
 . "$(dirname -- "${BASH_SOURCE[0]}")/fm-cursor-lib.sh"
+# shellcheck source=bin/fm-lock-owner-lib.sh
+. "$(dirname -- "${BASH_SOURCE[0]}")/fm-lock-owner-lib.sh"
 
 # Known harness command names; extend when a new adapter is verified.
 FM_HARNESS_RE='claude|codex|opencode|grok|kimi|^pi$|^pi-signed$'
@@ -152,6 +154,15 @@ fm_harness_pid_alive() {
   fm_harness_process_matches "$comm" "$args"
 }
 
+fm_session_lock_current_owner() {
+  local pid
+  if pid=$(fm_harness_ancestry_pid); then
+    printf '%s\n' "$pid"
+    return 0
+  fi
+  fm_codex_sandbox_owner
+}
+
 # True when state dir $1 holds a session lock whose pid is ANY harness ancestor
 # of the current process: this script runs inside the session that owns the
 # home's fleet lock. Membership is the honest test of that question, because the
@@ -162,10 +173,13 @@ fm_harness_pid_alive() {
 # ancestry that cannot be resolved all fail closed.
 fm_session_lock_owned_by_self() {
   local state=$1 lock_pid pids pid
+  [ -f "$state/.lock" ] && [ ! -L "$state/.lock" ] || return 1
   lock_pid=$(cat "$state/.lock" 2>/dev/null || true)
-  case "$lock_pid" in
-    ''|*[!0-9]*) return 1 ;;
-  esac
+  fm_session_lock_owner_valid "$lock_pid" || return 1
+  if fm_session_lock_owner_is_opaque "$lock_pid"; then
+    [ "$(fm_codex_sandbox_owner 2>/dev/null || true)" = "$lock_pid" ]
+    return
+  fi
   pids=$(fm_harness_ancestry_pids) || return 1
   while IFS= read -r pid; do
     [ "$pid" = "$lock_pid" ] && return 0

@@ -112,6 +112,15 @@ FM_TRACE_CONTEXT=on fm_trace_context_session_start "$CFG_OFF" "$SESSION_STATE"
   || fail "a new session state must freeze an env-on override over an absent config file"
 pass "session start normalizes config and environment precedence into frozen on/off state"
 
+printf '%s\n' 'codex-thread:trace-thread-1' > "$SESSION_DIR/.lock"
+FM_TRACE_CONTEXT=on fm_trace_context_session_start "$CFG_OFF" "$SESSION_STATE"
+[ "$(cat "$SESSION_STATE")" = "codex-thread:trace-thread-1 on" ] \
+  || fail "session publication did not bind tracing to the opaque lock owner"
+[ "$(fm_trace_context_session_effective "$SESSION_STATE")" = on ] \
+  || fail "the frozen trace decision rejected its unchanged opaque lock owner"
+printf '101\n' > "$SESSION_DIR/.lock"
+pass "trace context binds frozen session state to validated opaque lock owners"
+
 printf '100 on\n' > "$SESSION_STATE"
 chmod 0400 "$SESSION_STATE"
 FM_TRACE_CONTEXT=off fm_trace_context_session_start "$CFG_ON" "$SESSION_STATE"

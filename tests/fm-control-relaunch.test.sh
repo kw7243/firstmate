@@ -168,6 +168,7 @@ run_control() {  # <case-dir> <args...>
     FM_REAL_GIT="${FM_REAL_GIT:-}" FM_FAKE_GIT_FAILURE="${FM_FAKE_GIT_FAILURE:-}" \
     FM_REAL_MV="${FM_REAL_MV:-}" FM_FAKE_COMPLETE_JOURNAL_MV_FAIL="${FM_FAKE_COMPLETE_JOURNAL_MV_FAIL:-}" \
     FM_FAKE_META_PUBLISH_MV_FAIL="${FM_FAKE_META_PUBLISH_MV_FAIL:-}" \
+    FM_REAL_AWK="${FM_REAL_AWK:-}" FM_FAKE_META_READ_FAIL="${FM_FAKE_META_READ_FAIL:-}" \
     FM_FAKE_TRACE_PREPARE="${FM_FAKE_TRACE_PREPARE:-}" \
     FM_FAKE_META_WRITER_READY="${FM_FAKE_META_WRITER_READY:-}" \
     FM_FAKE_TRACE_EXPORTED="${FM_FAKE_TRACE_EXPORTED:-}" \
@@ -199,6 +200,17 @@ esac
 exec "$FM_REAL_GIT" "$@"
 SH
   chmod +x "$1/fakebin/git"
+}
+
+make_awk_failure_stub() {  # <case-dir>
+  cat > "$1/fakebin/awk" <<'SH'
+#!/usr/bin/env bash
+for argument in "$@"; do
+  [ "$argument" != "${FM_FAKE_META_READ_FAIL:-}" ] || exit 1
+done
+exec "$FM_REAL_AWK" "$@"
+SH
+  chmod +x "$1/fakebin/awk"
 }
 
 make_mv_failure_stub() {  # <case-dir>
@@ -295,6 +307,24 @@ test_relaunch_preserves_durable_task_metadata() {
   [ "$(meta_field "$dir" rl19 decisions_reviewed)" = 1 ] \
     || fail "the task decision state must survive relaunch"
   pass "fm-control relaunch: durable task metadata survives replacement launch publication"
+}
+
+test_relaunch_metadata_read_failure_keeps_prior_record() {
+  local dir out rc before
+  dir=$(new_case metadata-read-failure rl31)
+  add_ship_task "$dir" rl31 claude
+  printf '%s\n' 'x_request=request-31' >> "$dir/home/state/rl31.meta"
+  before=$(cat "$dir/home/state/rl31.meta")
+  make_awk_failure_stub "$dir"
+
+  out=$(FM_REAL_AWK=$(command -v awk) FM_FAKE_META_READ_FAIL="$dir/home/state/rl31.meta" \
+    run_control "$dir" rl31 relaunch --note "continue after metadata read"); rc=$?
+  expect_code 1 "$rc" "a durable metadata read failure must abort relaunch publication"
+  assert_contains "$out" "failed to write task metadata" \
+    "the metadata read failure was not reported"
+  [ "$(cat "$dir/home/state/rl31.meta")" = "$before" ] \
+    || fail "a metadata read failure replaced the prior durable record"
+  pass "fm-control relaunch: metadata read failures preserve the prior record"
 }
 
 test_relaunch_serializes_concurrent_durable_metadata_publication() {
@@ -1314,6 +1344,7 @@ test_spawn_relaunch_refuses_a_pane_outside_the_worktree() {
 
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint
 test_relaunch_preserves_durable_task_metadata
+test_relaunch_metadata_read_failure_keeps_prior_record
 test_relaunch_serializes_concurrent_durable_metadata_publication
 test_disabled_relaunch_clears_prior_trace_context
 test_relaunch_appends_the_progress_note_to_the_instructions

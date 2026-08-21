@@ -94,6 +94,9 @@
 #              persistent supervisor's environment cannot chain its unrelated
 #              routed tasks into one trace.
 
+# shellcheck source=bin/fm-lock-owner-lib.sh
+. "$(dirname -- "${BASH_SOURCE[0]}")/fm-lock-owner-lib.sh"
+
 # Strict W3C traceparent validator: version 00, 32-hex trace id, 16-hex span id,
 # 2-hex flags, with neither id all-zero. The regex lives in a variable because
 # bash 3.2 only honors an unquoted right-hand side for =~.
@@ -137,8 +140,8 @@ fm_trace_context_enabled() {  # <config-dir>
   [ -f "$config_dir/trace-context" ]
 }
 
-# Echo the lock pid that owns the effective-state file's home, or fail when the
-# adjacent session lock is absent or malformed. Binding the decision to this
+# Echo the lock owner token for the effective-state file's home, or fail when
+# the adjacent session lock is absent or malformed. Binding the decision to this
 # token makes a prior session's record inactive even if publication cannot
 # replace or remove that stale file.
 fm_trace_context_session_lock() {  # <effective-state-file>
@@ -149,10 +152,7 @@ fm_trace_context_session_lock() {  # <effective-state-file>
   # attempted: an absent lock is an ordinary silent "not locked" answer, and a
   # trailing 2>/dev/null on the bare read would still leak the open failure.
   { IFS= read -r lock_pid < "$state_dir/.lock"; } 2>/dev/null || return 1
-  case "$lock_pid" in
-    '' | *[!0-9]*) return 1 ;;
-  esac
-  [ "$lock_pid" -gt 1 ] || return 1
+  fm_session_lock_owner_valid "$lock_pid" || return 1
   printf '%s' "$lock_pid"
 }
 
