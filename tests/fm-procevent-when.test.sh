@@ -242,18 +242,39 @@ assert_absent "$CONDERRLOG" "an erroring condition never reaches the action"
 assert_absent "$H/state/when/when-conderr.fired" "no fire was claimed on an ambiguous condition"
 pass "a repeatedly erroring condition wakes firstmate instead of firing"
 
-# --- a deadline that passes wakes with never-true -----------------------------
+# --- the deadline bounds the inter-poll wait ---------------------------------
 H="$TMP_ROOT/h-deadline"; new_home "$H"
 DEADLOG="$TMP_ROOT/deadline-act"
-when "$H" arm deadline --interval 0.1 --deadline 1 \
+when "$H" arm deadline --interval 600 --deadline 2 \
   --condition false \
   --action "$ACT" "$DEADLOG" >/dev/null
 pe "$H" reconcile >/dev/null
-wait_for_result "$H" when-deadline || fail "no outcome was captured after the deadline"
+wait_for_result "$H" when-deadline 40 || fail "the poll interval exceeded the absolute deadline"
 RESULT=$(first_result "$H" when-deadline)
 assert_grep 'status: never-true' "$RESULT" "the outcome records the expired deadline"
+assert_grep 'condition_polls: 1' "$RESULT" "the condition was polled before the bounded wait"
 assert_absent "$DEADLOG" "the action never ran"
-pass "an expired deadline wakes with never-true"
+pass "the absolute deadline bounds the inter-poll wait"
+
+# --- the deadline bounds a slow condition poll -------------------------------
+H="$TMP_ROOT/h-slow-condition"; new_home "$H"
+SLOWLOG="$TMP_ROOT/slow-condition-act"
+SLOW="$TMP_ROOT/slow-condition.sh"
+cat > "$SLOW" <<'SH'
+#!/usr/bin/env bash
+sleep 10
+exit 0
+SH
+chmod +x "$SLOW"
+when "$H" arm slow-condition --deadline 2 --condition-timeout 30 \
+  --condition "$SLOW" --action "$ACT" "$SLOWLOG" >/dev/null
+pe "$H" reconcile >/dev/null
+wait_for_result "$H" when-slow-condition 40 || fail "the condition timeout exceeded the absolute deadline"
+RESULT=$(first_result "$H" when-slow-condition)
+assert_grep 'status: never-true' "$RESULT" "a condition bounded by the deadline expires as never-true"
+assert_grep 'condition_polls: 1' "$RESULT" "the slow condition was bounded while running"
+assert_absent "$SLOWLOG" "a condition bounded by the deadline never fires"
+pass "the absolute deadline bounds a slow condition poll"
 
 # --- a poll completing true after its deadline cannot fire -------------------
 H="$TMP_ROOT/h-late-true"; new_home "$H"

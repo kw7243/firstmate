@@ -21,11 +21,13 @@
 #            action without executing anything. Both argv vectors are executed
 #            directly with no shell, so nothing is re-split or interpreted.
 #            Options, before --condition:
-#              --interval <secs>           poll cadence, decimals allowed (default 60)
+#              --interval <secs>           poll cadence, decimals allowed and capped
+#                                          by the remaining deadline (default 60)
 #              --stable <n>                consecutive true polls required to fire (default 2)
 #              --deadline <secs>           give up and wake firstmate if the condition
 #                                          never held this long after arming (default 604800)
-#              --condition-timeout <secs>  per-poll bound on one condition run (default 60)
+#              --condition-timeout <secs>  per-poll bound, capped by the remaining
+#                                          deadline (default 60)
 #              --action-timeout <secs>     bound on the action run (default 1800)
 #              --error-budget <n>          consecutive condition errors tolerated
 #                                          before waking firstmate (default 3)
@@ -340,7 +342,8 @@ emit_doc() {
 }
 
 cmd_run() {
-  local sid=${1-} fired out rc polls=0 consecutive_true=0 consecutive_err=0 now
+  local sid=${1-} fired out rc polls=0 consecutive_true=0 consecutive_err=0
+  local now deadline_at remaining poll_timeout sleep_for
   fm_procevent_source_id_valid "$sid" || die "source id must be path-safe: $sid"
   fired=$(fired_file "$sid")
 
@@ -368,19 +371,24 @@ cmd_run() {
     exit 0
   fi
   trap 'rm -f -- "$out"' EXIT
+  deadline_at=$((SPEC_ARMED + SPEC_DEADLINE))
 
   while :; do
     now=$(date +%s)
-    if [ $(( now - SPEC_ARMED )) -ge "$SPEC_DEADLINE" ]; then
+    remaining=$((deadline_at - now))
+    if [ "$remaining" -le 0 ]; then
       emit_doc "$sid" never-true \
         "the condition never held for $SPEC_STABLE consecutive polls within ${SPEC_DEADLINE}s of arming" "$polls" '' ''
       exit 0
     fi
-    bounded_run "$SPEC_CONDITION_TIMEOUT" "$out" "${COND_ARGV[@]}"
+    poll_timeout=$SPEC_CONDITION_TIMEOUT
+    [ "$poll_timeout" -le "$remaining" ] || poll_timeout=$remaining
+    bounded_run "$poll_timeout" "$out" "${COND_ARGV[@]}"
     rc=$?
     polls=$((polls + 1))
     now=$(date +%s)
-    if [ $(( now - SPEC_ARMED )) -ge "$SPEC_DEADLINE" ]; then
+    remaining=$((deadline_at - now))
+    if [ "$remaining" -le 0 ]; then
       emit_doc "$sid" never-true \
         "the condition never held for $SPEC_STABLE consecutive polls within ${SPEC_DEADLINE}s of arming" "$polls" '' "$out"
       exit 0
@@ -405,11 +413,16 @@ cmd_run() {
         fi
         ;;
     esac
-    sleep "$SPEC_INTERVAL"
+    now=$(date +%s)
+    remaining=$((deadline_at - now))
+    [ "$remaining" -gt 0 ] || continue
+    sleep_for=$(LC_ALL=C awk -v interval="$SPEC_INTERVAL" -v remaining="$remaining" \
+      'BEGIN { print interval < remaining ? interval : remaining }')
+    sleep "$sleep_for"
   done
 
   now=$(date +%s)
-  if [ $(( now - SPEC_ARMED )) -ge "$SPEC_DEADLINE" ]; then
+  if [ "$now" -ge "$deadline_at" ]; then
     emit_doc "$sid" never-true \
       "the condition never held for $SPEC_STABLE consecutive polls within ${SPEC_DEADLINE}s of arming" "$polls" '' "$out"
     exit 0
