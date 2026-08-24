@@ -790,7 +790,7 @@ Read from the live agent process and from a tool subprocess it spawned:
 | `CURSOR_CONVERSATION_ID=<uuid>` | child/tool processes |
 | `AGENT_TRANSCRIPTS=<projects-root>/<slug>/agent-transcripts` | child/tool processes |
 
-Cursor does not clear an inherited `CLAUDECODE`, so ordering decides the verdict.
+Cursor itself does not clear an inherited `CLAUDECODE`; Firstmate removes it at the managed launch boundary, while ordering still decides the verdict for a Cursor process started by hand.
 With both markers set, `bin/fm-harness.sh` reports `cursor`; with `CLAUDECODE` alone it still reports `claude`.
 
 ### Composer

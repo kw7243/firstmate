@@ -386,9 +386,9 @@ Do not confuse `harness=cursor` using a `cursor-grok-4.5-*` model with `harness=
 | Primary limits | `stop` does not fire in headless `cursor-agent -p`. `preCompact` is deliberately unregistered because it cannot inject context, so a Cursor primary does not re-emit its digest after a compaction; that surface is deferred to a follow-up. Project hooks need `--trust`. |
 
 **Detection ordering is load-bearing.**
-Cursor does NOT clear an inherited `CLAUDECODE`, so a cursor worker under a claude primary carries both markers and whichever is tested first wins.
-`bin/fm-harness.sh` tests the cursor markers BEFORE the `CLAUDECODE` check, and the launch additionally clears the foreign markers.
-Both are kept: launch sanitization only covers sessions fm-spawn started, while the ordering also covers a cursor session a human started by hand.
+Cursor itself does NOT clear an inherited `CLAUDECODE`, so a cursor session started by hand under a claude primary can carry both markers and whichever is tested first wins.
+`bin/fm-harness.sh` tests the cursor markers BEFORE the `CLAUDECODE` check, while `fm-spawn` additionally clears the foreign markers before a managed Cursor worker starts.
+Both are kept: launch sanitization covers sessions `fm-spawn` started, while the ordering also covers a cursor session a human started by hand.
 
 **The `node` process-name caveat.**
 Cursor runs as a bundled node script, so tmux reports `#{pane_current_command}` as a bare `node` while `ps -o comm=` carries the cursor-agent install path.
