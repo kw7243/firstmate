@@ -1,0 +1,17 @@
+Firstmate upstream-sync history and GitHub provenance
+Validated target: 69f5b3885de22e9ec5391ea5abd1e08dc0db9205
+
+$ gh-axi api GET /repos/kw7243/firstmate --jq '{full_name, fork, parent: .parent.full_name, source: .source.full_name, default_branch}'
+default_branch: main
+fork: true
+full_name: kw7243/firstmate
+parent: kunchenguid/firstmate
+source: kunchenguid/firstmate
+
+$ git ancestry/merge-parent verification
+target expected=69f5b3885de22e9ec5391ea5abd1e08dc0db9205 actual=69f5b3885de22e9ec5391ea5abd1e08dc0db9205 match=yes
+original-fork-head=ef26489dc0066ef0fbf4eae749a6b623892eeec8 ancestor_of_target=yes
+parent-sync-head=1cb900c28faf23fe23c9bb54e63f7c3b436ea096 ancestor_of_target=yes
+history-merge=6f487ebb88899685fe2cfd5d691b6a0ca6edb0a6 ancestor_of_target=yes
+clean-synchronized-head=b1868c3aed79a3d78b662cd3279b4bc4089af50c ancestor_of_target=yes
+merge-parents=ef26489dc0066ef0fbf4eae749a6b623892eeec8 1cb900c28faf23fe23c9bb54e63f7c3b436ea096

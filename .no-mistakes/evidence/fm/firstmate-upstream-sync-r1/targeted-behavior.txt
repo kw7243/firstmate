@@ -1,0 +1,41 @@
+Firstmate targeted behavior validation
+Validated target: 69f5b3885de22e9ec5391ea5abd1e08dc0db9205 plus the test-phase corrections in tests/fm-session-start.test.sh
+
+Focused executable-interface results:
+ok - the absolute deadline bounds the inter-poll wait
+ok - the absolute deadline bounds a slow condition poll
+ok - trace context binds frozen session state to validated opaque lock owners
+ok - session-lock: opaque Codex owners require a matching validated sandbox identity
+ok - fm-startup-network: a validated Codex owner retains deferred mutation authority
+ok - run wrapper: sandboxed Codex startup completes and clear re-emits
+ok - muse launch clears foreign harness markers before ancestry detection
+ok - fm-control relaunch: metadata read failures preserve the prior record
+ok - a lock refusal prints a loud read-only banner, skips every mutating step, and still completes the digest
+ok - true-start AGENTS baselines stay immutable while every drifted Pi compact re-emits the current contract
+# fm-session-start.test.sh: all assertions passed
+
+Direct condition-watch CLI transcript:
+$ fm-procevent-when.sh arm manual-deadline --interval 600 --deadline 2 --condition false --action true
+armed: when-manual-deadline
+elapsed_seconds=1
+captured_outcome:
+when: when-manual-deadline
+status: never-true
+detail: the condition never held for 2 consecutive polls within 2s of arming
+condition_polls: 1
+output:
+adapter_classification=never-true
+handled: when-manual-deadline 1
+retired: when-manual-deadline
+
+Normalized Windows workflow contract:
+workflow=.github/workflows/windows-herdr-spike.yml
+job=measure runs-on=windows-latest
+checkout=actions/checkout@v6 persist-credentials=False
+install-step-shell=pwsh
+
+Remote artifact digest check on 2026-08-23:
+installer expected=6a85f6f5bf688a298541a050072e127d2b4a0bc70a4f846a15f0c3453d5c393c actual=3415ea0bc562cad003afcc70ac9916b81cde043c4c26087f05255ae7807d1ba7 match=no
+package   expected=b1d288118848ecd3ef33532a34506edc53a38a416057aee5b7fe1de4188a16fc actual=b1d288118848ecd3ef33532a34506edc53a38a416057aee5b7fe1de4188a16fc match=yes
+
+Interpretation: the versioned package is byte-identical to the approved digest. The floating installer has changed, and the pinned digest therefore prevents the new bytes from being trusted or executed. PowerShell is unavailable in this Linux test environment, so the Windows-only workflow was not launched locally.
