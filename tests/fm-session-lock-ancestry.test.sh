@@ -45,6 +45,32 @@ lib_eval() {  # <fakebin> <expression>
   " "$LIB"
 }
 
+test_codex_sandbox_owner_is_validated_and_matched() {
+  local dir fakebin
+  dir="$TMP_ROOT/codex-owner"
+  fakebin=$(fm_fakebin "$dir/fakebin")
+  mkdir -p "$dir/state"
+  printf '%s\n' 'codex-thread:thread-123' > "$dir/state/.lock"
+
+  CODEX_THREAD_ID=thread-123 CODEX_SQLITE_HOME="$dir/sqlite" \
+    lib_eval "$fakebin" "fm_session_lock_owned_by_self '$dir/state'" \
+    || fail "a matching sandboxed Codex identity did not own its opaque lock"
+  if CODEX_THREAD_ID=thread-456 CODEX_SQLITE_HOME="$dir/sqlite" \
+    lib_eval "$fakebin" "fm_session_lock_owned_by_self '$dir/state'"; then
+    fail "a different sandboxed Codex identity claimed the opaque lock"
+  fi
+  if CODEX_THREAD_ID=thread-123 \
+    lib_eval "$fakebin" "fm_session_lock_owned_by_self '$dir/state'"; then
+    fail "an ambient Codex thread without sandbox evidence claimed the opaque lock"
+  fi
+  printf '%s\n' 'codex-thread:../thread-123' > "$dir/state/.lock"
+  if CODEX_THREAD_ID='../thread-123' CODEX_SQLITE_HOME="$dir/sqlite" \
+    lib_eval "$fakebin" "fm_session_lock_owned_by_self '$dir/state'"; then
+    fail "a malformed opaque owner was accepted"
+  fi
+  pass "session-lock: opaque Codex owners require a matching validated sandbox identity"
+}
+
 test_version_named_session_is_identified_on_both_platforms() {
   local dir fakebin shape got
   dir="$TMP_ROOT/version-named"
@@ -230,6 +256,9 @@ install_autoarm_scripts() {
   cp "$ROOT/bin/fm-supervision-lib.sh" "$dir/bin/fm-supervision-lib.sh"
   cp "$ROOT/bin/fm-wake-lib.sh" "$dir/bin/fm-wake-lib.sh"
   cp "$ROOT/bin/fm-session-lock-lib.sh" "$dir/bin/fm-session-lock-lib.sh"
+  cp "$ROOT/bin/fm-lock-owner-lib.sh" "$dir/bin/fm-lock-owner-lib.sh"
+  cp "$ROOT/bin/fm-cursor-lib.sh" "$dir/bin/fm-cursor-lib.sh"
+  cp "$ROOT/bin/fm-hook-host-lib.sh" "$dir/bin/fm-hook-host-lib.sh"
   cp "$ROOT/bin/fm-lock.sh" "$dir/bin/fm-lock.sh"
   chmod +x "$dir/bin/fm-claude-stop-autoarm.sh" "$dir/bin/fm-lock.sh"
   cat > "$dir/bin/fm-watch-arm.sh" <<'SH'
@@ -355,6 +384,7 @@ test_e2e_daemon_parented_version_named_session_keeps_its_lock() {
 }
 
 test_version_named_session_is_identified_on_both_platforms
+test_codex_sandbox_owner_is_validated_and_matched
 test_ordinary_paths_are_never_harness_processes
 test_harness_beyond_a_gap_never_owns_the_lock
 test_competing_version_named_session_is_seen_as_live

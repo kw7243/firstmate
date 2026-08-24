@@ -197,8 +197,20 @@
       "audience": "maintainer-architecture"
     },
     {
+      "path": "GROK_BOT.md",
+      "audience": "public-product"
+    },
+    {
       "path": "README.md",
       "audience": "public-product"
+    },
+    {
+      "path": "VISION.md",
+      "audience": "public-product"
+    },
+    {
+      "path": "docs/agent-control.md",
+      "audience": "maintainer-architecture"
     },
     {
       "path": "docs/architecture.md",
@@ -293,6 +305,10 @@
       "audience": "agent-runtime"
     },
     {
+      "path": "docs/supervision-protocols/cursor.md",
+      "audience": "agent-runtime"
+    },
+    {
       "path": "docs/supervision-protocols/grok.md",
       "audience": "agent-runtime"
     },
@@ -322,6 +338,10 @@
     },
     {
       "path": "docs/verification/dispatch-auth.md",
+      "audience": "maintainer-verification"
+    },
+    {
+      "path": "docs/verification/muse.md",
       "audience": "maintainer-verification"
     },
     {
@@ -359,6 +379,10 @@
     {
       "path": "docs/zellij-backend.md",
       "audience": "operator-current"
+    },
+    {
+      "path": "skills/bearings/SKILL.md",
+      "audience": "public-product"
     },
     {
       "path": "skills/stow/SKILL.md",

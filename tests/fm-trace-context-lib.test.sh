@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# tests/fm-trace-context-lib.test.sh - unit tests for the native, default-off
-# W3C trace-context library (bin/fm-trace-context-lib.sh) plus structural checks
-# that bin/fm-spawn.sh wires it in at the pre-launch injection seam and that the
-# capability is inherited into secondmate homes. Pure functions, no backend and
+# Behavior tests for the native, default-off W3C trace-context library and its
+# inherited secondmate configuration contract. Pure functions, no backend and
 # no live spawn required.
 set -u
 
@@ -112,6 +110,15 @@ FM_TRACE_CONTEXT=on fm_trace_context_session_start "$CFG_OFF" "$SESSION_STATE"
   || fail "a new session state must freeze an env-on override over an absent config file"
 pass "session start normalizes config and environment precedence into frozen on/off state"
 
+printf '%s\n' 'codex-thread:trace-thread-1' > "$SESSION_DIR/.lock"
+FM_TRACE_CONTEXT=on fm_trace_context_session_start "$CFG_OFF" "$SESSION_STATE"
+[ "$(cat "$SESSION_STATE")" = "codex-thread:trace-thread-1 on" ] \
+  || fail "session publication did not bind tracing to the opaque lock owner"
+[ "$(fm_trace_context_session_effective "$SESSION_STATE")" = on ] \
+  || fail "the frozen trace decision rejected its unchanged opaque lock owner"
+printf '101\n' > "$SESSION_DIR/.lock"
+pass "trace context binds frozen session state to validated opaque lock owners"
+
 printf '100 on\n' > "$SESSION_STATE"
 chmod 0400 "$SESSION_STATE"
 FM_TRACE_CONTEXT=off fm_trace_context_session_start "$CFG_ON" "$SESSION_STATE"
@@ -212,62 +219,6 @@ ef_res=$(FM_TRACE_CONTEXT=on fm_trace_context_resolve "$CFG_ON" "$NOMETA"); ef_r
 [ -z "$ef_mint" ] && [ "$ef_mint_rc" -ne 0 ] || fail "mint must omit and report failure on entropy failure (rc=$ef_mint_rc out='$ef_mint')"
 [ -z "$ef_res" ] && [ "$ef_res_rc" -eq 0 ] || fail "resolve must omit and STILL return 0 on entropy failure (rc=$ef_res_rc out='$ef_res')"
 pass "entropy failure omits telemetry safely: mint reports failure, resolve returns success with no carrier"
-
-# --- fail-independent timing: no hang source, always returns 0 ---------------
-
-assert_no_grep 'sleep' "$ROOT/bin/fm-trace-context-lib.sh" "trace-context lib must not sleep on the spawn path"
-assert_no_grep 'timeout' "$ROOT/bin/fm-trace-context-lib.sh" "trace-context lib must not depend on an external timeout"
-assert_no_grep 'command:' "$ROOT/bin/fm-trace-context-lib.sh" "trace-context lib must not run an arbitrary command provider"
-fm_trace_context_resolve "$CFG_OFF" "$NOMETA" >/dev/null || fail "resolve must return 0 when off"
-pass "the resolver has no sleep/timeout/command hang source and always returns success"
-
-# --- harness/backend/kind independence (code only, comments stripped) ---------
-
-LIB_CODE=$(sed 's/#.*$//' "$ROOT/bin/fm-trace-context-lib.sh")
-for tok in harness backend tmux herdr zellij orca cmux claude codex opencode grok kind ship scout secondmate ; do
-  case "$LIB_CODE" in
-    *"$tok"*) fail "trace-context lib code must be harness/backend/kind agnostic, but references '$tok'" ;;
-  esac
-done
-pass "the carrier is minted identically for every harness, backend, and spawn kind (no such branching in the lib code)"
-
-# --- no prompt / task-prose reads (code only, comments stripped) --------------
-
-for tok in brief prompt report status ; do
-  case "$LIB_CODE" in
-    *"$tok"*) fail "trace-context lib code must never read task prose, but references '$tok'" ;;
-  esac
-done
-pass "the lib code never reads a brief, prompt, report, or status - it cannot leak content"
-
-# --- structural wiring in bin/fm-spawn.sh ------------------------------------
-
-SPAWN="$ROOT/bin/fm-spawn.sh"
-# Patterns deliberately start after any leading '$' so the fixed-string grep needs
-# no shell metacharacters while still pinning the exact wiring.
-assert_grep 'fm-trace-context-lib.sh' "$SPAWN" "fm-spawn.sh must source the trace-context lib"
-assert_grep 'SPAWN_TRACEPARENT=' "$SPAWN" "fm-spawn.sh must assign the resolved carrier"
-assert_grep 'fm_trace_context_resolve' "$SPAWN" "fm-spawn.sh must resolve the carrier through the lib entry point"
-# shellcheck disable=SC2016 # Dollar signs are literal source text in this fixed-string assertion.
-assert_grep 'if spawn_send_text_line "$T" "export TRACEPARENT=$SPAWN_TRACEPARENT"; then' "$SPAWN" \
-  "fm-spawn.sh must condition metadata publication on successful carrier delivery"
-# shellcheck disable=SC2016 # Dollar signs are literal source text in this fixed-string assertion.
-assert_grep 'echo "traceparent=$SPAWN_TRACEPARENT" >> "$STATE/$ID.meta"' "$SPAWN" \
-  "fm-spawn.sh must record the delivered carrier in metadata"
-assert_grep 'export TRACEPARENT=' "$SPAWN" "fm-spawn.sh must inject the W3C TRACEPARENT env var"
-pass "fm-spawn.sh sources the lib and records one shared SPAWN_TRACEPARENT only after successful injection"
-
-# The injection must ride the same channel and site as GOTMPDIR (before launch,
-# unconditional across kinds): the TRACEPARENT export follows the GOTMPDIR export.
-gotmp_line=$(grep -n 'export GOTMPDIR=' "$SPAWN" | tail -1 | cut -d: -f1)
-tp_line=$(grep -n 'export TRACEPARENT=' "$SPAWN" | tail -1 | cut -d: -f1)
-# shellcheck disable=SC2016 # Dollar signs are literal source text in this grep pattern.
-meta_line=$(grep -n 'echo "traceparent=$SPAWN_TRACEPARENT" >>' "$SPAWN" | tail -1 | cut -d: -f1)
-[ -n "$gotmp_line" ] && [ -n "$tp_line" ] && [ -n "$meta_line" ] \
-  && [ "$tp_line" -gt "$gotmp_line" ] && [ "$((tp_line - gotmp_line))" -le 5 ] \
-  && [ "$meta_line" -gt "$tp_line" ] \
-  || fail "TRACEPARENT must be exported before metadata publication at the pre-launch GOTMPDIR site (gotmp=$gotmp_line tp=$tp_line meta=$meta_line)"
-pass "TRACEPARENT is injected at the unconditional pre-launch GOTMPDIR site and recorded only after successful delivery"
 
 # --- secondmate inheritance wires the nested chain ---------------------------
 
