@@ -669,10 +669,12 @@ test_parent_evidence_reconciles_by_verb_and_key() {
   fm_write_secondmate_meta "$home/state/hold.meta" "$hold" "firstmate:fm-hold" sample
   fm_write_secondmate_meta "$home/state/blocked.meta" "$blocked" "firstmate:fm-blocked" sample
   fm_write_secondmate_meta "$home/state/decision.meta" "$decision" "firstmate:fm-decision" sample
-  printf 'working [key=stale-work]: old work still running\n' > "$home/state/hold.status"
-  printf 'paused [key=legal-release]: waiting for legal release\n' >> "$home/state/hold.status"
-  printf 'paused [key=stale-pause]: old pause still active\n' >> "$home/state/hold.status"
-  printf 'paused: legacy pause without an identity\n' >> "$home/state/hold.status"
+  {
+    printf 'working [key=stale-work]: old work still running\n'
+    printf 'paused [key=legal-release]: waiting for legal release\n'
+    printf 'paused [key=stale-pause]: old pause still active\n'
+    printf 'paused: legacy pause without an identity\n'
+  } > "$home/state/hold.status"
   printf 'blocked [key=vendor-release]: waiting for vendor release\n' > "$home/state/blocked.status"
   printf 'blocked: legacy block without an identity\n' >> "$home/state/blocked.status"
   printf 'needs-decision [key=stale-route]: choose the old route\n' > "$home/state/decision.status"
