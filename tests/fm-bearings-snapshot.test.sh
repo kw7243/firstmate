@@ -2043,6 +2043,82 @@ EOF
   pass "Codex semantic-state unknown remains explicit while structured evidence survives"
 }
 
+test_legacy_remote_partial_summary_normalizes_observability() {
+  local home fakebin remote_root remote_home base_summary summary canonical field
+  home=$(make_home legacy-remote-partial-parent)
+  : > "$home/data/secondmates.md"
+  remote_root="$TMP_ROOT/legacy-remote-root"
+  remote_home="$TMP_ROOT/legacy-remote-home"
+  printf -- '- legacy-remote - fixture domain (host: legacy-host; root: %s; home: %s; scope: fixture; projects: sample; added 2026-08-31)\n' \
+    "$remote_root" "$remote_home" >> "$home/data/secondmates.md"
+  fm_write_secondmate_meta "$home/state/legacy-remote.meta" "$remote_home" \
+    "firstmate:fm-legacy-remote" sample
+  printf 'working [key=legacy-working]: historical remote activity\n' \
+    > "$home/state/legacy-remote.status"
+  printf 'paused [key=legacy-paused]: historical remote wait\n' \
+    >> "$home/state/legacy-remote.status"
+  fakebin=$(make_fakebin "$home")
+  cat > "$fakebin/ssh" <<'SH'
+#!/usr/bin/env bash
+cat "${FM_TEST_REMOTE_SUMMARY_FILE:?}"
+SH
+  chmod +x "$fakebin/ssh"
+  base_summary="$home/legacy-summary-base.json"
+  summary="$home/legacy-summary.json"
+  jq -n --arg home "$remote_home" '{
+    schema:"fm-secondmate-home-summary.v1",generated:"2026-08-31T11:59:00Z",home:$home,
+    valid:false,reason:"child current state unavailable: legacy-working, legacy-paused",
+    invalidity:{kind:"child_current_unavailable",ids:["legacy-working","legacy-paused"]},
+    state:"unknown",active_children:[],decisions_open:[],holds:[],queued:[],landed:[],endpoints:[],
+    counts:{active_children:0,decisions_open:0,holds:0,queued:0,landed:0,endpoints:0},omitted:[]
+  }' > "$base_summary"
+  cp "$base_summary" "$summary"
+  canonical=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
+    FM_TEST_REMOTE_SUMMARY_FILE="$summary" FM_SNAPSHOT_NOW=2026-08-31T12:00:00Z \
+    "$ROOT/bin/fm-fleet-snapshot.sh" --json)
+  printf '%s' "$canonical" | jq -e '
+    .secondmate_current.records[] | select(.id == "legacy-remote")
+    | .remote == true
+      and .current.state == "unknown"
+      and .invalidity == {kind:"child_current_unavailable",ids:["legacy-working","legacy-paused"]}
+      and .inventory == {valid:true,reason:null,invalidity:{kind:null,ids:[]}}
+      and .observability.current_state == "unavailable"
+      and .observability.ids == ["legacy-working","legacy-paused"]
+      and .in_flight == []
+      and .retained_completed == []
+      and .provenance.selected == "structured-home"
+      and .provenance.trust == "partial-structured"
+      and .contradiction == false
+      and ([.parent_event.reconciliation.activities[]
+        | select(.key == "legacy-working" and .verb == "working")
+        | .verdict] == ["inconclusive"])
+      and ([.parent_event.reconciliation.activities[]
+        | select(.key == "legacy-paused" and .verb == "paused")
+        | .verdict] == ["inconclusive"])
+  ' >/dev/null || fail "legacy remote partial summary lost observability normalization: $canonical"
+  for field in inventory observability in_flight retained_completed; do
+    jq --arg field "$field" '
+      if $field == "inventory" then
+        .inventory = {valid:"true",reason:null,invalidity:{kind:null,ids:[]}}
+      elif $field == "observability" then
+        .observability = {current_state:"unavailable",ids:"legacy-working",reason:null}
+      elif $field == "in_flight" then .in_flight = {}
+      else .retained_completed = {} end
+    ' "$base_summary" > "$summary"
+    canonical=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
+      FM_TEST_REMOTE_SUMMARY_FILE="$summary" FM_SNAPSHOT_NOW=2026-08-31T12:00:00Z \
+      "$ROOT/bin/fm-fleet-snapshot.sh" --json)
+    printf '%s' "$canonical" | jq -e '
+      .secondmate_current.records[] | select(.id == "legacy-remote")
+      | .current == {state:"unknown",reason:"structured home snapshot was malformed or stale"}
+        and .provenance.selected == "parent-event-fallback"
+        and .inventory.valid == false
+        and .contradiction == false
+    ' >/dev/null || fail "malformed additive $field field crossed the remote summary boundary: $canonical"
+  done
+  pass "legacy remote partial summaries normalize safely and reject malformed additions"
+}
+
 test_main_captain_readiness_matches_secondmate_projection() {
   local home fakebin json
   home=$(make_home main-captain-readiness)
@@ -2145,6 +2221,7 @@ test_mixed_secondmate_roles_partial_state_and_captain_readiness
 test_retained_dead_done_workers_are_not_unowned_current_work
 test_alive_or_ambiguous_unmatched_metadata_stays_invalid
 test_codex_unknown_is_observability_not_inventory_contradiction
+test_legacy_remote_partial_summary_normalizes_observability
 test_main_captain_readiness_matches_secondmate_projection
 test_completed_scout_report_not_pending
 test_open_decision_surfaces_end_to_end

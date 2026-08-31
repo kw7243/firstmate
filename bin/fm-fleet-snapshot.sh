@@ -1272,19 +1272,52 @@ secondmate_current_json() {  # <parent-tasks-json>
           and (($remote == true) or .generated == $generated)
           and (.valid | type) == "boolean" and (.state | type) == "string"
           and (.invalidity | type) == "object" and (.invalidity.ids | type) == "array"
+          and all(.invalidity.ids[]; type == "string")
           and (.active_children | type) == "array" and (.decisions_open | type) == "array"
           and (.holds | type) == "array" and (.queued | type) == "array"
           and (.landed | type) == "array" and (.endpoints | type) == "array"
           and (.counts | type) == "object" and (.omitted | type) == "array"
+          and (if has("inventory") then
+            (.inventory | type) == "object"
+            and (.inventory.valid | type) == "boolean"
+            and ((.inventory.reason == null) or ((.inventory.reason | type) == "string"))
+            and (.inventory.invalidity | type) == "object"
+            and ((.inventory.invalidity.kind == null) or ((.inventory.invalidity.kind | type) == "string"))
+            and (.inventory.invalidity.ids | type) == "array"
+            and all(.inventory.invalidity.ids[]; type == "string")
+          else true end)
+          and (if has("observability") then
+            (.observability | type) == "object"
+            and (.observability.current_state | type) == "string"
+            and (.observability.ids | type) == "array"
+            and all(.observability.ids[]; type == "string")
+            and ((.observability.reason == null) or ((.observability.reason | type) == "string"))
+          else true end)
+          and (if has("in_flight") then
+            (.in_flight | type) == "array" and all(.in_flight[]; type == "object")
+          else true end)
+          and (if has("retained_completed") then
+            (.retained_completed | type) == "array" and all(.retained_completed[]; type == "object")
+          else true end)
         ' >/dev/null 2>&1; then
           reason="structured home snapshot was malformed or stale"
         else
-          summary_valid=$(printf '%s' "$summary" | jq -r '.valid')
-          if [ "$summary_valid" != true ]; then
-            summary_reason=$(printf '%s' "$summary" | jq -r '.reason // "unknown reason"')
-            summary_invalidity=$(printf '%s' "$summary" | jq -r '.invalidity.kind // "unknown"')
-            if [ "$summary_invalidity" != child_current_unavailable ]; then
-              reason="structured home state invalid: $summary_reason"
+          summary=$(printf '%s' "$summary" | jq -c '
+            if (.valid == false and .invalidity.kind == "child_current_unavailable") then
+              .inventory = (.inventory // {valid:true,reason:null,invalidity:{kind:null,ids:[]}})
+              | .observability = (.observability // {
+                  current_state:"unavailable",ids:.invalidity.ids,
+                  reason:"authoritative child current state unavailable"})
+            else . end
+          ') || reason="structured home snapshot was malformed or stale"
+          if [ -z "$reason" ]; then
+            summary_valid=$(printf '%s' "$summary" | jq -r '.valid')
+            if [ "$summary_valid" != true ]; then
+              summary_reason=$(printf '%s' "$summary" | jq -r '.reason // "unknown reason"')
+              summary_invalidity=$(printf '%s' "$summary" | jq -r '.invalidity.kind // "unknown"')
+              if [ "$summary_invalidity" != child_current_unavailable ]; then
+                reason="structured home state invalid: $summary_reason"
+              fi
             fi
           fi
         fi
