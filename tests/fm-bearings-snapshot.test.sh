@@ -1955,7 +1955,7 @@ EOF
   pass "Done captain rows cannot own retained child metadata"
 }
 
-test_retained_missing_endpoint_is_not_unhealthy() {
+test_retained_missing_work_stays_historical() {
   local home mate fakebin states canonical json
   home=$(make_home retained-missing-parent)
   : > "$home/data/secondmates.md"
@@ -1975,7 +1975,8 @@ EOF
     "window=firstmate:fm-retained-missing-worker" \
     "worktree=$mate/projects/retained-missing-worker" "project=sample" \
     "harness=codex" "kind=ship" "mode=no-mistakes"
-  printf 'done: retained work whose endpoint is gone\n' > "$mate/state/retained-missing-worker.status"
+  printf 'needs-decision [key=route]: choose the release route\ndone: retained work whose endpoint is gone\n' \
+    > "$mate/state/retained-missing-worker.status"
   states="$home/tmux-states"
   printf 'fm-retained-missing-worker missing\n' > "$states"
   fakebin=$(make_reconcile_fakebin "$home")
@@ -1986,8 +1987,11 @@ EOF
     .secondmate_current.records[] | select(.id == "retained-missing")
     | .current == {state:"no_active_work",reason:null}
       and [.retained_completed[].id] == ["retained-missing-worker"]
+      and .retained_completed[0].current_state.state == "unknown"
       and .retained_completed[0].endpoint.recovery_state == "missing"
       and .retained_completed[0].endpoint.exists == false
+      and .decisions_open == []
+      and .counts.decisions_open == 0
       and .endpoints[0].retained_completed == true
       and .endpoints[0].endpoint.exists == false
   ' >/dev/null || fail "missing retained endpoint lost its completed ownership: $canonical"
@@ -1995,9 +1999,11 @@ EOF
     FM_BEARINGS_NOW=2026-08-31T12:00:00Z NET_LOG="$home/net.log" "$BEARINGS" --json)
   printf '%s' "$json" | jq -e '
     (.landed | any(.id == "retained-missing-worker" and .owner == "retained-missing"))
+      and (.secondmates | any(.id == "retained-missing" and .state == "no_active_work"))
+      and ((.decisions_open // []) | all(.id != "retained-missing/retained-missing-worker"))
       and ((.unhealthy_endpoints // []) | all(.id != "retained-missing/retained-missing-worker"))
-  ' >/dev/null || fail "Bearings reported retained missing work as an unhealthy endpoint: $json"
-  pass "retained missing endpoints stay out of unhealthy endpoint alerts"
+  ' >/dev/null || fail "Bearings misclassified retained missing work as current: $json"
+  pass "retained missing work stays historical across current-state projections"
 }
 
 test_long_retained_id_uses_raw_ownership_key() {
@@ -2499,7 +2505,7 @@ test_main_orphan_counterfactual_meta_clears_inventory_warning
 test_mixed_secondmate_roles_partial_state_and_captain_readiness
 test_retained_dead_done_workers_are_not_unowned_current_work
 test_done_captain_row_does_not_own_child_metadata
-test_retained_missing_endpoint_is_not_unhealthy
+test_retained_missing_work_stays_historical
 test_long_retained_id_uses_raw_ownership_key
 test_alive_or_ambiguous_unmatched_metadata_stays_invalid
 test_wrong_task_endpoint_binding_stays_unverified
