@@ -505,6 +505,8 @@ task_json_lines() {
           alive) endpoint_exists=true; recovery_state=alive; agent_alive=alive ;;
           dead) endpoint_exists=true; recovery_state=dead; agent_alive=dead ;;
           missing) endpoint_exists=false; recovery_state=missing; agent_alive=dead ;;
+          ambiguous) endpoint_exists=true; recovery_state=ambiguous; agent_alive=unknown ;;
+          unreadable|unverified) endpoint_exists=null; recovery_state=$remote_state; agent_alive=unknown ;;
           *) endpoint_exists=null; recovery_state=unreadable; agent_alive=unknown ;;
         esac
       else
@@ -513,7 +515,9 @@ task_json_lines() {
         agent_alive=unknown
       fi
     else
-      if [ -n "$target" ]; then
+      if fm_backend_validate_task_endpoint "$meta" "$id" >/dev/null 2>&1; then
+        backend=$FM_BACKEND_VALIDATED_BACKEND
+        target=$FM_BACKEND_VALIDATED_TARGET
         if fm_backend_target_exists "$backend" "$target" "fm-$id" >/dev/null 2>&1; then
           endpoint_exists=true
         else
@@ -657,18 +661,45 @@ main_inventory_json() {  # <backlog-json> <tasks-json>
 # This mode never reads parent events or terminal text and never aggregates
 # nested secondmates.
 secondmate_home_summary_json() {  # <backlog-json> <tasks-json>
-  jq -n \
+  printf '%s\n%s\n' "$1" "$2" | jq -s \
     --arg generated "$SNAPSHOT_NOW" \
     --arg home "$FM_HOME" \
     --argjson child_n "$FM_SNAPSHOT_SECONDMATE_CHILDREN" \
     --argjson queued_n "$FM_SNAPSHOT_SECONDMATE_QUEUED" \
     --argjson decisions_n "$FM_SNAPSHOT_SECONDMATE_DECISIONS" \
-    --argjson landed_n "$FM_SNAPSHOT_SECONDMATE_LANDED_PER_HOME" \
-    --argjson backlog "$1" \
-    --argjson tasks "$2" '
+    --argjson landed_n "$FM_SNAPSHOT_SECONDMATE_LANDED_PER_HOME" '
+    .[0] as $backlog
+    | .[1] as $tasks
+    |
     def trunc($n):
       tostring | gsub("\\s+"; " ")
       | if length > $n then .[:$n] + "…" else . end;
+    def trunc_or_null($n):
+      if . == null then null else trunc($n) end;
+    def bounded_current_state:
+      if . == null then null else
+        {state:((.state // null) | trunc_or_null(40)),
+         source:((.source // null) | trunc_or_null(40)),
+         detail:((.detail // null) | trunc_or_null(120)),
+         raw:((.raw // null) | trunc_or_null(500)),
+         observed_at:((.observed_at // null) | trunc_or_null(40)),
+         freshness:((.freshness // null) | trunc_or_null(40))}
+      end;
+    def bounded_path:
+      if . == null then {path:null,present:false} else
+        {path:((.path // null) | trunc_or_null(500)),
+         present:(if has("present") then .present else false end)}
+      end;
+    def bounded_endpoint:
+      if . == null then null else
+        {target:((.target // null) | trunc_or_null(240)),
+         exists:(if has("exists") then .exists else null end),
+         recovery_state:((.recovery_state // null) | trunc_or_null(40)),
+         agent_alive:((.agent_alive // null) | trunc_or_null(40)),
+         status:((.status // null) | trunc_or_null(40)),
+         observed_at:((.observed_at // null) | trunc_or_null(40)),
+         freshness:((.freshness // null) | trunc_or_null(40))}
+      end;
     ([ $backlog.records[]?
        | select((.state == "in_flight" or .state == "queued") and (.structured | not)) ]) as $unstructured_current
     | ([ $backlog.records[]? | select(.state == "in_flight" and .structured) ]) as $owned_in_flight
@@ -699,7 +730,10 @@ secondmate_home_summary_json() {  # <backlog-json> <tasks-json>
          | $tasks[]
          | select(.id == $done.id
              and (.endpoint.recovery_state == "dead" or .endpoint.recovery_state == "missing"))
-         | {id,kind,current_state,worktree:.paths.worktree,endpoint} ]) as $retained_completed_all
+         | {id:(.id | trunc(120)),kind:((.kind // null) | trunc_or_null(40)),
+            current_state:(.current_state | bounded_current_state),
+            worktree:(.paths.worktree | bounded_path),
+            endpoint:(.endpoint | bounded_endpoint)} ]) as $retained_completed_all
     | ([ $tasks[]
          | select(.id as $id | [$owned_in_flight[].id] | index($id) | not)
          | select(.id as $id | [$retained_completed_all[].id] | index($id) | not)
@@ -733,10 +767,11 @@ secondmate_home_summary_json() {  # <backlog-json> <tasks-json>
          | {id:($work.id | trunc(120)),title:($work.title | trunc(120)),
             repo:(($work.repo // null) | if . == null then null else trunc(120) end),
             kind:(($work.kind // null) | if . == null then null else trunc(40) end),
-            current_role:$work.current_role,requires_child_metadata:$work.requires_child_metadata,
-            current_state:($task.current_state // null),
-            worktree:($task.paths.worktree // {path:null,present:false}),
-            endpoint:($task.endpoint // null)} ]) as $in_flight_all
+            current_role:(($work.current_role // null) | trunc_or_null(40)),
+            requires_child_metadata:$work.requires_child_metadata,
+            current_state:($task.current_state | bounded_current_state),
+            worktree:($task.paths.worktree | bounded_path),
+            endpoint:($task.endpoint | bounded_endpoint)} ]) as $in_flight_all
     | ([ $owned_in_flight[] as $work
          | select($work.current_role != "program")
          | $tasks[]

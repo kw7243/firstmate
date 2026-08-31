@@ -1970,6 +1970,148 @@ EOF
   pass "alive and ambiguous unmatched metadata still invalidate secondmate inventory"
 }
 
+test_wrong_task_endpoint_binding_stays_unverified() {
+  local mate fakebin states summary
+  mate="$TMP_ROOT/wrong-task-endpoint-home"
+  make_valid_secondmate_home wrong-task-endpoint "$mate"
+  cat > "$mate/data/backlog.md" <<'EOF'
+## In flight
+
+## Queued
+
+## Done
+- [x] rogue - Completed historical claim (repo: sample) (kind: ship) (done 2026-08-30)
+EOF
+  mkdir -p "$mate/projects/rogue"
+  fm_write_meta "$mate/state/rogue.meta" \
+    "window=firstmate:fm-other" "worktree=$mate/projects/rogue" "project=sample" \
+    "harness=codex" "kind=ship" "mode=no-mistakes"
+  printf 'done: unmatched historical claim\n' > "$mate/state/rogue.status"
+  states="$mate/tmux-states"
+  printf 'fm-other dead\n' > "$states"
+  fakebin=$(make_reconcile_fakebin "$mate")
+  summary=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$mate" \
+    FM_TEST_TMUX_STATE_FILE="$states" FM_SNAPSHOT_NOW=2026-08-31T12:00:00Z \
+    "$ROOT/bin/fm-fleet-snapshot.sh" --secondmate-home-summary)
+  printf '%s' "$summary" | jq -e '
+    .valid == false
+      and .inventory.valid == false
+      and .invalidity == {kind:"unowned_current",ids:["rogue"]}
+      and .retained_completed == []
+      and .endpoints[0].endpoint.target == "firstmate:fm-other"
+      and .endpoints[0].endpoint.exists == null
+      and .endpoints[0].endpoint.recovery_state == "unverified"
+  ' >/dev/null || fail "wrong-task dead target was trusted as retained completion evidence: $summary"
+  pass "wrong-task endpoint metadata stays unverified and fail-closed"
+}
+
+test_remote_unverified_recovery_state_is_preserved() {
+  local home fakebin remote_root remote_home canonical
+  home=$(make_home remote-unverified-parent)
+  : > "$home/data/secondmates.md"
+  remote_root="$TMP_ROOT/remote-unverified-root"
+  remote_home="$TMP_ROOT/remote-unverified-home"
+  printf -- '- remote-unverified - fixture domain (host: remote-host; root: %s; home: %s; scope: fixture; projects: sample; added 2026-08-31)\n' \
+    "$remote_root" "$remote_home" >> "$home/data/secondmates.md"
+  fm_write_meta "$home/state/remote-unverified.meta" \
+    "window=remote:remote-unverified" "endpoint_task_id=remote-unverified" \
+    "worktree=$remote_home" "project=sample" "harness=codex" "kind=secondmate" \
+    "mode=secondmate" "yolo=off" "home=$remote_home" "projects=sample" \
+    "remote_host=remote-host" "remote_root=$remote_root" "remote_backend=herdr" \
+    "remote_target=fm-remote:w1:p1"
+  fakebin=$(make_fakebin "$home")
+  cat > "$fakebin/ssh" <<'SH'
+#!/usr/bin/env bash
+printf 'unverified\n'
+SH
+  chmod +x "$fakebin/ssh"
+  canonical=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
+    FM_SNAPSHOT_NOW=2026-08-31T12:00:00Z "$ROOT/bin/fm-fleet-snapshot.sh" --json)
+  printf '%s' "$canonical" | jq -e '
+    .tasks[] | select(.id == "remote-unverified")
+    | .remote == {host:"remote-host",root:.remote.root}
+      and .paths.home.present == true
+      and .endpoint.target == "fm-remote:w1:p1"
+      and .endpoint.exists == null
+      and .endpoint.recovery_state == "unverified"
+      and .endpoint.agent_alive == "unknown"
+  ' >/dev/null || fail "remote unverified recovery verdict was relabeled: $canonical"
+  pass "remote unverified recovery evidence keeps its fail-closed label"
+}
+
+test_additive_child_evidence_is_bounded() {
+  local home mate fakebin states canonical component long_root live_wt retained_wt long_session long_detail id
+  home=$(make_home bounded-additive-parent)
+  : > "$home/data/secondmates.md"
+  mate="$TMP_ROOT/bounded-additive-home"
+  make_valid_secondmate_home bounded-additive "$mate"
+  append_secondmate_registry "$home" bounded-additive "$mate"
+  component=$(printf '%090d' 0 | tr 0 p)
+  long_root="$mate/projects/$component/$component/$component/$component/$component/$component"
+  live_wt="$long_root/live"
+  retained_wt="$long_root/retained"
+  mkdir -p "$live_wt" "$retained_wt"
+  long_session=$(printf '%0400d' 0 | tr 0 s)
+  long_detail=$(printf '%020000d' 0 | tr 0 x)
+  cat > "$mate/data/backlog.md" <<'EOF'
+## In flight
+- [ ] evidence-live - Preserve bounded live evidence (repo: sample) (kind: ship) (since 2026-08-31)
+
+## Queued
+
+## Done
+- [x] evidence-retained - Preserve bounded retained evidence (repo: sample) (kind: ship) (done 2026-08-31)
+EOF
+  for id in evidence-live evidence-retained; do
+    if [ "$id" = evidence-live ]; then
+      fm_write_meta "$mate/state/$id.meta" \
+        "window=$long_session:fm-$id" "endpoint_task_id=$id" "worktree=$live_wt" \
+        "project=sample" "harness=claude" "kind=ship" "mode=no-mistakes"
+    else
+      fm_write_meta "$mate/state/$id.meta" \
+        "window=$long_session:fm-$id" "endpoint_task_id=$id" "worktree=$retained_wt" \
+        "project=sample" "harness=claude" "kind=ship" "mode=no-mistakes"
+    fi
+    record_claude_state "$mate/state" "$id" idle
+  done
+  printf 'paused: %s\n' "$long_detail" > "$mate/state/evidence-live.status"
+  printf 'done: %s\n' "$long_detail" > "$mate/state/evidence-retained.status"
+  states="$home/tmux-states"
+  printf 'fm-evidence-live alive\nfm-evidence-retained dead\n' > "$states"
+  fakebin=$(make_reconcile_fakebin "$home")
+  canonical=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
+    FM_TEST_TMUX_STATE_FILE="$states" FM_SNAPSHOT_SECONDMATE_MAX_BYTES=16384 \
+    FM_SNAPSHOT_NOW=2026-08-31T12:00:00Z "$ROOT/bin/fm-fleet-snapshot.sh" --json)
+  printf '%s' "$canonical" | jq -e '
+    .secondmate_current.records[] | select(.id == "bounded-additive")
+    | .provenance.selected == "structured-home"
+      and .provenance.summary_valid == true
+      and .inventory.valid == true
+      and .current.state == "externally_held"
+      and [.in_flight[].id] == ["evidence-live"]
+      and [.retained_completed[].id] == ["evidence-retained"]
+      and .in_flight[0].current_state.state == "paused"
+      and (.in_flight[0].current_state.detail | length) <= 121
+      and (.in_flight[0].current_state.detail | endswith("…"))
+      and (.in_flight[0].current_state.raw | length) <= 501
+      and (.in_flight[0].current_state.raw | endswith("…"))
+      and (.in_flight[0].worktree.path | length) <= 501
+      and (.in_flight[0].worktree.path | endswith("…"))
+      and (.in_flight[0].endpoint.target | length) <= 241
+      and (.in_flight[0].endpoint.target | endswith("…"))
+      and .retained_completed[0].endpoint.recovery_state == "dead"
+      and (.retained_completed[0].current_state.detail | length) <= 121
+      and (.retained_completed[0].current_state.detail | endswith("…"))
+      and (.retained_completed[0].current_state.raw | length) <= 501
+      and (.retained_completed[0].current_state.raw | endswith("…"))
+      and (.retained_completed[0].worktree.path | length) <= 501
+      and (.retained_completed[0].worktree.path | endswith("…"))
+      and (.retained_completed[0].endpoint.target | length) <= 241
+      and (.retained_completed[0].endpoint.target | endswith("…"))
+  ' >/dev/null || fail "oversized additive evidence invalidated the home or escaped bounds: $canonical"
+  pass "in-flight and retained child evidence remain bounded and trustworthy"
+}
+
 # Codex has no verified busy/idle semantic source. Even a live endpoint, a paused
 # event, and a registered task-neutral external source must leave current state
 # unknown while preserving independently structured inventory evidence.
@@ -2220,6 +2362,9 @@ test_main_orphan_counterfactual_meta_clears_inventory_warning
 test_mixed_secondmate_roles_partial_state_and_captain_readiness
 test_retained_dead_done_workers_are_not_unowned_current_work
 test_alive_or_ambiguous_unmatched_metadata_stays_invalid
+test_wrong_task_endpoint_binding_stays_unverified
+test_remote_unverified_recovery_state_is_preserved
+test_additive_child_evidence_is_bounded
 test_codex_unknown_is_observability_not_inventory_contradiction
 test_legacy_remote_partial_summary_normalizes_observability
 test_main_captain_readiness_matches_secondmate_projection
