@@ -30,8 +30,10 @@
 #     against current_state; hints.pending_decision and hints.blocked_event are
 #     booleans derived from that set.
 #     endpoint.exists is the cheap backend endpoint-presence read.
-#     endpoint.recovery_state is the recovery-grade backend verdict; only dead
-#     and missing prove that a retained completed worker is no longer live.
+#     endpoint.recovery_state is the recovery-grade backend verdict. Local
+#     recovery probes run only after endpoint metadata binds the target to this
+#     task; only validated dead and missing verdicts prove a retained completed
+#     worker is no longer live.
 #     endpoint.agent_alive is populated for secondmates only, where it is useful
 #     return-channel supervision data; other tasks use "not_checked".
 #   scout_reports[]: present data/<id>/report.md pointers.
@@ -50,8 +52,10 @@
 #     observability and carries in_flight, active_children, retained_completed,
 #     decisions_open, holds, queued, landed, endpoints, counts, and omitted.
 #     Actionable captain holds appear in decisions_open; blocked captain holds
-#     remain queued with metadata. Metadata for a structured Done row is retained
-#     completion evidence only when its recovery-grade endpoint is dead or missing.
+#     remain queued with metadata. Metadata for a structured Done worker row is
+#     retained completion evidence only when its recovery-grade endpoint is dead
+#     or missing; captain and program rows never own retained child metadata.
+#     Endpoint rows carry the retained_completed ownership flag.
 #   secondmate_landed: {records[],truncated[],unreadable[],partial[]} - the
 #     compatibility landed-work roll-up derived from secondmate_current. Readable
 #     structured homes with an unknown current classification are partial, not
@@ -158,6 +162,9 @@ Its invalidity object names the normalized failure kind and affected ids.
 Its inventory and observability objects distinguish backlog contradictions from
 unavailable child semantics, while in_flight and retained_completed preserve
 independently trustworthy structured, path, and recovery-grade endpoint evidence.
+retained_completed accepts only structured Done worker rows whose task-bound
+recovery-grade endpoint is dead or missing; captain and program rows never own
+child metadata, and every other unmatched recovery verdict remains invalid.
 Actionable tasks-axi captain holds appear as decisions_open and stay visible in
 queued with hold_reason, hold_kind, and plural blocker fields for downstream
 projections. A captain hold is actionable only when every blocker is Done.
@@ -630,7 +637,7 @@ task_json_lines() {
 
 # Main-home current-inventory validity: same orphan / unstructured-current checks
 # used by secondmate_home_summary_json, without inventing live task rows.
-# Metadata inventory remains the sole source of retained worker records; this object only
+# Metadata inventory remains the sole source of worker records; this object only
 # discloses backlog↔task inconsistency for renderers (Bearings omitted/gates).
 main_inventory_json() {  # <backlog-json> <tasks-json>
   jq -n \
