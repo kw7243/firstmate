@@ -1920,6 +1920,42 @@ EOF
   pass "recovery-grade dead Done workers remain explicit retained completion evidence"
 }
 
+test_long_retained_id_uses_raw_ownership_key() {
+  local mate fakebin states summary long_id
+  mate="$TMP_ROOT/long-retained-id-home"
+  make_valid_secondmate_home long-retained-id "$mate"
+  long_id=$(printf '%0130d' 0 | tr 0 r)
+  [ "${#long_id}" -gt 120 ] || fail "long retained id fixture did not exceed the projection bound"
+  mkdir -p "$mate/projects/$long_id"
+  cat > "$mate/data/backlog.md" <<EOF
+## In flight
+
+## Queued
+
+## Done
+- [x] $long_id - Completed long-identity work (repo: sample) (kind: ship) (done 2026-08-30)
+EOF
+  fm_write_meta "$mate/state/$long_id.meta" \
+    "window=firstmate:fm-$long_id" "worktree=$mate/projects/$long_id" "project=sample" \
+    "harness=codex" "kind=ship" "mode=no-mistakes"
+  printf 'done: retained long-identity work\n' > "$mate/state/$long_id.status"
+  states="$mate/tmux-states"
+  printf 'fm-%s dead\n' "$long_id" > "$states"
+  fakebin=$(make_reconcile_fakebin "$mate")
+  summary=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$mate" \
+    FM_TEST_TMUX_STATE_FILE="$states" FM_SNAPSHOT_NOW=2026-08-31T12:00:00Z \
+    "$ROOT/bin/fm-fleet-snapshot.sh" --secondmate-home-summary)
+  printf '%s' "$summary" | jq -e --arg id "$long_id" '
+    .valid == true
+      and .inventory.valid == true
+      and .invalidity == {kind:null,ids:[]}
+      and .retained_completed[0].id == ($id[:120] + "…")
+      and .retained_completed[0].endpoint.recovery_state == "dead"
+      and .counts.retained_completed == 1
+  ' >/dev/null || fail "bounded retained id was reused as its ownership key: $summary"
+  pass "retained completion ownership preserves raw long task ids"
+}
+
 # The retained exception is deliberately narrow. Metadata unmatched by an
 # in-flight row remains invalid unless a structured Done row and a recovery-grade
 # dead/missing verdict both prove completed retained work.
@@ -2186,7 +2222,7 @@ EOF
 }
 
 test_legacy_remote_partial_summary_normalizes_observability() {
-  local home fakebin remote_root remote_home base_summary summary canonical field
+  local home fakebin remote_root remote_home base_summary summary canonical field variant
   home=$(make_home legacy-remote-partial-parent)
   : > "$home/data/secondmates.md"
   remote_root="$TMP_ROOT/legacy-remote-root"
@@ -2258,7 +2294,28 @@ SH
         and .contradiction == false
     ' >/dev/null || fail "malformed additive $field field crossed the remote summary boundary: $canonical"
   done
-  pass "legacy remote partial summaries normalize safely and reject malformed additions"
+  for variant in invalid-inventory mismatched-observability; do
+    jq --arg variant "$variant" '
+      if $variant == "invalid-inventory" then
+        .inventory = {valid:false,reason:"orphan child metadata",
+          invalidity:{kind:"orphan_in_flight",ids:["orphan"]}}
+      else
+        .observability = {current_state:"unavailable",ids:["different-child"],
+          reason:"authoritative child current state unavailable"}
+      end
+    ' "$base_summary" > "$summary"
+    canonical=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
+      FM_TEST_REMOTE_SUMMARY_FILE="$summary" FM_SNAPSHOT_NOW=2026-08-31T12:00:00Z \
+      "$ROOT/bin/fm-fleet-snapshot.sh" --json)
+    printf '%s' "$canonical" | jq -e '
+      .secondmate_current.records[] | select(.id == "legacy-remote")
+      | .current == {state:"unknown",reason:"structured home snapshot was malformed or stale"}
+        and .provenance.selected == "parent-event-fallback"
+        and .inventory.valid == false
+        and .contradiction == false
+    ' >/dev/null || fail "inconsistent partial $variant summary crossed the remote boundary: $canonical"
+  done
+  pass "legacy partial summaries normalize safely and reject malformed or inconsistent additions"
 }
 
 test_main_captain_readiness_matches_secondmate_projection() {
@@ -2361,6 +2418,7 @@ test_main_unstructured_current_is_disclosed_with_structured_sibling
 test_main_orphan_counterfactual_meta_clears_inventory_warning
 test_mixed_secondmate_roles_partial_state_and_captain_readiness
 test_retained_dead_done_workers_are_not_unowned_current_work
+test_long_retained_id_uses_raw_ownership_key
 test_alive_or_ambiguous_unmatched_metadata_stays_invalid
 test_wrong_task_endpoint_binding_stays_unverified
 test_remote_unverified_recovery_state_is_preserved

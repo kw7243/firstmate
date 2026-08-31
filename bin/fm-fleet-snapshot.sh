@@ -729,14 +729,15 @@ secondmate_home_summary_json() {  # <backlog-json> <tasks-json>
     | ([ $completed[] as $done
          | $tasks[]
          | select(.id == $done.id
-             and (.endpoint.recovery_state == "dead" or .endpoint.recovery_state == "missing"))
+             and (.endpoint.recovery_state == "dead" or .endpoint.recovery_state == "missing")) ]) as $retained_completed
+    | ([ $retained_completed[]
          | {id:(.id | trunc(120)),kind:((.kind // null) | trunc_or_null(40)),
             current_state:(.current_state | bounded_current_state),
             worktree:(.paths.worktree | bounded_path),
             endpoint:(.endpoint | bounded_endpoint)} ]) as $retained_completed_all
     | ([ $tasks[]
          | select(.id as $id | [$owned_in_flight[].id] | index($id) | not)
-         | select(.id as $id | [$retained_completed_all[].id] | index($id) | not)
+         | select(.id as $id | [$retained_completed[].id] | index($id) | not)
          | {id,state:.current_state.state} ]) as $unowned_children
     | ([ $owned_in_flight[] as $work
          | $tasks[]
@@ -1333,6 +1334,18 @@ secondmate_current_json() {  # <parent-tasks-json>
           else true end)
           and (if has("retained_completed") then
             (.retained_completed | type) == "array" and all(.retained_completed[]; type == "object")
+          else true end)
+          and (if (.valid == false and .invalidity.kind == "child_current_unavailable") then
+            (if has("inventory") then
+              .inventory.valid == true
+              and .inventory.reason == null
+              and .inventory.invalidity.kind == null
+              and (.inventory.invalidity.ids | length) == 0
+            else true end)
+            and (if has("observability") then
+              .observability.current_state == "unavailable"
+              and .observability.ids == .invalidity.ids
+            else true end)
           else true end)
         ' >/dev/null 2>&1; then
           reason="structured home snapshot was malformed or stale"
