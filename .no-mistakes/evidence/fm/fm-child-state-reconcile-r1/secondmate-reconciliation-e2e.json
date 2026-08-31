@@ -1,0 +1,278 @@
+{
+  "artifact": "Executable fm-fleet-snapshot.v1 reconciliation evidence",
+  "generated": "2026-08-31T12:00:00Z",
+  "base_commit": "d54b85f32eddf737aaaf66aaf1b846637d7445c6",
+  "target_commit": "2a68bafd39bfb5053408310b9e89bb0fa94a617f",
+  "retained_done_same_fixture": {
+    "baseline_dead_endpoint": {
+      "current": {
+        "state": "unknown",
+        "reason": "structured home state invalid: live child state has no in-flight backlog item: job=unknown"
+      },
+      "selected_provenance": "unknown",
+      "summary_valid": null,
+      "inventory": null,
+      "invalidity": null,
+      "contradiction": false,
+      "retained_completed": [],
+      "landed_ids": [],
+      "endpoint_evidence": []
+    },
+    "target_dead_endpoint": {
+      "current": {
+        "state": "no_active_work",
+        "reason": null
+      },
+      "selected_provenance": "structured-home",
+      "summary_valid": true,
+      "inventory": {
+        "valid": true,
+        "reason": null,
+        "invalidity": {
+          "kind": null,
+          "ids": []
+        }
+      },
+      "invalidity": {
+        "kind": null,
+        "ids": []
+      },
+      "contradiction": false,
+      "retained_completed": [
+        {
+          "id": "job",
+          "current_state": "unknown",
+          "worktree_present": true,
+          "recovery_state": "dead"
+        }
+      ],
+      "landed_ids": [
+        "job"
+      ],
+      "endpoint_evidence": [
+        {
+          "id": "job",
+          "retained_completed": true,
+          "exists": true,
+          "recovery_state": "dead"
+        }
+      ]
+    },
+    "target_alive_endpoint": {
+      "current": {
+        "state": "unknown",
+        "reason": "structured home state invalid: child metadata has no in-flight or retained-Done owner: job=unknown"
+      },
+      "selected_provenance": "unknown",
+      "summary_valid": null,
+      "inventory": {
+        "valid": false,
+        "reason": "structured home state invalid: child metadata has no in-flight or retained-Done owner: job=unknown",
+        "invalidity": {
+          "kind": "unavailable",
+          "ids": []
+        }
+      },
+      "invalidity": null,
+      "contradiction": false,
+      "retained_completed": [],
+      "landed_ids": [],
+      "endpoint_evidence": []
+    },
+    "target_ambiguous_endpoint": {
+      "current": {
+        "state": "unknown",
+        "reason": "structured home state invalid: child metadata has no in-flight or retained-Done owner: job=unknown"
+      },
+      "selected_provenance": "unknown",
+      "summary_valid": null,
+      "inventory": {
+        "valid": false,
+        "reason": "structured home state invalid: child metadata has no in-flight or retained-Done owner: job=unknown",
+        "invalidity": {
+          "kind": "unavailable",
+          "ids": []
+        }
+      },
+      "invalidity": null,
+      "contradiction": false,
+      "retained_completed": [],
+      "landed_ids": [],
+      "endpoint_evidence": []
+    },
+    "target_alive_home_summary": {
+      "valid": false,
+      "inventory": {
+        "valid": false,
+        "reason": "child metadata has no in-flight or retained-Done owner: job=unknown",
+        "invalidity": {
+          "kind": "unowned_current",
+          "ids": [
+            "job"
+          ]
+        }
+      },
+      "invalidity": {
+        "kind": "unowned_current",
+        "ids": [
+          "job"
+        ]
+      },
+      "retained_completed": [],
+      "landed_ids": [
+        "job"
+      ],
+      "endpoint_evidence": [
+        {
+          "id": "job",
+          "recovery_state": "alive"
+        }
+      ]
+    },
+    "target_ambiguous_home_summary": {
+      "valid": false,
+      "inventory": {
+        "valid": false,
+        "reason": "child metadata has no in-flight or retained-Done owner: job=unknown",
+        "invalidity": {
+          "kind": "unowned_current",
+          "ids": [
+            "job"
+          ]
+        }
+      },
+      "invalidity": {
+        "kind": "unowned_current",
+        "ids": [
+          "job"
+        ]
+      },
+      "retained_completed": [],
+      "landed_ids": [
+        "job"
+      ],
+      "endpoint_evidence": [
+        {
+          "id": "job",
+          "recovery_state": "ambiguous"
+        }
+      ]
+    }
+  },
+  "codex_unverified_live_children": {
+    "current": {
+      "state": "unknown",
+      "reason": "structured home state invalid: child current state unavailable: cnvq-a, cnvq-b"
+    },
+    "inventory": {
+      "valid": true,
+      "reason": null,
+      "invalidity": {
+        "kind": null,
+        "ids": []
+      }
+    },
+    "invalidity": {
+      "kind": "child_current_unavailable",
+      "ids": [
+        "cnvq-a",
+        "cnvq-b"
+      ]
+    },
+    "observability": {
+      "current_state": "unavailable",
+      "ids": [
+        "cnvq-a",
+        "cnvq-b"
+      ],
+      "reason": "authoritative child current state unavailable"
+    },
+    "contradiction": false,
+    "selected_provenance": "structured-home",
+    "trust": "partial-structured",
+    "parent_activity_verdicts": [
+      {
+        "key": "cnvq-a",
+        "verb": "working",
+        "verdict": "inconclusive"
+      },
+      {
+        "key": "cnvq-b",
+        "verb": "paused",
+        "verdict": "inconclusive"
+      }
+    ],
+    "in_flight": [
+      {
+        "id": "cnvq-a",
+        "current_state": "unknown",
+        "current_detail": "harness state unavailable (unknown codex-unverified)",
+        "recovery_state": "alive",
+        "worktree_present": true
+      },
+      {
+        "id": "cnvq-b",
+        "current_state": "unknown",
+        "current_detail": "harness state unavailable (unknown codex-unverified)",
+        "recovery_state": "alive",
+        "worktree_present": true
+      }
+    ],
+    "queued_ids": [
+      "cnvq-gate"
+    ],
+    "landed_ids": [
+      "cnvq-baseline"
+    ]
+  },
+  "retained_missing_endpoint": {
+    "fleet_snapshot": {
+      "current": {
+        "state": "no_active_work",
+        "reason": null
+      },
+      "inventory": {
+        "valid": true,
+        "reason": null,
+        "invalidity": {
+          "kind": null,
+          "ids": []
+        }
+      },
+      "decisions_open_count": 0,
+      "retained_completed": [
+        {
+          "id": "job",
+          "current_state": "unknown",
+          "recovery_state": "missing",
+          "exists": false
+        }
+      ],
+      "endpoint_evidence": [
+        {
+          "id": "job",
+          "retained_completed": true,
+          "exists": false,
+          "recovery_state": "missing"
+        }
+      ]
+    },
+    "bearings_projection": {
+      "secondmate": [
+        {
+          "id": "evidence-missing",
+          "state": "no_active_work",
+          "doing": "No active child work"
+        }
+      ],
+      "landed": [
+        {
+          "id": "job",
+          "owner": "evidence-missing"
+        }
+      ],
+      "leaked_decisions": [],
+      "unhealthy_retained_endpoints": []
+    }
+  }
+}
