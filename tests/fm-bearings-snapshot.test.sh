@@ -670,6 +670,7 @@ test_parent_evidence_reconciles_by_verb_and_key() {
   fm_write_secondmate_meta "$home/state/decision.meta" "$decision" "firstmate:fm-decision" sample
   printf 'working [key=stale-work]: old work still running\n' > "$home/state/hold.status"
   printf 'paused [key=legal-release]: waiting for legal release\n' >> "$home/state/hold.status"
+  printf 'paused [key=stale-pause]: old pause still active\n' >> "$home/state/hold.status"
   printf 'paused: legacy pause without an identity\n' >> "$home/state/hold.status"
   printf 'blocked [key=vendor-release]: waiting for vendor release\n' > "$home/state/blocked.status"
   printf 'blocked: legacy block without an identity\n' >> "$home/state/blocked.status"
@@ -716,6 +717,8 @@ EOF
         and .terminal_evidence.captured == false
         and (.parent_event.reconciliation.activities
           | any(.verb == "paused" and .key == "legal-release" and .verdict == "corroborates"))
+        and (.parent_event.reconciliation.activities
+          | any(.verb == "paused" and .key == "stale-pause" and .verdict == "contradicts"))
         and (.parent_event.reconciliation.activities
           | any(.verb == "paused" and .key == "default" and .verdict == "inconclusive" and .matched == null))
         and (.parent_event.reconciliation.activities
@@ -1927,6 +1930,14 @@ test_alive_or_ambiguous_unmatched_metadata_stays_invalid() {
   mate="$TMP_ROOT/unmatched-endpoint-home"
   make_valid_secondmate_home unmatched-endpoint "$mate"
   append_secondmate_registry "$home" unmatched-endpoint "$mate"
+  cat > "$mate/data/backlog.md" <<'EOF'
+## In flight
+
+## Queued
+
+## Done
+- [x] rogue - Completed historical claim (repo: sample) (kind: ship) (done 2026-08-30)
+EOF
   mkdir -p "$mate/projects/rogue"
   fm_write_meta "$mate/state/rogue.meta" \
     "window=firstmate:fm-rogue" "worktree=$mate/projects/rogue" "project=sample" \
@@ -1943,6 +1954,8 @@ test_alive_or_ambiguous_unmatched_metadata_stays_invalid() {
       .valid == false
         and .inventory.valid == false
         and .invalidity == {kind:"unowned_current",ids:["rogue"]}
+        and .retained_completed == []
+        and [.landed[].id] == ["rogue"]
         and .endpoints[0].endpoint.recovery_state == $verdict
     ' >/dev/null || fail "$verdict fixture did not exercise the intended strict recovery verdict: $summary"
     canonical=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" FM_TEST_TMUX_STATE_FILE="$states" \
@@ -1985,6 +1998,12 @@ EOF
       "harness=codex" "kind=ship" "mode=no-mistakes"
     printf 'paused: waiting for Slurm job 1579631\n' > "$mate/state/$id.status"
   done
+  fm_write_secondmate_meta "$home/state/codex-observability.meta" "$mate" \
+    "firstmate:fm-codex-observability" sample
+  printf 'working [key=cnvq-a]: historical training activity\n' \
+    > "$home/state/codex-observability.status"
+  printf 'paused [key=cnvq-b]: historical Slurm wait\n' \
+    >> "$home/state/codex-observability.status"
   FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$mate" \
     "$ROOT/bin/fm-procevent.sh" register when slurm-1579631 -- squeue --job 1579631 >/dev/null \
     || fail "could not register the task-neutral Slurm wait fixture"
@@ -2001,6 +2020,13 @@ EOF
       and .inventory.valid == true
       and .observability.current_state == "unavailable"
       and .observability.ids == ["cnvq-a","cnvq-b"]
+      and .contradiction == false
+      and ([.parent_event.reconciliation.activities[]
+        | select(.key == "cnvq-a" and .verb == "working")
+        | .verdict] == ["inconclusive"])
+      and ([.parent_event.reconciliation.activities[]
+        | select(.key == "cnvq-b" and .verb == "paused")
+        | .verdict] == ["inconclusive"])
       and .provenance.selected == "structured-home"
       and .provenance.trust == "partial-structured"
       and ([.in_flight[].id] | sort) == ["cnvq-a","cnvq-b"]

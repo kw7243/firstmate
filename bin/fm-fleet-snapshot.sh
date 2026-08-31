@@ -1119,14 +1119,16 @@ parent_evidence_reconciliation_json() {  # <summary-json> <activities-json> <dec
               | select(if ($e.key | keyed) then .id == $e.key else true end)
               | {surface:"active_children",id,key:null,verb:"working"}]) as $matches
            | result($e; $matches;
-               $summary.counts.active_children == ($summary.active_children | length);
+               ($summary.counts.active_children == ($summary.active_children | length)
+                and (($summary.observability.ids // []) | index($e.key)) == null);
                "active_children")
          elif $e.verb == "paused" then
            ([ $summary.holds[]
               | select(if ($e.key | keyed) then .id == $e.key or .blocked_by == $e.key else true end)
               | {surface:"holds",id,key:(.blocked_by // null),verb:"paused"}]) as $matches
            | result($e; $matches;
-               $summary.counts.holds == ($summary.holds | length);
+               ($summary.counts.holds == ($summary.holds | length)
+                and (($summary.observability.ids // []) | index($e.key)) == null);
                "holds")
          else
            $e + {verdict:"inconclusive",compared_to:null,matched:null}
