@@ -74,6 +74,50 @@ SH
   printf '%s\n' "$fb"
 }
 
+# Replace the ordinary tmux stub with a recovery-grade endpoint fixture.
+# Each line in FM_TEST_TMUX_STATE_FILE is "<window> <alive|dead|ambiguous|unreadable>".
+make_reconcile_fakebin() {  # <dir>
+  local fb
+  fb=$(make_fakebin "$1")
+  cat > "$fb/tmux" <<'SH'
+#!/usr/bin/env bash
+set -u
+target=
+prev=
+for arg in "$@"; do
+  if [ "$prev" = -t ]; then target=$arg; fi
+  prev=$arg
+done
+window=${target#*:}
+state=$(awk -v window="$window" '$1 == window {print $2; exit}' "${FM_TEST_TMUX_STATE_FILE:?}")
+case "${1:-}" in
+  list-windows)
+    awk '$2 != "missing" {print $1}' "$FM_TEST_TMUX_STATE_FILE"
+    ;;
+  display-message)
+    [ "$state" != unreadable ] || exit 1
+    case "$*" in
+      *pane_current_command*)
+        case "$state" in
+          alive) printf 'codex\n' ;;
+          dead) printf 'bash\n' ;;
+          ambiguous) printf 'python\n' ;;
+          *) exit 1 ;;
+        esac
+        ;;
+      *pane_pid*) printf '999999\n' ;;
+      *pane_tty*) printf '/dev/null\n' ;;
+      *) printf '%%1\n' ;;
+    esac
+    ;;
+  capture-pane) printf 'fixture terminal\n' ;;
+esac
+exit 0
+SH
+  chmod +x "$fb/tmux"
+  printf '%s\n' "$fb"
+}
+
 make_home() {  # <name>
   local home=$TMP_ROOT/$1
   mkdir -p "$home/state" "$home/data" "$home/projects" "$home/config"
@@ -736,7 +780,7 @@ EOF
   printf '%s' "$canonical" | jq -e '
     .secondmate_current.records[] | select(.id == "states")
     | .current.state == "unknown"
-      and (.current.reason | contains("live child state has no in-flight backlog item"))
+      and (.current.reason | contains("child metadata has no in-flight or retained-Done owner"))
       and (.current.reason | contains("parked=parked"))
   ' >/dev/null || fail "unowned held child was silently dropped: $canonical"
   cat > "$mate/data/backlog.md" <<'EOF'
@@ -1724,7 +1768,7 @@ EOF
   printf '%s' "$canonical" | jq -e '
     .secondmate_current.records[] | select(.id == "sshhip")
     | .current.state == "unknown"
-      and (.current.reason | contains("live child state has no in-flight backlog item: unreadable-child=unknown"))
+      and (.current.reason | contains("child metadata has no in-flight or retained-Done owner: unreadable-child=unknown"))
       and .provenance.selected != "structured-home"
       and .invalidity == null
       and .active_children == []
@@ -1822,6 +1866,155 @@ EOF
       and .endpoints == []
   ' >/dev/null || fail "an unrecognized worker kind no longer stayed strict: $canonical"
   pass "mixed secondmate roles, partial state, and captain readiness project independently"
+}
+
+# Structured Done rows may retain clean worktrees and metadata while an unmerged
+# local branch still carries the completed result. A recovery-grade dead endpoint
+# makes that retained evidence completed history, not unmatched current work.
+test_retained_dead_done_workers_are_not_unowned_current_work() {
+  local home mate fakebin states canonical
+  home=$(make_home retained-dead-parent)
+  : > "$home/data/secondmates.md"
+  mate="$TMP_ROOT/retained-dead-home"
+  make_valid_secondmate_home retained-dead "$mate"
+  append_secondmate_registry "$home" retained-dead "$mate"
+  states="$home/tmux-states"
+  : > "$states"
+  cat > "$mate/data/backlog.md" <<'EOF'
+## In flight
+
+## Queued
+
+## Done
+- [x] rotation-a - Structured rotation A (repo: rotations) (kind: ship) (done 2026-08-30)
+- [x] rotation-b - Structured rotation B (repo: rotations) (kind: ship) (done 2026-08-30)
+- [x] rotation-c - Structured rotation C (repo: rotations) (kind: ship) (done 2026-08-30)
+EOF
+  for id in rotation-a rotation-b rotation-c; do
+    mkdir -p "$mate/projects/$id"
+    fm_write_meta "$mate/state/$id.meta" \
+      "window=firstmate:fm-$id" "worktree=$mate/projects/$id" "project=rotations" \
+      "harness=codex" "kind=ship" "mode=no-mistakes"
+    printf 'done: retained on local research branch\n' > "$mate/state/$id.status"
+    printf 'fm-%s dead\n' "$id" >> "$states"
+  done
+  fakebin=$(make_reconcile_fakebin "$home")
+  canonical=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" FM_TEST_TMUX_STATE_FILE="$states" \
+    FM_SNAPSHOT_NOW=2026-08-31T12:00:00Z "$ROOT/bin/fm-fleet-snapshot.sh" --json)
+  printf '%s' "$canonical" | jq -e '
+    .secondmate_current.records[] | select(.id == "retained-dead")
+    | .current == {state:"no_active_work",reason:null}
+      and .provenance.summary_valid == true
+      and .invalidity == {kind:null,ids:[]}
+      and ([.retained_completed[].id] | sort) == ["rotation-a", "rotation-b", "rotation-c"]
+      and all(.retained_completed[];
+        .current_state.state == "unknown"
+          and .endpoint.recovery_state == "dead"
+          and .worktree.present == true)
+      and ([.landed[].id] | sort) == ["rotation-a", "rotation-b", "rotation-c"]
+      and .counts.retained_completed == 3
+  ' >/dev/null || fail "dead retained Done workers invalidated structured summary or lost evidence: $canonical"
+  pass "recovery-grade dead Done workers remain explicit retained completion evidence"
+}
+
+# The retained exception is deliberately narrow. Metadata unmatched by an
+# in-flight row remains invalid unless a structured Done row and a recovery-grade
+# dead/missing verdict both prove completed retained work.
+test_alive_or_ambiguous_unmatched_metadata_stays_invalid() {
+  local home mate fakebin states canonical summary verdict
+  home=$(make_home unmatched-endpoint-parent)
+  : > "$home/data/secondmates.md"
+  mate="$TMP_ROOT/unmatched-endpoint-home"
+  make_valid_secondmate_home unmatched-endpoint "$mate"
+  append_secondmate_registry "$home" unmatched-endpoint "$mate"
+  mkdir -p "$mate/projects/rogue"
+  fm_write_meta "$mate/state/rogue.meta" \
+    "window=firstmate:fm-rogue" "worktree=$mate/projects/rogue" "project=sample" \
+    "harness=codex" "kind=ship" "mode=no-mistakes"
+  printf 'done: unmatched historical claim\n' > "$mate/state/rogue.status"
+  states="$home/tmux-states"
+  fakebin=$(make_reconcile_fakebin "$home")
+  for verdict in alive ambiguous; do
+    printf 'fm-rogue %s\n' "$verdict" > "$states"
+    summary=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$mate" \
+      FM_TEST_TMUX_STATE_FILE="$states" FM_SNAPSHOT_NOW=2026-08-31T12:00:00Z \
+      "$ROOT/bin/fm-fleet-snapshot.sh" --secondmate-home-summary)
+    printf '%s' "$summary" | jq -e --arg verdict "$verdict" '
+      .valid == false
+        and .inventory.valid == false
+        and .invalidity == {kind:"unowned_current",ids:["rogue"]}
+        and .endpoints[0].endpoint.recovery_state == $verdict
+    ' >/dev/null || fail "$verdict fixture did not exercise the intended strict recovery verdict: $summary"
+    canonical=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" FM_TEST_TMUX_STATE_FILE="$states" \
+      FM_SNAPSHOT_NOW=2026-08-31T12:00:00Z "$ROOT/bin/fm-fleet-snapshot.sh" --json)
+    printf '%s' "$canonical" | jq -e '
+      .secondmate_current.records[] | select(.id == "unmatched-endpoint")
+      | .current.state == "unknown"
+        and (.current.reason | contains("child metadata has no in-flight or retained-Done owner: rogue="))
+        and .provenance.selected != "structured-home"
+    ' >/dev/null || fail "$verdict unmatched metadata did not invalidate inventory: $canonical"
+  done
+  pass "alive and ambiguous unmatched metadata still invalidate secondmate inventory"
+}
+
+# Codex has no verified busy/idle semantic source. Even a live endpoint, a paused
+# event, and a registered task-neutral external source must leave current state
+# unknown while preserving independently structured inventory evidence.
+test_codex_unknown_is_observability_not_inventory_contradiction() {
+  local home mate fakebin states canonical
+  home=$(make_home codex-observability-parent)
+  : > "$home/data/secondmates.md"
+  mate="$TMP_ROOT/codex-observability-home"
+  make_valid_secondmate_home codex-observability "$mate"
+  append_secondmate_registry "$home" codex-observability "$mate"
+  mkdir -p "$mate/projects/cnvq-a" "$mate/projects/cnvq-b" "$mate/state/procevent"
+  cat > "$mate/data/backlog.md" <<'EOF'
+## In flight
+- [ ] cnvq-a - Train CNVQ A (repo: cnvq) (kind: ship) (since 2026-08-30)
+- [ ] cnvq-b - Train CNVQ B (repo: cnvq) (kind: ship) (since 2026-08-30)
+
+## Queued
+- [ ] cnvq-gate - Evaluate after training blocked-by: cnvq-a blocked-by: cnvq-b (repo: cnvq) (kind: ship)
+
+## Done
+- [x] cnvq-baseline - Baseline evaluation (repo: cnvq) (kind: ship) (done 2026-08-29)
+EOF
+  for id in cnvq-a cnvq-b; do
+    fm_write_meta "$mate/state/$id.meta" \
+      "window=firstmate:fm-$id" "worktree=$mate/projects/$id" "project=cnvq" \
+      "harness=codex" "kind=ship" "mode=no-mistakes"
+    printf 'paused: waiting for Slurm job 1579631\n' > "$mate/state/$id.status"
+  done
+  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$mate" \
+    "$ROOT/bin/fm-procevent.sh" register when slurm-1579631 -- squeue --job 1579631 >/dev/null \
+    || fail "could not register the task-neutral Slurm wait fixture"
+  states="$home/tmux-states"
+  printf 'fm-cnvq-a alive\nfm-cnvq-b alive\n' > "$states"
+  fakebin=$(make_reconcile_fakebin "$home")
+  canonical=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" FM_TEST_TMUX_STATE_FILE="$states" \
+    FM_SNAPSHOT_NOW=2026-08-31T12:00:00Z "$ROOT/bin/fm-fleet-snapshot.sh" --json)
+  printf '%s' "$canonical" | jq -e '
+    .secondmate_current.records[] | select(.id == "codex-observability")
+    | .current.state == "unknown"
+      and (.current.reason | contains("child current state unavailable"))
+      and .invalidity == {kind:"child_current_unavailable",ids:["cnvq-a","cnvq-b"]}
+      and .inventory.valid == true
+      and .observability.current_state == "unavailable"
+      and .observability.ids == ["cnvq-a","cnvq-b"]
+      and .provenance.selected == "structured-home"
+      and .provenance.trust == "partial-structured"
+      and ([.in_flight[].id] | sort) == ["cnvq-a","cnvq-b"]
+      and all(.in_flight[];
+        .current_state.state == "unknown"
+          and .current_state.source == "pane"
+          and (.current_state.detail | contains("codex-unverified"))
+          and .endpoint.recovery_state == "alive"
+          and .worktree.present == true)
+      and [.queued[].id] == ["cnvq-gate"]
+      and [.landed[].id] == ["cnvq-baseline"]
+      and .counts.in_flight == 2
+  ' >/dev/null || fail "Codex unknown state was conflated with an inventory contradiction or lost evidence: $canonical"
+  pass "Codex semantic-state unknown remains explicit while structured evidence survives"
 }
 
 test_main_captain_readiness_matches_secondmate_projection() {
@@ -1923,6 +2116,9 @@ test_main_orphan_in_flight_is_disclosed_not_invented
 test_main_unstructured_current_is_disclosed_with_structured_sibling
 test_main_orphan_counterfactual_meta_clears_inventory_warning
 test_mixed_secondmate_roles_partial_state_and_captain_readiness
+test_retained_dead_done_workers_are_not_unowned_current_work
+test_alive_or_ambiguous_unmatched_metadata_stays_invalid
+test_codex_unknown_is_observability_not_inventory_contradiction
 test_main_captain_readiness_matches_secondmate_projection
 test_completed_scout_report_not_pending
 test_open_decision_surfaces_end_to_end
