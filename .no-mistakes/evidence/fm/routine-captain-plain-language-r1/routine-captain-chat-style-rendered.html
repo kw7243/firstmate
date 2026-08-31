@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Routine Captain Chat Style — rendered evidence</title>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<style>
+:root { color-scheme: light; --ink:#1f2328; --muted:#59636e; --line:#d0d7de; --paper:#fff; --canvas:#f6f8fa; --accent:#0969da; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--canvas); color:var(--ink); font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+.frame { width:min(920px,calc(100% - 40px)); margin:32px auto; background:var(--paper); border:1px solid var(--line); border-radius:12px; box-shadow:0 8px 28px rgba(31,35,40,.08); overflow:hidden; }
+.evidence-head { padding:14px 28px; border-bottom:1px solid var(--line); color:var(--muted); font-size:13px; font-weight:600; letter-spacing:.02em; }
+.markdown-body { padding:28px 36px 40px; min-width:0; overflow-wrap:anywhere; }
+h1 { margin:0 0 18px; padding-bottom:10px; border-bottom:1px solid var(--line); font-size:32px; line-height:1.25; }
+h2 { margin:30px 0 14px; font-size:22px; line-height:1.25; }
+p { margin:0 0 14px; }
+ul { margin:0 0 18px; padding-left:28px; }
+li { margin:5px 0; }
+code { padding:.15em .35em; border-radius:6px; background:rgba(175,184,193,.2); font:85% ui-monospace,SFMono-Regular,Consolas,monospace; }
+pre { margin:12px 0 18px; padding:14px 16px; border:1px solid var(--line); border-radius:8px; background:var(--canvas); overflow:auto; }
+pre code { padding:0; background:transparent; font-size:14px; line-height:1.45; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<main class="frame">
+<div class="evidence-head">Rendered AGENTS.md contract · target 4eb3930</div>
+<article id="content" class="markdown-body"></article>
+</main>
+<script>
+const source = "# Routine Captain Chat Style\n\nUse this small section as the default style reference when talking directly with the captain.\nDo not load the full `data/WRITING_STYLE.md` for routine chat.\nThe examples below are the main voice anchors; load the full guide when drafting a substantial report, notebook, gate, email, external message, or other polished artifact.\n\n## Defaults\n\n- Lead with the outcome or current state.\n- Use short, informal, conversational sentences with low ceremony.\n- Keep concrete facts first and separate facts from inference.\n- Use the shortest version that preserves the evidence and the ask.\n- Address the captain naturally at least once, without repeating it in every sentence.\n- Explain routine work with simple, direct language, short sentences, and only necessary domain-specific terms.\n- Use technical precision when it helps, but rewrite stacked abstractions and long technical clauses in plain language.\n\nToo technical: \"Unavailable child semantics, inventory contradictions, and a top-level/inventory/observability truth table at the cross-home boundary.\"\n\nBetter: \"When Firstmate cannot verify a child agent's status, it should say unknown.\nIn a few edge cases, it could incorrectly say the child is actively working.\nThe fix rejects those inconsistent reports.\"\n\n## Representative Google Chat DM examples\n\n```text\nSounds good to me\n```\n\n```text\nwait never mind, resolved\n```\n\n## Representative email examples\n\n```text\nHi Jake,\n\nBig thanks. Appreciate your support.\n\nKevin\n```\n\n```text\nHi Jake,\nHope you're well!\n\nWas just curious about my work this summer. In a doc I got sent, one of the bullets mentioned efficiency and adapting existing models for work, and I've recently gotten interested in efficient inference methods such as sparsity, quantization, long-context, and few-step generation. I'm wondering if you know the details of potential directions my summer work could take.\n\nThanks,\nKevin\n```\n\n";
+document.getElementById("content").innerHTML = marked.parse(source);
+</script>
+</body>
+</html>
