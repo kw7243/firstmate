@@ -1921,11 +1921,11 @@ EOF
   pass "recovery-grade dead Done workers remain explicit retained completion evidence"
 }
 
-test_done_captain_row_does_not_own_child_metadata() {
-  local mate fakebin states summary
-  mate="$TMP_ROOT/done-captain-collision-home"
-  make_valid_secondmate_home done-captain-collision "$mate"
-  mkdir -p "$mate/projects/captain-collision"
+test_done_nonworker_rows_do_not_own_child_metadata() {
+  local mate fakebin states summary id
+  mate="$TMP_ROOT/done-nonworker-collision-home"
+  make_valid_secondmate_home done-nonworker-collision "$mate"
+  mkdir -p "$mate/projects/captain-collision" "$mate/projects/program-collision"
   cat > "$mate/data/backlog.md" <<'EOF'
 ## In flight
 
@@ -1933,13 +1933,16 @@ test_done_captain_row_does_not_own_child_metadata() {
 
 ## Done
 - [x] captain-collision - Completed captain action (repo: sample) (kind: captain) (done 2026-08-30)
+- [x] program-collision - Completed program record (repo: sample) (kind: program) (done 2026-08-30)
 EOF
-  fm_write_meta "$mate/state/captain-collision.meta" \
-    "window=firstmate:fm-captain-collision" "worktree=$mate/projects/captain-collision" \
-    "project=sample" "harness=codex" "kind=ship" "mode=no-mistakes"
-  printf 'done: stale child record sharing a captain id\n' > "$mate/state/captain-collision.status"
+  for id in captain-collision program-collision; do
+    fm_write_meta "$mate/state/$id.meta" \
+      "window=firstmate:fm-$id" "worktree=$mate/projects/$id" \
+      "project=sample" "harness=codex" "kind=ship" "mode=no-mistakes"
+    printf 'done: stale child record sharing a non-worker id\n' > "$mate/state/$id.status"
+  done
   states="$mate/tmux-states"
-  printf 'fm-captain-collision dead\n' > "$states"
+  printf 'fm-captain-collision dead\nfm-program-collision dead\n' > "$states"
   fakebin=$(make_reconcile_fakebin "$mate")
   summary=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$mate" \
     FM_TEST_TMUX_STATE_FILE="$states" FM_SNAPSHOT_NOW=2026-08-31T12:00:00Z \
@@ -1947,12 +1950,12 @@ EOF
   printf '%s' "$summary" | jq -e '
     .valid == false
       and .inventory.valid == false
-      and .invalidity == {kind:"unowned_current",ids:["captain-collision"]}
+      and .invalidity == {kind:"unowned_current",ids:["captain-collision","program-collision"]}
       and .retained_completed == []
-      and .landed == []
-      and .endpoints[0].retained_completed == false
-  ' >/dev/null || fail "a Done captain row owned stale child metadata: $summary"
-  pass "Done captain rows cannot own retained child metadata"
+      and [.landed[].id] == ["program-collision"]
+      and all(.endpoints[]; .retained_completed == false)
+  ' >/dev/null || fail "a Done non-worker row owned stale child metadata: $summary"
+  pass "Done non-worker rows cannot own retained child metadata"
 }
 
 test_retained_missing_work_stays_historical() {
@@ -2380,14 +2383,30 @@ SH
         and .contradiction == false
     ' >/dev/null || fail "malformed additive $field field crossed the remote summary boundary: $canonical"
   done
-  for variant in invalid-inventory mismatched-observability; do
+  for variant in invalid-inventory mismatched-observability live-partial-state valid-invalid-inventory valid-unavailable-observability; do
     jq --arg variant "$variant" '
       if $variant == "invalid-inventory" then
         .inventory = {valid:false,reason:"orphan child metadata",
           invalidity:{kind:"orphan_in_flight",ids:["orphan"]}}
-      else
+      elif $variant == "mismatched-observability" then
         .observability = {current_state:"unavailable",ids:["different-child"],
           reason:"authoritative child current state unavailable"}
+      elif $variant == "live-partial-state" then
+        .state = "active_child_work"
+      elif $variant == "valid-invalid-inventory" then
+        .valid = true
+        | .reason = null
+        | .invalidity = {kind:null,ids:[]}
+        | .state = "no_active_work"
+        | .inventory = {valid:false,reason:"orphan child metadata",
+            invalidity:{kind:"orphan_in_flight",ids:["orphan"]}}
+      else
+        .valid = true
+        | .reason = null
+        | .invalidity = {kind:null,ids:[]}
+        | .state = "no_active_work"
+        | .observability = {current_state:"unavailable",ids:["legacy-working"],
+            reason:"authoritative child current state unavailable"}
       end
     ' "$base_summary" > "$summary"
     canonical=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
@@ -2504,7 +2523,7 @@ test_main_unstructured_current_is_disclosed_with_structured_sibling
 test_main_orphan_counterfactual_meta_clears_inventory_warning
 test_mixed_secondmate_roles_partial_state_and_captain_readiness
 test_retained_dead_done_workers_are_not_unowned_current_work
-test_done_captain_row_does_not_own_child_metadata
+test_done_nonworker_rows_do_not_own_child_metadata
 test_retained_missing_work_stays_historical
 test_long_retained_id_uses_raw_ownership_key
 test_alive_or_ambiguous_unmatched_metadata_stays_invalid

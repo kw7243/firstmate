@@ -705,6 +705,7 @@ secondmate_home_summary_json() {  # <backlog-json> <tasks-json>
     | ([ $backlog.records[]? | select(.state == "in_flight" and .structured) ]) as $owned_in_flight
     | ([ $backlog.records[]?
          | select(.state == "done" and .structured and .kind != "captain") ]) as $completed
+    | ([ $completed[] | select(.kind != "program") ]) as $retention_candidates
     | ([ $backlog.records[]?
          | select(.structured and
              (.state == "queued" or
@@ -727,7 +728,7 @@ secondmate_home_summary_json() {  # <backlog-json> <tasks-json>
     | ([ $owned_in_flight[]
          | select(.requires_child_metadata)
          | select(.id as $id | [$tasks[].id] | index($id) | not) ]) as $orphan_in_flight
-    | ([ $completed[] as $done
+    | ([ $retention_candidates[] as $done
          | $tasks[]
          | select(.id == $done.id
              and (.endpoint.recovery_state == "dead" or .endpoint.recovery_state == "missing")) ]) as $retained_completed
@@ -1309,10 +1310,22 @@ secondmate_current_json() {  # <parent-tasks-json>
         if [ "$summary_bytes" -gt "$FM_SNAPSHOT_SECONDMATE_MAX_BYTES" ]; then
           reason="structured home snapshot exceeded byte limit"
         elif ! printf '%s' "$summary" | jq -e --arg home "$home" --arg generated "$SNAPSHOT_NOW" --argjson remote "$remote" '
+          def clean_inventory:
+            .valid == true
+            and .reason == null
+            and .invalidity.kind == null
+            and (.invalidity.ids | length) == 0;
+          def available_observability:
+            .current_state == "available"
+            and (.ids | length) == 0
+            and .reason == null;
           .schema == "fm-secondmate-home-summary.v1" and .home == $home
           and (($remote == true) or .generated == $generated)
           and (.valid | type) == "boolean" and (.state | type) == "string"
-          and (.invalidity | type) == "object" and (.invalidity.ids | type) == "array"
+          and ((.reason == null) or ((.reason | type) == "string"))
+          and (.invalidity | type) == "object"
+          and ((.invalidity.kind == null) or ((.invalidity.kind | type) == "string"))
+          and (.invalidity.ids | type) == "array"
           and all(.invalidity.ids[]; type == "string")
           and (.active_children | type) == "array" and (.decisions_open | type) == "array"
           and (.holds | type) == "array" and (.queued | type) == "array"
@@ -1340,18 +1353,26 @@ secondmate_current_json() {  # <parent-tasks-json>
           and (if has("retained_completed") then
             (.retained_completed | type) == "array" and all(.retained_completed[]; type == "object")
           else true end)
-          and (if (.valid == false and .invalidity.kind == "child_current_unavailable") then
-            (if has("inventory") then
-              .inventory.valid == true
-              and .inventory.reason == null
-              and .inventory.invalidity.kind == null
-              and (.inventory.invalidity.ids | length) == 0
-            else true end)
-            and (if has("observability") then
-              .observability.current_state == "unavailable"
-              and .observability.ids == .invalidity.ids
-            else true end)
-          else true end)
+          and (.invalidity.ids as $invalidity_ids
+            | if .valid == true then
+                .reason == null
+                and .invalidity.kind == null
+                and ($invalidity_ids | length) == 0
+                and (.state == "captain_decision" or .state == "active_child_work"
+                  or .state == "externally_held" or .state == "no_active_work")
+                and (if has("inventory") then (.inventory | clean_inventory) else true end)
+                and (if has("observability") then (.observability | available_observability) else true end)
+              elif .invalidity.kind == "child_current_unavailable" then
+                (.reason | type) == "string"
+                and ($invalidity_ids | length) > 0
+                and .state == "unknown"
+                and (if has("inventory") then (.inventory | clean_inventory) else true end)
+                and (if has("observability") then
+                  .observability.current_state == "unavailable"
+                  and .observability.ids == $invalidity_ids
+                  and (.observability.reason | type) == "string"
+                else true end)
+              else true end)
         ' >/dev/null 2>&1; then
           reason="structured home snapshot was malformed or stale"
         else
