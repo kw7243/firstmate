@@ -330,9 +330,11 @@ MODEL=$(printf '%s' "$SNAP" | jq \
   | ([ .tasks[]
        | select(.endpoint.exists == false or .endpoint.agent_alive == "dead")
        | {id, backend, target:(.endpoint.target // "-"), exists:.endpoint.exists, agent:.endpoint.agent_alive} ]
-     + [ (.secondmate_current.records // [])[] as $m | $m.endpoints[]?
-         | select(.endpoint.exists == false or .endpoint.agent_alive == "dead")
-         | {id:($m.id + "/" + .id),backend:"secondmate-home",target:(.endpoint.target // "-"),exists:.endpoint.exists,agent:.endpoint.agent_alive} ]) as $unhealthy_all
+     + [ (.secondmate_current.records // [])[] as $m | $m.endpoints[]? as $endpoint
+         | select(((($endpoint.retained_completed // false) == true)
+             or any($m.retained_completed[]?; .id == $endpoint.id)) | not)
+         | select($endpoint.endpoint.exists == false or $endpoint.endpoint.agent_alive == "dead")
+         | {id:($m.id + "/" + $endpoint.id),backend:"secondmate-home",target:($endpoint.endpoint.target // "-"),exists:$endpoint.endpoint.exists,agent:$endpoint.endpoint.agent_alive} ]) as $unhealthy_all
   | ([ (.secondmate_current.records // [])[]
        | ([.decisions_open[]? | select(.source == "backlog" and .verb == "captain-hold")]) as $captain_holds
        | ([.holds[]? | select(.source == "backlog")]) as $backlog_holds

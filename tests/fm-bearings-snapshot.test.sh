@@ -96,6 +96,7 @@ case "${1:-}" in
     ;;
   display-message)
     [ "$state" != unreadable ] || exit 1
+    [ "$state" != missing ] || exit 1
     case "$*" in
       *pane_current_command*)
         case "$state" in
@@ -1920,6 +1921,85 @@ EOF
   pass "recovery-grade dead Done workers remain explicit retained completion evidence"
 }
 
+test_done_captain_row_does_not_own_child_metadata() {
+  local mate fakebin states summary
+  mate="$TMP_ROOT/done-captain-collision-home"
+  make_valid_secondmate_home done-captain-collision "$mate"
+  mkdir -p "$mate/projects/captain-collision"
+  cat > "$mate/data/backlog.md" <<'EOF'
+## In flight
+
+## Queued
+
+## Done
+- [x] captain-collision - Completed captain action (repo: sample) (kind: captain) (done 2026-08-30)
+EOF
+  fm_write_meta "$mate/state/captain-collision.meta" \
+    "window=firstmate:fm-captain-collision" "worktree=$mate/projects/captain-collision" \
+    "project=sample" "harness=codex" "kind=ship" "mode=no-mistakes"
+  printf 'done: stale child record sharing a captain id\n' > "$mate/state/captain-collision.status"
+  states="$mate/tmux-states"
+  printf 'fm-captain-collision dead\n' > "$states"
+  fakebin=$(make_reconcile_fakebin "$mate")
+  summary=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$mate" \
+    FM_TEST_TMUX_STATE_FILE="$states" FM_SNAPSHOT_NOW=2026-08-31T12:00:00Z \
+    "$ROOT/bin/fm-fleet-snapshot.sh" --secondmate-home-summary)
+  printf '%s' "$summary" | jq -e '
+    .valid == false
+      and .inventory.valid == false
+      and .invalidity == {kind:"unowned_current",ids:["captain-collision"]}
+      and .retained_completed == []
+      and .landed == []
+      and .endpoints[0].retained_completed == false
+  ' >/dev/null || fail "a Done captain row owned stale child metadata: $summary"
+  pass "Done captain rows cannot own retained child metadata"
+}
+
+test_retained_missing_endpoint_is_not_unhealthy() {
+  local home mate fakebin states canonical json
+  home=$(make_home retained-missing-parent)
+  : > "$home/data/secondmates.md"
+  mate="$TMP_ROOT/retained-missing-home"
+  make_valid_secondmate_home retained-missing "$mate"
+  append_secondmate_registry "$home" retained-missing "$mate"
+  mkdir -p "$mate/projects/retained-missing-worker"
+  cat > "$mate/data/backlog.md" <<'EOF'
+## In flight
+
+## Queued
+
+## Done
+- [x] retained-missing-worker - Completed missing-endpoint work (repo: sample) (kind: ship) (done 2026-08-30)
+EOF
+  fm_write_meta "$mate/state/retained-missing-worker.meta" \
+    "window=firstmate:fm-retained-missing-worker" \
+    "worktree=$mate/projects/retained-missing-worker" "project=sample" \
+    "harness=codex" "kind=ship" "mode=no-mistakes"
+  printf 'done: retained work whose endpoint is gone\n' > "$mate/state/retained-missing-worker.status"
+  states="$home/tmux-states"
+  printf 'fm-retained-missing-worker missing\n' > "$states"
+  fakebin=$(make_reconcile_fakebin "$home")
+  canonical=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
+    FM_TEST_TMUX_STATE_FILE="$states" FM_SNAPSHOT_NOW=2026-08-31T12:00:00Z \
+    "$ROOT/bin/fm-fleet-snapshot.sh" --json)
+  printf '%s' "$canonical" | jq -e '
+    .secondmate_current.records[] | select(.id == "retained-missing")
+    | .current == {state:"no_active_work",reason:null}
+      and [.retained_completed[].id] == ["retained-missing-worker"]
+      and .retained_completed[0].endpoint.recovery_state == "missing"
+      and .retained_completed[0].endpoint.exists == false
+      and .endpoints[0].retained_completed == true
+      and .endpoints[0].endpoint.exists == false
+  ' >/dev/null || fail "missing retained endpoint lost its completed ownership: $canonical"
+  json=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_TEST_TMUX_STATE_FILE="$states" \
+    FM_BEARINGS_NOW=2026-08-31T12:00:00Z NET_LOG="$home/net.log" "$BEARINGS" --json)
+  printf '%s' "$json" | jq -e '
+    (.landed | any(.id == "retained-missing-worker" and .owner == "retained-missing"))
+      and ((.unhealthy_endpoints // []) | all(.id != "retained-missing/retained-missing-worker"))
+  ' >/dev/null || fail "Bearings reported retained missing work as an unhealthy endpoint: $json"
+  pass "retained missing endpoints stay out of unhealthy endpoint alerts"
+}
+
 test_long_retained_id_uses_raw_ownership_key() {
   local mate fakebin states summary long_id
   mate="$TMP_ROOT/long-retained-id-home"
@@ -2418,6 +2498,8 @@ test_main_unstructured_current_is_disclosed_with_structured_sibling
 test_main_orphan_counterfactual_meta_clears_inventory_warning
 test_mixed_secondmate_roles_partial_state_and_captain_readiness
 test_retained_dead_done_workers_are_not_unowned_current_work
+test_done_captain_row_does_not_own_child_metadata
+test_retained_missing_endpoint_is_not_unhealthy
 test_long_retained_id_uses_raw_ownership_key
 test_alive_or_ambiguous_unmatched_metadata_stays_invalid
 test_wrong_task_endpoint_binding_stays_unverified

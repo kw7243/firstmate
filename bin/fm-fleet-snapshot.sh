@@ -703,7 +703,8 @@ secondmate_home_summary_json() {  # <backlog-json> <tasks-json>
     ([ $backlog.records[]?
        | select((.state == "in_flight" or .state == "queued") and (.structured | not)) ]) as $unstructured_current
     | ([ $backlog.records[]? | select(.state == "in_flight" and .structured) ]) as $owned_in_flight
-    | ([ $backlog.records[]? | select(.state == "done" and .structured) ]) as $completed
+    | ([ $backlog.records[]?
+         | select(.state == "done" and .structured and .kind != "captain") ]) as $completed
     | ([ $backlog.records[]?
          | select(.structured and
              (.state == "queued" or
@@ -714,7 +715,7 @@ secondmate_home_summary_json() {  # <backlog-json> <tasks-json>
          | select(.captain_actionable == true)
          | {id,key:.id,verb:"captain-hold",summary:(.title | trunc(160)),
             reason:(.hold_reason | trunc(160)),source:"backlog"} ]) as $captain_holds_all
-    | ([ $backlog.records[]? | select(.state == "done" and .structured and .kind != "captain")
+    | ([ $completed[]
          | {id:(.id | trunc(120)),title:(.title | trunc(120)),
             pr_url:((.pr_url // null) | if . == null then null else trunc(500) end),
             report_path:((.report_path // null) | if . == null then null else trunc(500) end),
@@ -845,6 +846,7 @@ secondmate_home_summary_json() {  # <backlog-json> <tasks-json>
           kind:((.kind // null) | if . == null then null else trunc(40) end)}][:$queued_n]),
         landed:(if $landed_n == 0 then $landed_all else $landed_all[:$landed_n] end),
         endpoints:([$tasks[] | {id,state:.current_state.state,source:.current_state.source,
+          retained_completed:(.id as $id | any($retained_completed[]; .id == $id)),
           endpoint:(.endpoint + {target:((.endpoint.target // null) | if . == null then null else trunc(240) end)})}][:$child_n]),
         counts:{
           in_flight:($in_flight_all | length),
