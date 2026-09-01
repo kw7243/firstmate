@@ -588,6 +588,8 @@ test_view_renders_dead_secondmate_agent_status() {
   home=$(make_home dead-secondmate)
   fm_write_meta "$home/state/dead-secondmate.meta" \
     "window=firstmate:fm-dead-secondmate" \
+    "endpoint_task_id=dead-secondmate" \
+    "worktree=$home/secondmate-home" \
     "project=$home/secondmate-home" \
     "harness=codex" \
     "kind=secondmate" \

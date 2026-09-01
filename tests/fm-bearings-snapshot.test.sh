@@ -74,6 +74,51 @@ SH
   printf '%s\n' "$fb"
 }
 
+# Replace the ordinary tmux stub with a recovery-grade endpoint fixture.
+# Each line in FM_TEST_TMUX_STATE_FILE is "<window> <alive|dead|ambiguous|unreadable>".
+make_reconcile_fakebin() {  # <dir>
+  local fb
+  fb=$(make_fakebin "$1")
+  cat > "$fb/tmux" <<'SH'
+#!/usr/bin/env bash
+set -u
+target=
+prev=
+for arg in "$@"; do
+  if [ "$prev" = -t ]; then target=$arg; fi
+  prev=$arg
+done
+window=${target#*:}
+state=$(awk -v window="$window" '$1 == window {print $2; exit}' "${FM_TEST_TMUX_STATE_FILE:?}")
+case "${1:-}" in
+  list-windows)
+    awk '$2 != "missing" {print $1}' "$FM_TEST_TMUX_STATE_FILE"
+    ;;
+  display-message)
+    [ "$state" != unreadable ] || exit 1
+    [ "$state" != missing ] || exit 1
+    case "$*" in
+      *pane_current_command*)
+        case "$state" in
+          alive) printf 'codex\n' ;;
+          dead) printf 'bash\n' ;;
+          ambiguous) printf 'python\n' ;;
+          *) exit 1 ;;
+        esac
+        ;;
+      *pane_pid*) printf '999999\n' ;;
+      *pane_tty*) printf '/dev/null\n' ;;
+      *) printf '%%1\n' ;;
+    esac
+    ;;
+  capture-pane) printf 'fixture terminal\n' ;;
+esac
+exit 0
+SH
+  chmod +x "$fb/tmux"
+  printf '%s\n' "$fb"
+}
+
 make_home() {  # <name>
   local home=$TMP_ROOT/$1
   mkdir -p "$home/state" "$home/data" "$home/projects" "$home/config"
@@ -624,9 +669,12 @@ test_parent_evidence_reconciles_by_verb_and_key() {
   fm_write_secondmate_meta "$home/state/hold.meta" "$hold" "firstmate:fm-hold" sample
   fm_write_secondmate_meta "$home/state/blocked.meta" "$blocked" "firstmate:fm-blocked" sample
   fm_write_secondmate_meta "$home/state/decision.meta" "$decision" "firstmate:fm-decision" sample
-  printf 'working [key=stale-work]: old work still running\n' > "$home/state/hold.status"
-  printf 'paused [key=legal-release]: waiting for legal release\n' >> "$home/state/hold.status"
-  printf 'paused: legacy pause without an identity\n' >> "$home/state/hold.status"
+  {
+    printf 'working [key=stale-work]: old work still running\n'
+    printf 'paused [key=legal-release]: waiting for legal release\n'
+    printf 'paused [key=stale-pause]: old pause still active\n'
+    printf 'paused: legacy pause without an identity\n'
+  } > "$home/state/hold.status"
   printf 'blocked [key=vendor-release]: waiting for vendor release\n' > "$home/state/blocked.status"
   printf 'blocked: legacy block without an identity\n' >> "$home/state/blocked.status"
   printf 'needs-decision [key=stale-route]: choose the old route\n' > "$home/state/decision.status"
@@ -672,6 +720,8 @@ EOF
         and .terminal_evidence.captured == false
         and (.parent_event.reconciliation.activities
           | any(.verb == "paused" and .key == "legal-release" and .verdict == "corroborates"))
+        and (.parent_event.reconciliation.activities
+          | any(.verb == "paused" and .key == "stale-pause" and .verdict == "contradicts"))
         and (.parent_event.reconciliation.activities
           | any(.verb == "paused" and .key == "default" and .verdict == "inconclusive" and .matched == null))
         and (.parent_event.reconciliation.activities
@@ -736,7 +786,7 @@ EOF
   printf '%s' "$canonical" | jq -e '
     .secondmate_current.records[] | select(.id == "states")
     | .current.state == "unknown"
-      and (.current.reason | contains("live child state has no in-flight backlog item"))
+      and (.current.reason | contains("child metadata has no in-flight or retained-Done owner"))
       and (.current.reason | contains("parked=parked"))
   ' >/dev/null || fail "unowned held child was silently dropped: $canonical"
   cat > "$mate/data/backlog.md" <<'EOF'
@@ -1724,7 +1774,7 @@ EOF
   printf '%s' "$canonical" | jq -e '
     .secondmate_current.records[] | select(.id == "sshhip")
     | .current.state == "unknown"
-      and (.current.reason | contains("live child state has no in-flight backlog item: unreadable-child=unknown"))
+      and (.current.reason | contains("child metadata has no in-flight or retained-Done owner: unreadable-child=unknown"))
       and .provenance.selected != "structured-home"
       and .invalidity == null
       and .active_children == []
@@ -1822,6 +1872,557 @@ EOF
       and .endpoints == []
   ' >/dev/null || fail "an unrecognized worker kind no longer stayed strict: $canonical"
   pass "mixed secondmate roles, partial state, and captain readiness project independently"
+}
+
+# Structured Done rows may retain clean worktrees and metadata while an unmerged
+# local branch still carries the completed result. A recovery-grade dead endpoint
+# makes that retained evidence completed history, not unmatched current work.
+test_retained_dead_done_workers_are_not_unowned_current_work() {
+  local home mate fakebin states canonical
+  home=$(make_home retained-dead-parent)
+  : > "$home/data/secondmates.md"
+  mate="$TMP_ROOT/retained-dead-home"
+  make_valid_secondmate_home retained-dead "$mate"
+  append_secondmate_registry "$home" retained-dead "$mate"
+  states="$home/tmux-states"
+  : > "$states"
+  cat > "$mate/data/backlog.md" <<'EOF'
+## In flight
+
+## Queued
+
+## Done
+- [x] rotation-a - Structured rotation A (repo: rotations) (kind: ship) (done 2026-08-30)
+- [x] rotation-b - Structured rotation B (repo: rotations) (kind: ship) (done 2026-08-30)
+- [x] rotation-c - Structured rotation C (repo: rotations) (kind: ship) (done 2026-08-30)
+EOF
+  for id in rotation-a rotation-b rotation-c; do
+    mkdir -p "$mate/projects/$id"
+    fm_write_meta "$mate/state/$id.meta" \
+      "window=firstmate:fm-$id" "worktree=$mate/projects/$id" "project=rotations" \
+      "harness=codex" "kind=ship" "mode=no-mistakes"
+    printf 'done: retained on local research branch\n' > "$mate/state/$id.status"
+    printf 'fm-%s dead\n' "$id" >> "$states"
+  done
+  fakebin=$(make_reconcile_fakebin "$home")
+  canonical=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" FM_TEST_TMUX_STATE_FILE="$states" \
+    FM_SNAPSHOT_NOW=2026-08-31T12:00:00Z "$ROOT/bin/fm-fleet-snapshot.sh" --json)
+  printf '%s' "$canonical" | jq -e '
+    .secondmate_current.records[] | select(.id == "retained-dead")
+    | .current == {state:"no_active_work",reason:null}
+      and .provenance.summary_valid == true
+      and .invalidity == {kind:null,ids:[]}
+      and ([.retained_completed[].id] | sort) == ["rotation-a", "rotation-b", "rotation-c"]
+      and all(.retained_completed[];
+        .current_state.state == "unknown"
+          and .endpoint.recovery_state == "dead"
+          and .worktree.present == true)
+      and ([.landed[].id] | sort) == ["rotation-a", "rotation-b", "rotation-c"]
+      and .counts.retained_completed == 3
+  ' >/dev/null || fail "dead retained Done workers invalidated structured summary or lost evidence: $canonical"
+  pass "recovery-grade dead Done workers remain explicit retained completion evidence"
+}
+
+test_done_nonworker_rows_do_not_own_child_metadata() {
+  local mate fakebin states summary id
+  mate="$TMP_ROOT/done-nonworker-collision-home"
+  make_valid_secondmate_home done-nonworker-collision "$mate"
+  mkdir -p "$mate/projects/captain-collision" "$mate/projects/program-collision"
+  cat > "$mate/data/backlog.md" <<'EOF'
+## In flight
+
+## Queued
+
+## Done
+- [x] captain-collision - Completed captain action (repo: sample) (kind: captain) (done 2026-08-30)
+- [x] program-collision - Completed program record (repo: sample) (kind: program) (done 2026-08-30)
+EOF
+  for id in captain-collision program-collision; do
+    fm_write_meta "$mate/state/$id.meta" \
+      "window=firstmate:fm-$id" "worktree=$mate/projects/$id" \
+      "project=sample" "harness=codex" "kind=ship" "mode=no-mistakes"
+    printf 'done: stale child record sharing a non-worker id\n' > "$mate/state/$id.status"
+  done
+  states="$mate/tmux-states"
+  printf 'fm-captain-collision dead\nfm-program-collision dead\n' > "$states"
+  fakebin=$(make_reconcile_fakebin "$mate")
+  summary=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$mate" \
+    FM_TEST_TMUX_STATE_FILE="$states" FM_SNAPSHOT_NOW=2026-08-31T12:00:00Z \
+    "$ROOT/bin/fm-fleet-snapshot.sh" --secondmate-home-summary)
+  printf '%s' "$summary" | jq -e '
+    .valid == false
+      and .inventory.valid == false
+      and .invalidity == {kind:"unowned_current",ids:["captain-collision","program-collision"]}
+      and .retained_completed == []
+      and [.landed[].id] == ["program-collision"]
+      and all(.endpoints[]; .retained_completed == false)
+  ' >/dev/null || fail "a Done non-worker row owned stale child metadata: $summary"
+  pass "Done non-worker rows cannot own retained child metadata"
+}
+
+test_retained_missing_work_stays_historical() {
+  local home mate fakebin states canonical json
+  home=$(make_home retained-missing-parent)
+  : > "$home/data/secondmates.md"
+  mate="$TMP_ROOT/retained-missing-home"
+  make_valid_secondmate_home retained-missing "$mate"
+  append_secondmate_registry "$home" retained-missing "$mate"
+  mkdir -p "$mate/projects/retained-missing-worker"
+  cat > "$mate/data/backlog.md" <<'EOF'
+## In flight
+
+## Queued
+
+## Done
+- [x] retained-missing-worker - Completed missing-endpoint work (repo: sample) (kind: ship) (done 2026-08-30)
+EOF
+  fm_write_meta "$mate/state/retained-missing-worker.meta" \
+    "window=firstmate:fm-retained-missing-worker" \
+    "worktree=$mate/projects/retained-missing-worker" "project=sample" \
+    "harness=codex" "kind=ship" "mode=no-mistakes"
+  printf 'needs-decision [key=route]: choose the release route\ndone: retained work whose endpoint is gone\n' \
+    > "$mate/state/retained-missing-worker.status"
+  states="$home/tmux-states"
+  printf 'fm-retained-missing-worker missing\n' > "$states"
+  fakebin=$(make_reconcile_fakebin "$home")
+  canonical=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
+    FM_TEST_TMUX_STATE_FILE="$states" FM_SNAPSHOT_NOW=2026-08-31T12:00:00Z \
+    "$ROOT/bin/fm-fleet-snapshot.sh" --json)
+  printf '%s' "$canonical" | jq -e '
+    .secondmate_current.records[] | select(.id == "retained-missing")
+    | .current == {state:"no_active_work",reason:null}
+      and [.retained_completed[].id] == ["retained-missing-worker"]
+      and .retained_completed[0].current_state.state == "unknown"
+      and .retained_completed[0].endpoint.recovery_state == "missing"
+      and .retained_completed[0].endpoint.exists == false
+      and .decisions_open == []
+      and .counts.decisions_open == 0
+      and .endpoints[0].retained_completed == true
+      and .endpoints[0].endpoint.exists == false
+  ' >/dev/null || fail "missing retained endpoint lost its completed ownership: $canonical"
+  json=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_TEST_TMUX_STATE_FILE="$states" \
+    FM_BEARINGS_NOW=2026-08-31T12:00:00Z NET_LOG="$home/net.log" "$BEARINGS" --json)
+  printf '%s' "$json" | jq -e '
+    (.landed | any(.id == "retained-missing-worker" and .owner == "retained-missing"))
+      and (.secondmates | any(.id == "retained-missing" and .state == "no_active_work"))
+      and ((.decisions_open // []) | all(.id != "retained-missing/retained-missing-worker"))
+      and ((.unhealthy_endpoints // []) | all(.id != "retained-missing/retained-missing-worker"))
+  ' >/dev/null || fail "Bearings misclassified retained missing work as current: $json"
+  pass "retained missing work stays historical across current-state projections"
+}
+
+test_long_retained_id_uses_raw_ownership_key() {
+  local mate fakebin states summary long_id
+  mate="$TMP_ROOT/long-retained-id-home"
+  make_valid_secondmate_home long-retained-id "$mate"
+  long_id=$(printf '%0130d' 0 | tr 0 r)
+  [ "${#long_id}" -gt 120 ] || fail "long retained id fixture did not exceed the projection bound"
+  mkdir -p "$mate/projects/$long_id"
+  cat > "$mate/data/backlog.md" <<EOF
+## In flight
+
+## Queued
+
+## Done
+- [x] $long_id - Completed long-identity work (repo: sample) (kind: ship) (done 2026-08-30)
+EOF
+  fm_write_meta "$mate/state/$long_id.meta" \
+    "window=firstmate:fm-$long_id" "worktree=$mate/projects/$long_id" "project=sample" \
+    "harness=codex" "kind=ship" "mode=no-mistakes"
+  printf 'done: retained long-identity work\n' > "$mate/state/$long_id.status"
+  states="$mate/tmux-states"
+  printf 'fm-%s dead\n' "$long_id" > "$states"
+  fakebin=$(make_reconcile_fakebin "$mate")
+  summary=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$mate" \
+    FM_TEST_TMUX_STATE_FILE="$states" FM_SNAPSHOT_NOW=2026-08-31T12:00:00Z \
+    "$ROOT/bin/fm-fleet-snapshot.sh" --secondmate-home-summary)
+  printf '%s' "$summary" | jq -e --arg id "$long_id" '
+    .valid == true
+      and .inventory.valid == true
+      and .invalidity == {kind:null,ids:[]}
+      and .retained_completed[0].id == ($id[:120] + "…")
+      and .retained_completed[0].endpoint.recovery_state == "dead"
+      and .counts.retained_completed == 1
+  ' >/dev/null || fail "bounded retained id was reused as its ownership key: $summary"
+  pass "retained completion ownership preserves raw long task ids"
+}
+
+# The retained exception is deliberately narrow. Metadata unmatched by an
+# in-flight row remains invalid unless a structured Done row and a recovery-grade
+# dead/missing verdict both prove completed retained work.
+test_alive_or_ambiguous_unmatched_metadata_stays_invalid() {
+  local home mate fakebin states canonical summary verdict
+  home=$(make_home unmatched-endpoint-parent)
+  : > "$home/data/secondmates.md"
+  mate="$TMP_ROOT/unmatched-endpoint-home"
+  make_valid_secondmate_home unmatched-endpoint "$mate"
+  append_secondmate_registry "$home" unmatched-endpoint "$mate"
+  cat > "$mate/data/backlog.md" <<'EOF'
+## In flight
+
+## Queued
+
+## Done
+- [x] rogue - Completed historical claim (repo: sample) (kind: ship) (done 2026-08-30)
+EOF
+  mkdir -p "$mate/projects/rogue"
+  fm_write_meta "$mate/state/rogue.meta" \
+    "window=firstmate:fm-rogue" "worktree=$mate/projects/rogue" "project=sample" \
+    "harness=codex" "kind=ship" "mode=no-mistakes"
+  printf 'done: unmatched historical claim\n' > "$mate/state/rogue.status"
+  states="$home/tmux-states"
+  fakebin=$(make_reconcile_fakebin "$home")
+  for verdict in alive ambiguous; do
+    printf 'fm-rogue %s\n' "$verdict" > "$states"
+    summary=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$mate" \
+      FM_TEST_TMUX_STATE_FILE="$states" FM_SNAPSHOT_NOW=2026-08-31T12:00:00Z \
+      "$ROOT/bin/fm-fleet-snapshot.sh" --secondmate-home-summary)
+    printf '%s' "$summary" | jq -e --arg verdict "$verdict" '
+      .valid == false
+        and .inventory.valid == false
+        and .invalidity == {kind:"unowned_current",ids:["rogue"]}
+        and .retained_completed == []
+        and [.landed[].id] == ["rogue"]
+        and .endpoints[0].endpoint.recovery_state == $verdict
+    ' >/dev/null || fail "$verdict fixture did not exercise the intended strict recovery verdict: $summary"
+    canonical=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" FM_TEST_TMUX_STATE_FILE="$states" \
+      FM_SNAPSHOT_NOW=2026-08-31T12:00:00Z "$ROOT/bin/fm-fleet-snapshot.sh" --json)
+    printf '%s' "$canonical" | jq -e '
+      .secondmate_current.records[] | select(.id == "unmatched-endpoint")
+      | .current.state == "unknown"
+        and (.current.reason | contains("child metadata has no in-flight or retained-Done owner: rogue="))
+        and .provenance.selected != "structured-home"
+    ' >/dev/null || fail "$verdict unmatched metadata did not invalidate inventory: $canonical"
+  done
+  pass "alive and ambiguous unmatched metadata still invalidate secondmate inventory"
+}
+
+test_wrong_task_endpoint_binding_stays_unverified() {
+  local mate fakebin states summary
+  mate="$TMP_ROOT/wrong-task-endpoint-home"
+  make_valid_secondmate_home wrong-task-endpoint "$mate"
+  cat > "$mate/data/backlog.md" <<'EOF'
+## In flight
+
+## Queued
+
+## Done
+- [x] rogue - Completed historical claim (repo: sample) (kind: ship) (done 2026-08-30)
+EOF
+  mkdir -p "$mate/projects/rogue"
+  fm_write_meta "$mate/state/rogue.meta" \
+    "window=firstmate:fm-other" "worktree=$mate/projects/rogue" "project=sample" \
+    "harness=codex" "kind=ship" "mode=no-mistakes"
+  printf 'done: unmatched historical claim\n' > "$mate/state/rogue.status"
+  states="$mate/tmux-states"
+  printf 'fm-other dead\n' > "$states"
+  fakebin=$(make_reconcile_fakebin "$mate")
+  summary=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$mate" \
+    FM_TEST_TMUX_STATE_FILE="$states" FM_SNAPSHOT_NOW=2026-08-31T12:00:00Z \
+    "$ROOT/bin/fm-fleet-snapshot.sh" --secondmate-home-summary)
+  printf '%s' "$summary" | jq -e '
+    .valid == false
+      and .inventory.valid == false
+      and .invalidity == {kind:"unowned_current",ids:["rogue"]}
+      and .retained_completed == []
+      and .endpoints[0].endpoint.target == "firstmate:fm-other"
+      and .endpoints[0].endpoint.exists == null
+      and .endpoints[0].endpoint.recovery_state == "unverified"
+  ' >/dev/null || fail "wrong-task dead target was trusted as retained completion evidence: $summary"
+  pass "wrong-task endpoint metadata stays unverified and fail-closed"
+}
+
+test_remote_unverified_recovery_state_is_preserved() {
+  local home fakebin remote_root remote_home canonical
+  home=$(make_home remote-unverified-parent)
+  : > "$home/data/secondmates.md"
+  remote_root="$TMP_ROOT/remote-unverified-root"
+  remote_home="$TMP_ROOT/remote-unverified-home"
+  printf -- '- remote-unverified - fixture domain (host: remote-host; root: %s; home: %s; scope: fixture; projects: sample; added 2026-08-31)\n' \
+    "$remote_root" "$remote_home" >> "$home/data/secondmates.md"
+  fm_write_meta "$home/state/remote-unverified.meta" \
+    "window=remote:remote-unverified" "endpoint_task_id=remote-unverified" \
+    "worktree=$remote_home" "project=sample" "harness=codex" "kind=secondmate" \
+    "mode=secondmate" "yolo=off" "home=$remote_home" "projects=sample" \
+    "remote_host=remote-host" "remote_root=$remote_root" "remote_backend=herdr" \
+    "remote_target=fm-remote:w1:p1"
+  fakebin=$(make_fakebin "$home")
+  cat > "$fakebin/ssh" <<'SH'
+#!/usr/bin/env bash
+printf 'unverified\n'
+SH
+  chmod +x "$fakebin/ssh"
+  canonical=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
+    FM_SNAPSHOT_NOW=2026-08-31T12:00:00Z "$ROOT/bin/fm-fleet-snapshot.sh" --json)
+  printf '%s' "$canonical" | jq -e '
+    .tasks[] | select(.id == "remote-unverified")
+    | .remote == {host:"remote-host",root:.remote.root}
+      and .paths.home.present == true
+      and .endpoint.target == "fm-remote:w1:p1"
+      and .endpoint.exists == null
+      and .endpoint.recovery_state == "unverified"
+      and .endpoint.agent_alive == "unknown"
+  ' >/dev/null || fail "remote unverified recovery verdict was relabeled: $canonical"
+  pass "remote unverified recovery evidence keeps its fail-closed label"
+}
+
+test_additive_child_evidence_is_bounded() {
+  local home mate fakebin states canonical component long_root live_wt retained_wt long_session long_detail id
+  home=$(make_home bounded-additive-parent)
+  : > "$home/data/secondmates.md"
+  mate="$TMP_ROOT/bounded-additive-home"
+  make_valid_secondmate_home bounded-additive "$mate"
+  append_secondmate_registry "$home" bounded-additive "$mate"
+  component=$(printf '%090d' 0 | tr 0 p)
+  long_root="$mate/projects/$component/$component/$component/$component/$component/$component"
+  live_wt="$long_root/live"
+  retained_wt="$long_root/retained"
+  mkdir -p "$live_wt" "$retained_wt"
+  long_session=$(printf '%0400d' 0 | tr 0 s)
+  long_detail=$(printf '%020000d' 0 | tr 0 x)
+  cat > "$mate/data/backlog.md" <<'EOF'
+## In flight
+- [ ] evidence-live - Preserve bounded live evidence (repo: sample) (kind: ship) (since 2026-08-31)
+
+## Queued
+
+## Done
+- [x] evidence-retained - Preserve bounded retained evidence (repo: sample) (kind: ship) (done 2026-08-31)
+EOF
+  for id in evidence-live evidence-retained; do
+    if [ "$id" = evidence-live ]; then
+      fm_write_meta "$mate/state/$id.meta" \
+        "window=$long_session:fm-$id" "endpoint_task_id=$id" "worktree=$live_wt" \
+        "project=sample" "harness=claude" "kind=ship" "mode=no-mistakes"
+    else
+      fm_write_meta "$mate/state/$id.meta" \
+        "window=$long_session:fm-$id" "endpoint_task_id=$id" "worktree=$retained_wt" \
+        "project=sample" "harness=claude" "kind=ship" "mode=no-mistakes"
+    fi
+    record_claude_state "$mate/state" "$id" idle
+  done
+  printf 'paused: %s\n' "$long_detail" > "$mate/state/evidence-live.status"
+  printf 'done: %s\n' "$long_detail" > "$mate/state/evidence-retained.status"
+  states="$home/tmux-states"
+  printf 'fm-evidence-live alive\nfm-evidence-retained dead\n' > "$states"
+  fakebin=$(make_reconcile_fakebin "$home")
+  canonical=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
+    FM_TEST_TMUX_STATE_FILE="$states" FM_SNAPSHOT_SECONDMATE_MAX_BYTES=16384 \
+    FM_SNAPSHOT_NOW=2026-08-31T12:00:00Z "$ROOT/bin/fm-fleet-snapshot.sh" --json)
+  printf '%s' "$canonical" | jq -e '
+    .secondmate_current.records[] | select(.id == "bounded-additive")
+    | .provenance.selected == "structured-home"
+      and .provenance.summary_valid == true
+      and .inventory.valid == true
+      and .current.state == "externally_held"
+      and [.in_flight[].id] == ["evidence-live"]
+      and [.retained_completed[].id] == ["evidence-retained"]
+      and .in_flight[0].current_state.state == "paused"
+      and (.in_flight[0].current_state.detail | length) <= 121
+      and (.in_flight[0].current_state.detail | endswith("…"))
+      and (.in_flight[0].current_state.raw | length) <= 501
+      and (.in_flight[0].current_state.raw | endswith("…"))
+      and (.in_flight[0].worktree.path | length) <= 501
+      and (.in_flight[0].worktree.path | endswith("…"))
+      and (.in_flight[0].endpoint.target | length) <= 241
+      and (.in_flight[0].endpoint.target | endswith("…"))
+      and .retained_completed[0].endpoint.recovery_state == "dead"
+      and (.retained_completed[0].current_state.detail | length) <= 121
+      and (.retained_completed[0].current_state.detail | endswith("…"))
+      and (.retained_completed[0].current_state.raw | length) <= 501
+      and (.retained_completed[0].current_state.raw | endswith("…"))
+      and (.retained_completed[0].worktree.path | length) <= 501
+      and (.retained_completed[0].worktree.path | endswith("…"))
+      and (.retained_completed[0].endpoint.target | length) <= 241
+      and (.retained_completed[0].endpoint.target | endswith("…"))
+  ' >/dev/null || fail "oversized additive evidence invalidated the home or escaped bounds: $canonical"
+  pass "in-flight and retained child evidence remain bounded and trustworthy"
+}
+
+# Codex has no verified busy/idle semantic source. Even a live endpoint, a paused
+# event, and a registered task-neutral external source must leave current state
+# unknown while preserving independently structured inventory evidence.
+test_codex_unknown_is_observability_not_inventory_contradiction() {
+  local home mate fakebin states canonical
+  home=$(make_home codex-observability-parent)
+  : > "$home/data/secondmates.md"
+  mate="$TMP_ROOT/codex-observability-home"
+  make_valid_secondmate_home codex-observability "$mate"
+  append_secondmate_registry "$home" codex-observability "$mate"
+  mkdir -p "$mate/projects/cnvq-a" "$mate/projects/cnvq-b" "$mate/state/procevent"
+  cat > "$mate/data/backlog.md" <<'EOF'
+## In flight
+- [ ] cnvq-a - Train CNVQ A (repo: cnvq) (kind: ship) (since 2026-08-30)
+- [ ] cnvq-b - Train CNVQ B (repo: cnvq) (kind: ship) (since 2026-08-30)
+
+## Queued
+- [ ] cnvq-gate - Evaluate after training blocked-by: cnvq-a blocked-by: cnvq-b (repo: cnvq) (kind: ship)
+
+## Done
+- [x] cnvq-baseline - Baseline evaluation (repo: cnvq) (kind: ship) (done 2026-08-29)
+EOF
+  for id in cnvq-a cnvq-b; do
+    fm_write_meta "$mate/state/$id.meta" \
+      "window=firstmate:fm-$id" "worktree=$mate/projects/$id" "project=cnvq" \
+      "harness=codex" "kind=ship" "mode=no-mistakes"
+    printf 'paused: waiting for Slurm job 1579631\n' > "$mate/state/$id.status"
+  done
+  fm_write_secondmate_meta "$home/state/codex-observability.meta" "$mate" \
+    "firstmate:fm-codex-observability" sample
+  printf 'working [key=cnvq-a]: historical training activity\n' \
+    > "$home/state/codex-observability.status"
+  printf 'paused [key=cnvq-b]: historical Slurm wait\n' \
+    >> "$home/state/codex-observability.status"
+  FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$mate" \
+    "$ROOT/bin/fm-procevent.sh" register when slurm-1579631 -- squeue --job 1579631 >/dev/null \
+    || fail "could not register the task-neutral Slurm wait fixture"
+  states="$home/tmux-states"
+  printf 'fm-cnvq-a alive\nfm-cnvq-b alive\n' > "$states"
+  fakebin=$(make_reconcile_fakebin "$home")
+  canonical=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" FM_TEST_TMUX_STATE_FILE="$states" \
+    FM_SNAPSHOT_NOW=2026-08-31T12:00:00Z "$ROOT/bin/fm-fleet-snapshot.sh" --json)
+  printf '%s' "$canonical" | jq -e '
+    .secondmate_current.records[] | select(.id == "codex-observability")
+    | .current.state == "unknown"
+      and (.current.reason | contains("child current state unavailable"))
+      and .invalidity == {kind:"child_current_unavailable",ids:["cnvq-a","cnvq-b"]}
+      and .inventory.valid == true
+      and .observability.current_state == "unavailable"
+      and .observability.ids == ["cnvq-a","cnvq-b"]
+      and .contradiction == false
+      and ([.parent_event.reconciliation.activities[]
+        | select(.key == "cnvq-a" and .verb == "working")
+        | .verdict] == ["inconclusive"])
+      and ([.parent_event.reconciliation.activities[]
+        | select(.key == "cnvq-b" and .verb == "paused")
+        | .verdict] == ["inconclusive"])
+      and .provenance.selected == "structured-home"
+      and .provenance.trust == "partial-structured"
+      and ([.in_flight[].id] | sort) == ["cnvq-a","cnvq-b"]
+      and all(.in_flight[];
+        .current_state.state == "unknown"
+          and .current_state.source == "pane"
+          and (.current_state.detail | contains("codex-unverified"))
+          and .endpoint.recovery_state == "alive"
+          and .worktree.present == true)
+      and [.queued[].id] == ["cnvq-gate"]
+      and [.landed[].id] == ["cnvq-baseline"]
+      and .counts.in_flight == 2
+  ' >/dev/null || fail "Codex unknown state was conflated with an inventory contradiction or lost evidence: $canonical"
+  pass "Codex semantic-state unknown remains explicit while structured evidence survives"
+}
+
+test_legacy_remote_partial_summary_normalizes_observability() {
+  local home fakebin remote_root remote_home base_summary summary canonical field variant
+  home=$(make_home legacy-remote-partial-parent)
+  : > "$home/data/secondmates.md"
+  remote_root="$TMP_ROOT/legacy-remote-root"
+  remote_home="$TMP_ROOT/legacy-remote-home"
+  printf -- '- legacy-remote - fixture domain (host: legacy-host; root: %s; home: %s; scope: fixture; projects: sample; added 2026-08-31)\n' \
+    "$remote_root" "$remote_home" >> "$home/data/secondmates.md"
+  fm_write_secondmate_meta "$home/state/legacy-remote.meta" "$remote_home" \
+    "firstmate:fm-legacy-remote" sample
+  printf 'working [key=legacy-working]: historical remote activity\n' \
+    > "$home/state/legacy-remote.status"
+  printf 'paused [key=legacy-paused]: historical remote wait\n' \
+    >> "$home/state/legacy-remote.status"
+  fakebin=$(make_fakebin "$home")
+  cat > "$fakebin/ssh" <<'SH'
+#!/usr/bin/env bash
+cat "${FM_TEST_REMOTE_SUMMARY_FILE:?}"
+SH
+  chmod +x "$fakebin/ssh"
+  base_summary="$home/legacy-summary-base.json"
+  summary="$home/legacy-summary.json"
+  jq -n --arg home "$remote_home" '{
+    schema:"fm-secondmate-home-summary.v1",generated:"2026-08-31T11:59:00Z",home:$home,
+    valid:false,reason:"child current state unavailable: legacy-working, legacy-paused",
+    invalidity:{kind:"child_current_unavailable",ids:["legacy-working","legacy-paused"]},
+    state:"unknown",active_children:[],decisions_open:[],holds:[],queued:[],landed:[],endpoints:[],
+    counts:{active_children:0,decisions_open:0,holds:0,queued:0,landed:0,endpoints:0},omitted:[]
+  }' > "$base_summary"
+  cp "$base_summary" "$summary"
+  canonical=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
+    FM_TEST_REMOTE_SUMMARY_FILE="$summary" FM_SNAPSHOT_NOW=2026-08-31T12:00:00Z \
+    "$ROOT/bin/fm-fleet-snapshot.sh" --json)
+  printf '%s' "$canonical" | jq -e '
+    .secondmate_current.records[] | select(.id == "legacy-remote")
+    | .remote == true
+      and .current.state == "unknown"
+      and .invalidity == {kind:"child_current_unavailable",ids:["legacy-working","legacy-paused"]}
+      and .inventory == {valid:true,reason:null,invalidity:{kind:null,ids:[]}}
+      and .observability.current_state == "unavailable"
+      and .observability.ids == ["legacy-working","legacy-paused"]
+      and .in_flight == []
+      and .retained_completed == []
+      and .provenance.selected == "structured-home"
+      and .provenance.trust == "partial-structured"
+      and .contradiction == false
+      and ([.parent_event.reconciliation.activities[]
+        | select(.key == "legacy-working" and .verb == "working")
+        | .verdict] == ["inconclusive"])
+      and ([.parent_event.reconciliation.activities[]
+        | select(.key == "legacy-paused" and .verb == "paused")
+        | .verdict] == ["inconclusive"])
+  ' >/dev/null || fail "legacy remote partial summary lost observability normalization: $canonical"
+  for field in inventory observability in_flight retained_completed; do
+    jq --arg field "$field" '
+      if $field == "inventory" then
+        .inventory = {valid:"true",reason:null,invalidity:{kind:null,ids:[]}}
+      elif $field == "observability" then
+        .observability = {current_state:"unavailable",ids:"legacy-working",reason:null}
+      elif $field == "in_flight" then .in_flight = {}
+      else .retained_completed = {} end
+    ' "$base_summary" > "$summary"
+    canonical=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
+      FM_TEST_REMOTE_SUMMARY_FILE="$summary" FM_SNAPSHOT_NOW=2026-08-31T12:00:00Z \
+      "$ROOT/bin/fm-fleet-snapshot.sh" --json)
+    printf '%s' "$canonical" | jq -e '
+      .secondmate_current.records[] | select(.id == "legacy-remote")
+      | .current == {state:"unknown",reason:"structured home snapshot was malformed or stale"}
+        and .provenance.selected == "parent-event-fallback"
+        and .inventory.valid == false
+        and .contradiction == false
+    ' >/dev/null || fail "malformed additive $field field crossed the remote summary boundary: $canonical"
+  done
+  for variant in invalid-inventory mismatched-observability live-partial-state valid-invalid-inventory valid-unavailable-observability; do
+    jq --arg variant "$variant" '
+      if $variant == "invalid-inventory" then
+        .inventory = {valid:false,reason:"orphan child metadata",
+          invalidity:{kind:"orphan_in_flight",ids:["orphan"]}}
+      elif $variant == "mismatched-observability" then
+        .observability = {current_state:"unavailable",ids:["different-child"],
+          reason:"authoritative child current state unavailable"}
+      elif $variant == "live-partial-state" then
+        .state = "active_child_work"
+      elif $variant == "valid-invalid-inventory" then
+        .valid = true
+        | .reason = null
+        | .invalidity = {kind:null,ids:[]}
+        | .state = "no_active_work"
+        | .inventory = {valid:false,reason:"orphan child metadata",
+            invalidity:{kind:"orphan_in_flight",ids:["orphan"]}}
+      else
+        .valid = true
+        | .reason = null
+        | .invalidity = {kind:null,ids:[]}
+        | .state = "no_active_work"
+        | .observability = {current_state:"unavailable",ids:["legacy-working"],
+            reason:"authoritative child current state unavailable"}
+      end
+    ' "$base_summary" > "$summary"
+    canonical=$(PATH="$fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
+      FM_TEST_REMOTE_SUMMARY_FILE="$summary" FM_SNAPSHOT_NOW=2026-08-31T12:00:00Z \
+      "$ROOT/bin/fm-fleet-snapshot.sh" --json)
+    printf '%s' "$canonical" | jq -e '
+      .secondmate_current.records[] | select(.id == "legacy-remote")
+      | .current == {state:"unknown",reason:"structured home snapshot was malformed or stale"}
+        and .provenance.selected == "parent-event-fallback"
+        and .inventory.valid == false
+        and .contradiction == false
+    ' >/dev/null || fail "inconsistent partial $variant summary crossed the remote boundary: $canonical"
+  done
+  pass "legacy partial summaries normalize safely and reject malformed or inconsistent additions"
 }
 
 test_main_captain_readiness_matches_secondmate_projection() {
@@ -1923,6 +2524,16 @@ test_main_orphan_in_flight_is_disclosed_not_invented
 test_main_unstructured_current_is_disclosed_with_structured_sibling
 test_main_orphan_counterfactual_meta_clears_inventory_warning
 test_mixed_secondmate_roles_partial_state_and_captain_readiness
+test_retained_dead_done_workers_are_not_unowned_current_work
+test_done_nonworker_rows_do_not_own_child_metadata
+test_retained_missing_work_stays_historical
+test_long_retained_id_uses_raw_ownership_key
+test_alive_or_ambiguous_unmatched_metadata_stays_invalid
+test_wrong_task_endpoint_binding_stays_unverified
+test_remote_unverified_recovery_state_is_preserved
+test_additive_child_evidence_is_bounded
+test_codex_unknown_is_observability_not_inventory_contradiction
+test_legacy_remote_partial_summary_normalizes_observability
 test_main_captain_readiness_matches_secondmate_projection
 test_completed_scout_report_not_pending
 test_open_decision_surfaces_end_to_end

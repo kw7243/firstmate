@@ -30,6 +30,10 @@
 #     against current_state; hints.pending_decision and hints.blocked_event are
 #     booleans derived from that set.
 #     endpoint.exists is the cheap backend endpoint-presence read.
+#     endpoint.recovery_state is the recovery-grade backend verdict. Local
+#     recovery probes run only after endpoint metadata binds the target to this
+#     task; only validated dead and missing verdicts prove a retained completed
+#     worker is no longer live.
 #     endpoint.agent_alive is populated for secondmates only, where it is useful
 #     return-channel supervision data; other tasks use "not_checked".
 #   scout_reports[]: present data/<id>/report.md pointers.
@@ -44,9 +48,14 @@
 #     each home with explicit provenance, freshness, endpoint evidence, and unknown
 #     failure reasons. Parent status and bounded terminal evidence are historical,
 #     untrusted supplements only and never override readable structured-home facts.
-#     Each structured-home record carries active_children, decisions_open, holds,
-#     queued, landed, endpoints, counts, and omitted. Actionable captain holds
-#     appear in decisions_open; blocked captain holds remain queued with metadata.
+#     Each structured-home record separates inventory validity from current-state
+#     observability and carries in_flight, active_children, retained_completed,
+#     decisions_open, holds, queued, landed, endpoints, counts, and omitted.
+#     Actionable captain holds appear in decisions_open; blocked captain holds
+#     remain queued with metadata. Metadata for a structured Done worker row is
+#     retained completion evidence only when its recovery-grade endpoint is dead
+#     or missing; captain and program rows never own retained child metadata.
+#     Endpoint rows carry the retained_completed ownership flag.
 #   secondmate_landed: {records[],truncated[],unreadable[],partial[]} - the
 #     compatibility landed-work roll-up derived from secondmate_current. Readable
 #     structured homes with an unknown current classification are partial, not
@@ -150,6 +159,12 @@ JSON is the stable machine-readable output contract.
 validated registered-home handoff. It is local-only, skips nested secondmate
 aggregation, and marks inventory contradictions or unavailable child state invalid.
 Its invalidity object names the normalized failure kind and affected ids.
+Its inventory and observability objects distinguish backlog contradictions from
+unavailable child semantics, while in_flight and retained_completed preserve
+independently trustworthy structured, path, and recovery-grade endpoint evidence.
+retained_completed accepts only structured Done worker rows whose task-bound
+recovery-grade endpoint is dead or missing; captain and program rows never own
+child metadata, and every other unmatched recovery verdict remains invalid.
 Actionable tasks-axi captain holds appear as decisions_open and stay visible in
 queued with hold_reason, hold_kind, and plural blocker fields for downstream
 projections. A captain hold is actionable only when every blocker is Done.
@@ -403,7 +418,7 @@ backlog_json() {  # [<backlog-path>] - defaults to this home's $BACKLOG
 task_json_lines() {
   local meta id kind harness mode yolo project worktree home projects backend target status_log report_path
   local remote_host remote_root remote_state remote_rc remote_home_present
-  local pr pr_source event_json current_json endpoint_exists agent_alive meta_json status_json report_json worktree_json home_json
+  local pr pr_source event_json current_json endpoint_exists recovery_state agent_alive meta_json status_json report_json worktree_json home_json
   local last_event_raw current_state current_source pending_decision blocked_event report_present=0 pr_from_status
   local open_decisions_tsv open_decisions_json
 
@@ -481,6 +496,7 @@ task_json_lines() {
     blocked_event=$(printf '%s' "$open_decisions_json" | jq 'if any(.[]; .verb == "blocked") then 1 else 0 end')
 
     endpoint_exists=null
+    recovery_state=unverified
     agent_alive=not_checked
     if [ -n "$remote_host" ]; then
       if remote_state=$(fm_run_timed "$FM_SNAPSHOT_SECONDMATE_TIMEOUT" \
@@ -493,25 +509,39 @@ task_json_lines() {
         remote_home_present=true
         remote_state=$(printf '%s\n' "$remote_state" | tail -1)
         case "$remote_state" in
-          alive) endpoint_exists=true; agent_alive=alive ;;
-          dead) endpoint_exists=true; agent_alive=dead ;;
-          missing) endpoint_exists=false; agent_alive=dead ;;
-          *) endpoint_exists=null; agent_alive=unknown ;;
+          alive) endpoint_exists=true; recovery_state=alive; agent_alive=alive ;;
+          dead) endpoint_exists=true; recovery_state=dead; agent_alive=dead ;;
+          missing) endpoint_exists=false; recovery_state=missing; agent_alive=dead ;;
+          ambiguous) endpoint_exists=true; recovery_state=ambiguous; agent_alive=unknown ;;
+          unreadable|unverified) endpoint_exists=null; recovery_state=$remote_state; agent_alive=unknown ;;
+          *) endpoint_exists=null; recovery_state=unreadable; agent_alive=unknown ;;
         esac
       else
         endpoint_exists=null
+        recovery_state=unreadable
         agent_alive=unknown
       fi
     else
-      if [ -n "$target" ]; then
+      if fm_backend_validate_task_endpoint "$meta" "$id" >/dev/null 2>&1; then
+        backend=$FM_BACKEND_VALIDATED_BACKEND
+        target=$FM_BACKEND_VALIDATED_TARGET
         if fm_backend_target_exists "$backend" "$target" "fm-$id" >/dev/null 2>&1; then
           endpoint_exists=true
         else
           endpoint_exists=false
         fi
+        recovery_state=$(fm_backend_agent_state "$backend" "$target" 2>/dev/null || printf unreadable)
+        case "$recovery_state" in
+          alive|dead|missing|ambiguous|unreadable|unverified) ;;
+          *) recovery_state=unreadable ;;
+        esac
       fi
       if [ "$kind" = secondmate ] && [ -n "$target" ]; then
-        agent_alive=$(fm_backend_agent_alive "$backend" "$target" 2>/dev/null || printf unknown)
+        case "$recovery_state" in
+          alive) agent_alive=alive ;;
+          dead|missing) agent_alive=dead ;;
+          *) agent_alive=unknown ;;
+        esac
       fi
     fi
 
@@ -545,6 +575,7 @@ task_json_lines() {
       --arg pr "$pr" \
       --arg pr_source "$pr_source" \
       --arg agent_alive "$agent_alive" \
+      --arg recovery_state "$recovery_state" \
       --arg observed_at "$SNAPSHOT_NOW" \
       --arg last_event_raw "$last_event_raw" \
       --argjson current_state "$current_json" \
@@ -576,7 +607,8 @@ task_json_lines() {
         },
         secondmate_projects:($projects | if . == "" then [] else split(",") | map(gsub("^[[:space:]]+|[[:space:]]+$"; "")) | map(select(. != "")) end),
         current_state:($current_state + {observed_at:$observed_at,freshness:"fresh"}),
-        endpoint:{target:($target | if . == "" then null else . end),exists:$endpoint_exists,agent_alive:$agent_alive,
+        endpoint:{target:($target | if . == "" then null else . end),exists:$endpoint_exists,
+          recovery_state:$recovery_state,agent_alive:$agent_alive,
           status:(if $endpoint_exists == false then "absent"
                   elif $agent_alive == "alive" or $agent_alive == "dead" then $agent_alive
                   else "unknown" end),
@@ -605,7 +637,7 @@ task_json_lines() {
 
 # Main-home current-inventory validity: same orphan / unstructured-current checks
 # used by secondmate_home_summary_json, without inventing live task rows.
-# Meta inventory remains the sole source of live workers; this object only
+# Metadata inventory remains the sole source of worker records; this object only
 # discloses backlog↔task inconsistency for renderers (Bearings omitted/gates).
 main_inventory_json() {  # <backlog-json> <tasks-json>
   jq -n \
@@ -636,21 +668,51 @@ main_inventory_json() {  # <backlog-json> <tasks-json>
 # This mode never reads parent events or terminal text and never aggregates
 # nested secondmates.
 secondmate_home_summary_json() {  # <backlog-json> <tasks-json>
-  jq -n \
+  printf '%s\n%s\n' "$1" "$2" | jq -s \
     --arg generated "$SNAPSHOT_NOW" \
     --arg home "$FM_HOME" \
     --argjson child_n "$FM_SNAPSHOT_SECONDMATE_CHILDREN" \
     --argjson queued_n "$FM_SNAPSHOT_SECONDMATE_QUEUED" \
     --argjson decisions_n "$FM_SNAPSHOT_SECONDMATE_DECISIONS" \
-    --argjson landed_n "$FM_SNAPSHOT_SECONDMATE_LANDED_PER_HOME" \
-    --argjson backlog "$1" \
-    --argjson tasks "$2" '
+    --argjson landed_n "$FM_SNAPSHOT_SECONDMATE_LANDED_PER_HOME" '
+    .[0] as $backlog
+    | .[1] as $tasks
+    |
     def trunc($n):
       tostring | gsub("\\s+"; " ")
       | if length > $n then .[:$n] + "…" else . end;
+    def trunc_or_null($n):
+      if . == null then null else trunc($n) end;
+    def bounded_current_state:
+      if . == null then null else
+        {state:((.state // null) | trunc_or_null(40)),
+         source:((.source // null) | trunc_or_null(40)),
+         detail:((.detail // null) | trunc_or_null(120)),
+         raw:((.raw // null) | trunc_or_null(500)),
+         observed_at:((.observed_at // null) | trunc_or_null(40)),
+         freshness:((.freshness // null) | trunc_or_null(40))}
+      end;
+    def bounded_path:
+      if . == null then {path:null,present:false} else
+        {path:((.path // null) | trunc_or_null(500)),
+         present:(if has("present") then .present else false end)}
+      end;
+    def bounded_endpoint:
+      if . == null then null else
+        {target:((.target // null) | trunc_or_null(240)),
+         exists:(if has("exists") then .exists else null end),
+         recovery_state:((.recovery_state // null) | trunc_or_null(40)),
+         agent_alive:((.agent_alive // null) | trunc_or_null(40)),
+         status:((.status // null) | trunc_or_null(40)),
+         observed_at:((.observed_at // null) | trunc_or_null(40)),
+         freshness:((.freshness // null) | trunc_or_null(40))}
+      end;
     ([ $backlog.records[]?
        | select((.state == "in_flight" or .state == "queued") and (.structured | not)) ]) as $unstructured_current
     | ([ $backlog.records[]? | select(.state == "in_flight" and .structured) ]) as $owned_in_flight
+    | ([ $backlog.records[]?
+         | select(.state == "done" and .structured and .kind != "captain") ]) as $completed
+    | ([ $completed[] | select(.kind != "program") ]) as $retention_candidates
     | ([ $backlog.records[]?
          | select(.structured and
              (.state == "queued" or
@@ -661,18 +723,30 @@ secondmate_home_summary_json() {  # <backlog-json> <tasks-json>
          | select(.captain_actionable == true)
          | {id,key:.id,verb:"captain-hold",summary:(.title | trunc(160)),
             reason:(.hold_reason | trunc(160)),source:"backlog"} ]) as $captain_holds_all
-    | ([ $backlog.records[]? | select(.state == "done" and .structured and .kind != "captain")
+    | ([ $completed[]
          | {id:(.id | trunc(120)),title:(.title | trunc(120)),
             pr_url:((.pr_url // null) | if . == null then null else trunc(500) end),
             report_path:((.report_path // null) | if . == null then null else trunc(500) end),
             local_note:((.local_note // null) | if . == null then null else trunc(120) end),completion} ]
        | sort_by([(.completion.date // ""), .id]) | reverse) as $landed_all
-    | ([ $tasks[] | select(.current_state.state == "unknown") ]) as $unknown_children
+    | ([ $owned_in_flight[] as $work
+         | $tasks[]
+         | select(.id == $work.id and .current_state.state == "unknown") ]) as $unknown_children
     | ([ $owned_in_flight[]
          | select(.requires_child_metadata)
          | select(.id as $id | [$tasks[].id] | index($id) | not) ]) as $orphan_in_flight
+    | ([ $retention_candidates[] as $done
+         | $tasks[]
+         | select(.id == $done.id
+             and (.endpoint.recovery_state == "dead" or .endpoint.recovery_state == "missing")) ]) as $retained_completed
+    | ([ $retained_completed[]
+         | {id:(.id | trunc(120)),kind:((.kind // null) | trunc_or_null(40)),
+            current_state:(.current_state | bounded_current_state),
+            worktree:(.paths.worktree | bounded_path),
+            endpoint:(.endpoint | bounded_endpoint)} ]) as $retained_completed_all
     | ([ $tasks[]
          | select(.id as $id | [$owned_in_flight[].id] | index($id) | not)
+         | select(.id as $id | [$retained_completed[].id] | index($id) | not)
          | {id,state:.current_state.state} ]) as $unowned_children
     | ([ $owned_in_flight[] as $work
          | $tasks[]
@@ -690,7 +764,7 @@ secondmate_home_summary_json() {  # <backlog-json> <tasks-json>
         else empty end,
         if ($unowned_children | length) > 0 then
           {kind:"unowned_current",ids:($unowned_children | map(.id)),
-           reason:("live child state has no in-flight backlog item: " +
+           reason:("child metadata has no in-flight or retained-Done owner: " +
                    ($unowned_children | map(.id + "=" + .state) | join(", ")))}
         else empty end,
         if ($terminal_in_flight | length) > 0 then
@@ -699,13 +773,26 @@ secondmate_home_summary_json() {  # <backlog-json> <tasks-json>
                    ($terminal_in_flight | map(.id + "=" + .state) | join(", ")))}
         else empty end]) as $strict_invalidities
     | ([ $owned_in_flight[] as $work
+         | ([ $tasks[] | select(.id == $work.id) ][0] // null) as $task
+         | {id:($work.id | trunc(120)),title:($work.title | trunc(120)),
+            repo:(($work.repo // null) | if . == null then null else trunc(120) end),
+            kind:(($work.kind // null) | if . == null then null else trunc(40) end),
+            current_role:(($work.current_role // null) | trunc_or_null(40)),
+            requires_child_metadata:$work.requires_child_metadata,
+            current_state:($task.current_state | bounded_current_state),
+            worktree:($task.paths.worktree | bounded_path),
+            endpoint:($task.endpoint | bounded_endpoint)} ]) as $in_flight_all
+    | ([ $owned_in_flight[] as $work
          | select($work.current_role != "program")
          | $tasks[]
          | select(.id == $work.id and .current_state.state == "working")
          | {id,kind,state:.current_state.state,source:.current_state.source,
             doing:((.current_state.detail // "") | trunc(120))} ]) as $active_all
     | ($captain_holds_all
-       + ([ $tasks[] as $t | ($t.hints.open_decisions // [])[]
+       + ([ $owned_in_flight[] as $work
+            | $tasks[] as $t
+            | select($t.id == $work.id)
+            | ($t.hints.open_decisions // [])[]
             | {id:$t.id,key,verb,summary:(.summary | trunc(160)),reason:null,source:"status"} ])) as $decisions_all
     | ([ $queued_all[]
          | select((.unresolved_blocker_ids | length) > 0 or (.hold_reason != null and .hold_kind != null))
@@ -723,10 +810,10 @@ secondmate_home_summary_json() {  # <backlog-json> <tasks-json>
               reason:((.current_state.detail // .current_state.state) | trunc(120)),source:"child-state"} ]) as $holds_all
     | ($backlog.present == true
        and ($unstructured_current | length) == 0
-       and ($unknown_children | length) == 0
        and ($orphan_in_flight | length) == 0
        and ($unowned_children | length) == 0
-       and ($terminal_in_flight | length) == 0) as $valid
+       and ($terminal_in_flight | length) == 0) as $inventory_valid
+    | ($inventory_valid and ($unknown_children | length) == 0) as $valid
     | (if ($strict_invalidities | length) > 0 then $strict_invalidities[0].reason
        elif ($unknown_children | length) > 0 then
          "child current state unavailable: " + ($unknown_children | map(.id) | join(", "))
@@ -747,7 +834,15 @@ secondmate_home_summary_json() {  # <backlog-json> <tasks-json>
         reason:$reason,
         invalidity:$invalidity,
         state:$state,
+        inventory:{valid:$inventory_valid,
+          reason:(if ($strict_invalidities | length) > 0 then $strict_invalidities[0].reason else null end),
+          invalidity:(if ($strict_invalidities | length) > 0 then $strict_invalidities[0] | del(.reason) else {kind:null,ids:[]} end)},
+        observability:{current_state:(if ($unknown_children | length) > 0 then "unavailable" else "available" end),
+          ids:($unknown_children | map(.id)),
+          reason:(if ($unknown_children | length) > 0 then "authoritative child current state unavailable" else null end)},
+        in_flight:$in_flight_all[:$child_n],
         active_children:$active_all[:$child_n],
+        retained_completed:$retained_completed_all[:$child_n],
         decisions_open:$decisions_all[:$decisions_n],
         holds:$holds_all[:$queued_n],
         queued:([$queued_all[] | {id:(.id | trunc(120)),title:(.title | trunc(120)),
@@ -762,9 +857,12 @@ secondmate_home_summary_json() {  # <backlog-json> <tasks-json>
           kind:((.kind // null) | if . == null then null else trunc(40) end)}][:$queued_n]),
         landed:(if $landed_n == 0 then $landed_all else $landed_all[:$landed_n] end),
         endpoints:([$tasks[] | {id,state:.current_state.state,source:.current_state.source,
+          retained_completed:(.id as $id | any($retained_completed[]; .id == $id)),
           endpoint:(.endpoint + {target:((.endpoint.target // null) | if . == null then null else trunc(240) end)})}][:$child_n]),
         counts:{
+          in_flight:($in_flight_all | length),
           active_children:($active_all | length),
+          retained_completed:($retained_completed_all | length),
           decisions_open:($decisions_all | length),
           holds:($holds_all | length),
           queued:($queued_all | length),
@@ -772,7 +870,9 @@ secondmate_home_summary_json() {  # <backlog-json> <tasks-json>
           endpoints:($tasks | length)
         },
         omitted:[
+          (if ($in_flight_all | length) > $child_n then {surface:"in_flight",count:(($in_flight_all | length) - $child_n)} else empty end),
           (if ($active_all | length) > $child_n then {surface:"active_children",count:(($active_all | length) - $child_n)} else empty end),
+          (if ($retained_completed_all | length) > $child_n then {surface:"retained_completed",count:(($retained_completed_all | length) - $child_n)} else empty end),
           (if ($decisions_all | length) > $decisions_n then {surface:"decisions_open",count:(($decisions_all | length) - $decisions_n)} else empty end),
           (if ($queued_all | length) > $queued_n then {surface:"queued",count:(($queued_all | length) - $queued_n)} else empty end),
           (if ($tasks | length) > $child_n then {surface:"endpoints",count:(($tasks | length) - $child_n)} else empty end),
@@ -1068,14 +1168,16 @@ parent_evidence_reconciliation_json() {  # <summary-json> <activities-json> <dec
               | select(if ($e.key | keyed) then .id == $e.key else true end)
               | {surface:"active_children",id,key:null,verb:"working"}]) as $matches
            | result($e; $matches;
-               $summary.counts.active_children == ($summary.active_children | length);
+               ($summary.counts.active_children == ($summary.active_children | length)
+                and (($summary.observability.ids // []) | index($e.key)) == null);
                "active_children")
          elif $e.verb == "paused" then
            ([ $summary.holds[]
               | select(if ($e.key | keyed) then .id == $e.key or .blocked_by == $e.key else true end)
               | {surface:"holds",id,key:(.blocked_by // null),verb:"paused"}]) as $matches
            | result($e; $matches;
-               $summary.counts.holds == ($summary.holds | length);
+               ($summary.counts.holds == ($summary.holds | length)
+                and (($summary.observability.ids // []) | index($e.key)) == null);
                "holds")
          else
            $e + {verdict:"inconclusive",compared_to:null,matched:null}
@@ -1215,23 +1317,88 @@ secondmate_current_json() {  # <parent-tasks-json>
         if [ "$summary_bytes" -gt "$FM_SNAPSHOT_SECONDMATE_MAX_BYTES" ]; then
           reason="structured home snapshot exceeded byte limit"
         elif ! printf '%s' "$summary" | jq -e --arg home "$home" --arg generated "$SNAPSHOT_NOW" --argjson remote "$remote" '
+          def clean_inventory:
+            .valid == true
+            and .reason == null
+            and .invalidity.kind == null
+            and (.invalidity.ids | length) == 0;
+          def available_observability:
+            .current_state == "available"
+            and (.ids | length) == 0
+            and .reason == null;
           .schema == "fm-secondmate-home-summary.v1" and .home == $home
           and (($remote == true) or .generated == $generated)
           and (.valid | type) == "boolean" and (.state | type) == "string"
-          and (.invalidity | type) == "object" and (.invalidity.ids | type) == "array"
+          and ((.reason == null) or ((.reason | type) == "string"))
+          and (.invalidity | type) == "object"
+          and ((.invalidity.kind == null) or ((.invalidity.kind | type) == "string"))
+          and (.invalidity.ids | type) == "array"
+          and all(.invalidity.ids[]; type == "string")
           and (.active_children | type) == "array" and (.decisions_open | type) == "array"
           and (.holds | type) == "array" and (.queued | type) == "array"
           and (.landed | type) == "array" and (.endpoints | type) == "array"
           and (.counts | type) == "object" and (.omitted | type) == "array"
+          and (if has("inventory") then
+            (.inventory | type) == "object"
+            and (.inventory.valid | type) == "boolean"
+            and ((.inventory.reason == null) or ((.inventory.reason | type) == "string"))
+            and (.inventory.invalidity | type) == "object"
+            and ((.inventory.invalidity.kind == null) or ((.inventory.invalidity.kind | type) == "string"))
+            and (.inventory.invalidity.ids | type) == "array"
+            and all(.inventory.invalidity.ids[]; type == "string")
+          else true end)
+          and (if has("observability") then
+            (.observability | type) == "object"
+            and (.observability.current_state | type) == "string"
+            and (.observability.ids | type) == "array"
+            and all(.observability.ids[]; type == "string")
+            and ((.observability.reason == null) or ((.observability.reason | type) == "string"))
+          else true end)
+          and (if has("in_flight") then
+            (.in_flight | type) == "array" and all(.in_flight[]; type == "object")
+          else true end)
+          and (if has("retained_completed") then
+            (.retained_completed | type) == "array" and all(.retained_completed[]; type == "object")
+          else true end)
+          and (.invalidity.ids as $invalidity_ids
+            | if .valid == true then
+                .reason == null
+                and .invalidity.kind == null
+                and ($invalidity_ids | length) == 0
+                and (.state == "captain_decision" or .state == "active_child_work"
+                  or .state == "externally_held" or .state == "no_active_work")
+                and (if has("inventory") then (.inventory | clean_inventory) else true end)
+                and (if has("observability") then (.observability | available_observability) else true end)
+              elif .invalidity.kind == "child_current_unavailable" then
+                (.reason | type) == "string"
+                and ($invalidity_ids | length) > 0
+                and .state == "unknown"
+                and (if has("inventory") then (.inventory | clean_inventory) else true end)
+                and (if has("observability") then
+                  .observability.current_state == "unavailable"
+                  and .observability.ids == $invalidity_ids
+                  and (.observability.reason | type) == "string"
+                else true end)
+              else true end)
         ' >/dev/null 2>&1; then
           reason="structured home snapshot was malformed or stale"
         else
-          summary_valid=$(printf '%s' "$summary" | jq -r '.valid')
-          if [ "$summary_valid" != true ]; then
-            summary_reason=$(printf '%s' "$summary" | jq -r '.reason // "unknown reason"')
-            summary_invalidity=$(printf '%s' "$summary" | jq -r '.invalidity.kind // "unknown"')
-            if [ "$summary_invalidity" != child_current_unavailable ]; then
-              reason="structured home state invalid: $summary_reason"
+          summary=$(printf '%s' "$summary" | jq -c '
+            if (.valid == false and .invalidity.kind == "child_current_unavailable") then
+              .inventory = (.inventory // {valid:true,reason:null,invalidity:{kind:null,ids:[]}})
+              | .observability = (.observability // {
+                  current_state:"unavailable",ids:.invalidity.ids,
+                  reason:"authoritative child current state unavailable"})
+            else . end
+          ') || reason="structured home snapshot was malformed or stale"
+          if [ -z "$reason" ]; then
+            summary_valid=$(printf '%s' "$summary" | jq -r '.valid')
+            if [ "$summary_valid" != true ]; then
+              summary_reason=$(printf '%s' "$summary" | jq -r '.reason // "unknown reason"')
+              summary_invalidity=$(printf '%s' "$summary" | jq -r '.invalidity.kind // "unknown"')
+              if [ "$summary_invalidity" != child_current_unavailable ]; then
+                reason="structured home state invalid: $summary_reason"
+              fi
             fi
           fi
         fi
@@ -1266,7 +1433,10 @@ secondmate_current_json() {  # <parent-tasks-json>
          provenance:{selected:"structured-home",structured_home:$home,summary_valid:$summary_valid,
            trust:(if $summary_valid then "complete" else "partial-structured" end),parent_event_role:"historical-only"},
          freshness:{status:"fresh",observed_at:$observed,age_seconds:0},
-         active_children:$summary.active_children,
+         inventory:($summary.inventory // {valid:$summary_valid,reason:$summary.reason,invalidity:$summary.invalidity}),
+         observability:($summary.observability // {current_state:(if $summary_valid then "available" else "unknown" end),ids:[],reason:null}),
+         in_flight:($summary.in_flight // []),active_children:$summary.active_children,
+         retained_completed:($summary.retained_completed // []),
          decisions_open:$summary.decisions_open,holds:$summary.holds,queued:$summary.queued,
          landed:$summary.landed,endpoints:$summary.endpoints,counts:$summary.counts,omitted:$summary.omitted,
          parent_event:{raw:$event_raw,note:$event_note,age_seconds:$event_age,open_activities:$activities,open_decisions:$decisions,activity_scan:$activity_scan,reconciliation:$reconciliation},
@@ -1294,7 +1464,9 @@ secondmate_current_json() {  # <parent-tasks-json>
          current:{state:"unknown",reason:$reason},invalidity:null,
          provenance:{selected:$provenance,structured_home:($home | if . == "" then null else . end),parent_event_role:"fallback-only-not-current"},
          freshness:{status:$freshness,observed_at:$observed,age_seconds:$event_age},
-         active_children:[],decisions_open:[],holds:[],queued:[],landed:[],endpoints:[],counts:{active_children:0,decisions_open:0,holds:0,queued:0,landed:0,endpoints:0},omitted:[],
+         inventory:{valid:false,reason:$reason,invalidity:{kind:"unavailable",ids:[]}},
+         observability:{current_state:"unknown",ids:[],reason:$reason},
+         in_flight:[],active_children:[],retained_completed:[],decisions_open:[],holds:[],queued:[],landed:[],endpoints:[],counts:{in_flight:0,active_children:0,retained_completed:0,decisions_open:0,holds:0,queued:0,landed:0,endpoints:0},omitted:[],
          parent_event:{raw:$event_raw,note:$event_note,age_seconds:$event_age,open_activities:$activities,open_decisions:$decisions,activity_scan:$activity_scan},
          terminal_evidence:$terminal,contradiction:false}')
     fi
