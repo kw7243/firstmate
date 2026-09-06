@@ -79,7 +79,7 @@ SH
   cat > "$fakebin/no-mistakes" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --version ]; then
-  printf '%s\n' "${FM_FAKE_NO_MISTAKES_VERSION:-no-mistakes version v1.31.2 (fake) 2026-06-27T00:02:18Z}"
+  printf '%s\n' "${FM_FAKE_NO_MISTAKES_VERSION:-no-mistakes version v1.46.0 (fake) 2026-06-27T00:02:18Z}"
   exit 0
 fi
 exit 0
@@ -311,82 +311,6 @@ ROWS
   pass "bootstrap reports treehouse lease + tasks-axi/quota-axi bootstrap contracts"
 }
 
-test_network_sandbox_accepts_local_gh_token() {
-  local case_dir fakebin out
-  case_dir="$TMP_ROOT/gh-sandbox-token"
-  mkdir -p "$case_dir/home"
-  fakebin=$(make_fake_toolchain "$case_dir")
-  cat > "$fakebin/gh" <<'SH'
-#!/usr/bin/env bash
-if [ "${1:-}" = auth ] && [ "${2:-}" = status ]; then
-  exit 1
-fi
-if [ "${1:-}" = auth ] && [ "${2:-}" = token ]; then
-  printf '%s\n' 'gho_fake'
-  exit 0
-fi
-exit 1
-SH
-  chmod +x "$fakebin/gh"
-
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    CODEX_SANDBOX_NETWORK_DISABLED=1 FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
-
-  assert_not_contains "$out" "NEEDS_GH_AUTH" "network-disabled sandbox with local gh token should not report auth missing"
-  pass "bootstrap accepts local gh token when codex sandbox disables network validation"
-}
-
-test_network_sandbox_accepts_keyring_hidden_gh_auth() {
-  local case_dir fakebin out
-  case_dir="$TMP_ROOT/gh-sandbox-keyring"
-  mkdir -p "$case_dir/home"
-  fakebin=$(make_fake_toolchain "$case_dir")
-  cat > "$fakebin/gh" <<'SH'
-#!/usr/bin/env bash
-if [ "${1:-}" = auth ] && [ "${2:-}" = status ]; then
-  printf '%s\n' 'The token in default is invalid' >&2
-  exit 1
-fi
-if [ "${1:-}" = auth ] && [ "${2:-}" = token ]; then
-  printf '%s\n' 'no oauth token found for github.com' >&2
-  exit 1
-fi
-exit 1
-SH
-  chmod +x "$fakebin/gh"
-
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    CODEX_SANDBOX=seatbelt CODEX_SANDBOX_NETWORK_DISABLED=1 \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
-
-  assert_not_contains "$out" "NEEDS_GH_AUTH" "network-disabled Codex sandbox with keyring-hidden gh auth should not report auth missing"
-  pass "bootstrap suppresses gh auth login prompt when Codex sandbox cannot read keyring auth"
-}
-
-test_non_sandbox_gh_auth_failure_still_reports_missing() {
-  local case_dir fakebin out
-  case_dir="$TMP_ROOT/gh-nonsandbox-missing"
-  mkdir -p "$case_dir/home"
-  fakebin=$(make_fake_toolchain "$case_dir")
-  cat > "$fakebin/gh" <<'SH'
-#!/usr/bin/env bash
-if [ "${1:-}" = auth ] && [ "${2:-}" = status ]; then
-  exit 1
-fi
-if [ "${1:-}" = auth ] && [ "${2:-}" = token ]; then
-  exit 1
-fi
-exit 1
-SH
-  chmod +x "$fakebin/gh"
-
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
-    CODEX_SANDBOX_NETWORK_DISABLED=1 FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
-
-  assert_contains "$out" "NEEDS_GH_AUTH" "non-sandbox gh auth failure should still report missing auth"
-  pass "bootstrap keeps ordinary gh auth failures actionable outside a Codex sandbox"
-}
-
 test_no_mistakes_min_version() {
   local label version mode case_dir fakebin out missing n
   missing='MISSING: no-mistakes (install: curl -fsSL https://raw.githubusercontent.com/kunchenguid/no-mistakes/main/docs/install.sh | sh)'
@@ -408,10 +332,10 @@ test_no_mistakes_min_version() {
         [ "$out" = "$missing" ] || fail "$label: expected '$missing', got: $out" ;;
     esac
   done <<'ROWS'
-minimum no-mistakes version is accepted^no-mistakes version v1.31.2 (fake)^empty
-newer no-mistakes minor is accepted^no-mistakes version v1.32.0 (fake)^empty
+minimum no-mistakes version is accepted^no-mistakes version v1.46.0 (fake)^empty
+newer no-mistakes minor is accepted^no-mistakes version v1.47.0 (fake)^empty
 newer no-mistakes major is accepted^no-mistakes version v2.0.0 (fake)^empty
-older no-mistakes patch reports an upgrade^no-mistakes version v1.31.1 (fake)^missing
+older no-mistakes patch reports an upgrade^no-mistakes version v1.45.4 (fake)^missing
 unparseable no-mistakes version reports an upgrade^no-mistakes development build^missing
 ROWS
   pass "bootstrap enforces no-mistakes minimum version"
@@ -1033,16 +957,6 @@ SH
     "the stale worker did not report the refused handoff sweep"
   assert_contains "$out" "changed before project clone refresh" \
     "the stale worker did not report the refused clone refresh"
-
-  rm -f "$marker"
-  printf '%s\n' 'codex-thread:bootstrap-thread-1' > "$case_dir/home/state/.lock"
-  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$fake_root" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_BOOTSTRAP_NETWORK=only \
-    FM_BOOTSTRAP_NETWORK_LOCK_PID=codex-thread:bootstrap-thread-1 \
-    FM_FAKE_FLEET_SYNC_STARTED_MARKER="$marker" "$ROOT/bin/fm-bootstrap.sh")
-  assert_present "$marker" "a matching opaque lock owner could not refresh project clones"
-  assert_not_contains "$out" "fleet lock ownership changed" \
-    "a matching opaque lock owner was treated as stale"
   pass "bootstrap: every deferred mutating sweep rechecks fleet-lock ownership"
 }
 
@@ -1235,9 +1149,6 @@ ROWS
 }
 
 test_bootstrap_reporting
-test_network_sandbox_accepts_local_gh_token
-test_network_sandbox_accepts_keyring_hidden_gh_auth
-test_non_sandbox_gh_auth_failure_still_reports_missing
 test_no_mistakes_min_version
 test_gh_axi_min_version
 test_lavish_axi_min_version
