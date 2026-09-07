@@ -1,0 +1,8 @@
+TRACE-CONTEXT PUBLIC RESOLVER TRANSCRIPT
+disabled rc=0 stdout_bytes=0 stderr_bytes=0 elapsed_ms=11
+claude/tmux/ship rc=0 valid=true sampled=true task_prose_disclosed=false stderr_bytes=0 elapsed_ms=28 carrier=00-2569a97229e7122f99bc98ce1570696e-e717e6189976129d-01
+codex/herdr/scout rc=0 valid=true sampled=true task_prose_disclosed=false stderr_bytes=0 elapsed_ms=31 carrier=00-9851c4cf9062ca7ceb3b5cef1cc868d1-941933853cd19cc9-01
+opencode/zellij/secondmate rc=0 valid=true sampled=true task_prose_disclosed=false stderr_bytes=0 elapsed_ms=32 carrier=00-d2307de7c2c83b07c6e4a6e1381afb6f-2e2b71c79dc34bf9-01
+grok/orca/ship rc=0 valid=true sampled=true task_prose_disclosed=false stderr_bytes=0 elapsed_ms=35 carrier=00-756227ab578b9efea134ba34e4d910fe-1116cba427908bd9-01
+cursor/cmux/scout rc=0 valid=true sampled=true task_prose_disclosed=false stderr_bytes=0 elapsed_ms=36 carrier=00-daee4b9e0c01c158d0e2d48cd8cb4750-fd22de667a1431de-01
+resolver_calls=6 provider_executed=false

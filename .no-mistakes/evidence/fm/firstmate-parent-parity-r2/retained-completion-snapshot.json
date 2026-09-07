@@ -1,0 +1,39 @@
+{
+  "retained_home": {
+    "id": "retained-dead",
+    "current": {
+      "state": "no_active_work",
+      "reason": null
+    },
+    "invalidity": {
+      "kind": null,
+      "ids": []
+    },
+    "retained_completed": [
+      {
+        "id": "rotation-a",
+        "current_state": "unknown",
+        "endpoint_state": "dead",
+        "worktree_present": true
+      },
+      {
+        "id": "rotation-b",
+        "current_state": "unknown",
+        "endpoint_state": "dead",
+        "worktree_present": true
+      },
+      {
+        "id": "rotation-c",
+        "current_state": "unknown",
+        "endpoint_state": "dead",
+        "worktree_present": true
+      }
+    ],
+    "landed_ids": [
+      "rotation-c",
+      "rotation-b",
+      "rotation-a"
+    ],
+    "retained_count": 3
+  }
+}

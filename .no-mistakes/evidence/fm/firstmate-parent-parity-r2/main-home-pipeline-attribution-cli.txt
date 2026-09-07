@@ -1,0 +1,9 @@
+SCENARIO pipeline-owned newer head over older failed row
+state: working · source: run-step · validating (running)
+ok - pipeline-owned active run binds without head equality and beats the failed row
+SCENARIO genuine failed-run head
+state: failed · source: run-step · run failed
+ok - a genuinely failed run with no later run is not hidden
+SCENARIO durable runs-ledger attribution for unfetched pipeline head
+state: working · source: run-step · validating (fixing)
+ok - active fix round with an unfetched pipeline head reads working

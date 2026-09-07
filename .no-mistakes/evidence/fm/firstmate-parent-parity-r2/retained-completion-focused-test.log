@@ -1,0 +1,6 @@
+ok - recovery-grade dead Done workers remain explicit retained completion evidence
+ok - Done non-worker rows cannot own retained child metadata
+ok - retained missing work stays historical across current-state projections
+ok - retained completion ownership preserves raw long task ids
+ok - alive and ambiguous unmatched metadata still invalidate secondmate inventory
+ok - wrong-task endpoint metadata stays unverified and fail-closed
