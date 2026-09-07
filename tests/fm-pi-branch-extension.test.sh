@@ -107,6 +107,7 @@ export class ModelRuntime {
     this.models = (globalThis.__fmBranchStaticModels?.() ?? []).map((model) => ({ ...model }));
     this.authenticated = new Set(this.models.filter((model) => model.storedAuth !== false).map((model) => model.provider));
     this.registeredProviderConfigs = new Map();
+    this.registeredNativeProviders = new Map();
     // Like the real runtime, a registered provider's credentials are only
     // known once refresh() has run for it; registration alone is provisional.
     this.pendingAuth = new Set();
@@ -120,16 +121,47 @@ export class ModelRuntime {
     return runtime;
   }
   registerProvider(providerId, config) {
+    this.registeredNativeProviders.delete(providerId);
     this.registeredProviderConfigs.set(providerId, config);
-    for (const model of config.models ?? []) {
-      this.models.push({ ...model, provider: providerId });
+    const inherited = this.models.filter((model) => model.provider === providerId);
+    this.models = this.models.filter((model) => model.provider !== providerId);
+    for (const model of config.models ?? inherited) {
+      const previous = inherited.find((candidate) => candidate.id === model.id);
+      this.models.push({
+        ...previous,
+        ...model,
+        provider: providerId,
+        ...(config.baseUrl === undefined ? {} : { baseUrl: config.baseUrl }),
+        ...(config.api === undefined ? {} : { api: config.api }),
+      });
     }
     if (config.oauth || config.apiKey) this.pendingAuth.add(providerId);
   }
+  registerNativeProvider(provider) {
+    const providerId = provider.id;
+    this.registeredProviderConfigs.delete(providerId);
+    this.registeredNativeProviders.set(providerId, provider);
+    this.models = this.models.filter((model) => model.provider !== providerId);
+    for (const model of provider.models ?? []) {
+      this.models.push({
+        ...model,
+        provider: providerId,
+        ...(provider.baseUrl === undefined ? {} : { baseUrl: provider.baseUrl }),
+        ...(provider.api === undefined ? {} : { api: provider.api }),
+      });
+    }
+    if (provider.oauth || provider.apiKey || provider.getApiKey) this.pendingAuth.add(providerId);
+  }
   async refresh(options) {
+    (globalThis.__fmModelRuntimeRefreshCalls ??= []).push({ runtime: this, options });
+    if (globalThis.__fmModelRuntimeRefresh) {
+      const result = await globalThis.__fmModelRuntimeRefresh(this, options);
+      if (result !== undefined) return result;
+    }
     for (const providerId of options?.providers ?? this.pendingAuth) {
       if (this.pendingAuth.delete(providerId)) this.authenticated.add(providerId);
     }
+    return { aborted: Boolean(options?.signal?.aborted), errors: new Map() };
   }
   getModel(provider, id) {
     return this.models.find((model) => model.provider === provider && model.id === id);
@@ -463,7 +495,13 @@ const modelRegistry = {
   find: (provider, id) => registryModels.find((model) => model.provider === provider && model.id === id),
   hasConfiguredAuth: (model) => model.mainAvailable !== false,
   getRegisteredProviderConfig: (providerId) => globalThis.__fmExtensionProviderConfigs?.get(providerId),
-  getRegisteredProviderIds: () => [...(globalThis.__fmExtensionProviderConfigs?.keys() ?? [])],
+  getRegisteredNativeProvider: (providerId) => globalThis.__fmExtensionNativeProviders?.get(providerId),
+  getRegisteredProviderIds: () => [
+    ...new Set([
+      ...(globalThis.__fmExtensionProviderConfigs?.keys() ?? []),
+      ...(globalThis.__fmExtensionNativeProviders?.keys() ?? []),
+    ]),
+  ],
 };
 function makeCtx(extra) {
   return {
@@ -4753,6 +4791,158 @@ EOF
   pass "a failed cursor write re-delivers a routine note exactly once more while a captain outcome stays deduplicated"
 }
 
+test_effective_extension_provider_registration_precedes_model_lookup() {
+  local repo home out status
+  repo="$TMP_ROOT/extprov-effective-root"
+  home="$TMP_ROOT/extprov-effective-home"
+  mkdir -p "$home/state" "$home/config"
+  install_pi_branch_extension_fixture "$repo"
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+const prelude = process.env.DRIVER_PRELUDE;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, registryModels, home }; })()`);
+const { fire, dispatch, settle, makeCtx, registryModels, home } = globalThis.__t;
+import { writeFileSync } from "node:fs";
+
+registryModels.push(
+  { provider: "anthropic", id: "main-model", baseUrl: "https://api.anthropic.com" },
+  { provider: "native-proxy", id: "native-model", branchAvailable: false },
+);
+globalThis.__fmExtensionProviderConfigs = new Map([
+  [
+    "anthropic",
+    {
+      name: "Private Anthropic proxy",
+      api: "anthropic-messages",
+      baseUrl: "https://anthropic.proxy.invalid",
+      apiKey: "stored-proxy-credential",
+    },
+  ],
+]);
+globalThis.__fmExtensionNativeProviders = new Map([
+  [
+    "native-proxy",
+    {
+      id: "native-proxy",
+      name: "Native private proxy",
+      api: "native-private-api",
+      baseUrl: "https://native.proxy.invalid",
+      apiKey: "stored-native-credential",
+      models: [{ id: "native-model", name: "Native model" }],
+      streamSimple: () => {},
+    },
+  ],
+]);
+
+await fire("session_start", {}, makeCtx());
+const overrideOffer = dispatch("signal: effective config override");
+await settle(() => (globalThis.__fmSessions ?? []).length === 1, "config-override branch build");
+const overridden = globalThis.__fmSessions[0].options.model;
+if (overridden?.baseUrl !== "https://anthropic.proxy.invalid") {
+  throw new Error(`the branch bypassed the effective provider override: ${JSON.stringify(overridden)}`);
+}
+await overrideOffer.settlement.then(() => null, () => null);
+
+writeFileSync(`${home}/config/supervision-branch-model`, "native-proxy/native-model\n");
+await fire("session_shutdown", {});
+await fire("session_start", {}, makeCtx());
+const nativeOffer = dispatch("signal: native provider registration");
+await settle(() => (globalThis.__fmSessions ?? []).length === 2, "native-provider branch build");
+const native = globalThis.__fmSessions[1].options.model;
+if (
+  native?.provider !== "native-proxy" ||
+  native?.id !== "native-model" ||
+  native?.baseUrl !== "https://native.proxy.invalid" ||
+  native?.api !== "native-private-api"
+) {
+  throw new Error(`the branch did not preserve the native provider registration: ${JSON.stringify(native)}`);
+}
+await nativeOffer.settlement.then(() => null, () => null);
+process.exit(0);
+EOF
+  status=$?
+  out=$(cat "$TMP_ROOT/node-output")
+  expect_code 0 "$status" "effective provider overrides and native registrations must bind branch models: $out"
+  pass "effective provider overrides and native registrations bind before branch model lookup"
+}
+
+test_extension_provider_refresh_deadline_rejects_to_watcher_fallback() {
+  local repo home out status
+  repo="$TMP_ROOT/extprov-deadline-root"
+  home="$TMP_ROOT/extprov-deadline-home"
+  mkdir -p "$home/state" "$home/config"
+  install_pi_branch_extension_fixture "$repo"
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+const prelude = process.env.DRIVER_PRELUDE;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, makeCtx, registryModels, mainUserMessages }; })()`);
+const { fire, dispatch, makeCtx, registryModels, mainUserMessages } = globalThis.__t;
+
+registryModels.push({ provider: "anthropic", id: "main-model", baseUrl: "https://api.anthropic.com" });
+globalThis.__fmExtensionProviderConfigs = new Map([
+  [
+    "anthropic",
+    {
+      name: "Private Anthropic proxy",
+      api: "anthropic-messages",
+      baseUrl: "https://anthropic.proxy.invalid",
+      apiKey: "stored-proxy-credential",
+    },
+  ],
+]);
+globalThis.__fmModelRuntimeRefresh = async (_runtime, options) =>
+  new Promise((resolve, reject) => {
+    if (!options?.signal) {
+      reject(new Error("provider refresh received no cancellation signal"));
+      return;
+    }
+    const finish = () => resolve({ aborted: true, errors: new Map() });
+    if (options.signal.aborted) finish();
+    else options.signal.addEventListener("abort", finish, { once: true });
+  });
+
+await fire("session_start", {}, makeCtx());
+const realSetTimeout = globalThis.setTimeout;
+let deadlineMs = null;
+globalThis.setTimeout = (callback, delay, ...args) => {
+  if (deadlineMs === null) {
+    deadlineMs = Number(delay);
+    return realSetTimeout(callback, 0, ...args);
+  }
+  return realSetTimeout(callback, delay, ...args);
+};
+let offer;
+let failure;
+try {
+  offer = dispatch("signal: blocked extension-provider refresh");
+  failure = await offer.settlement.then(
+    () => null,
+    (error) => error,
+  );
+} finally {
+  globalThis.setTimeout = realSetTimeout;
+}
+if (!offer?.accepted) throw new Error("the refresh-deadline wake was not accepted for settlement");
+if (!Number.isFinite(deadlineMs) || deadlineMs <= 0) {
+  throw new Error(`provider refresh had no positive finite deadline: ${String(deadlineMs)}`);
+}
+if (!(failure instanceof Error) || !failure.message.includes("extension-provider availability refresh exceeded")) {
+  throw new Error(`the blocked provider refresh did not reject to watcher fallback: ${String(failure)}`);
+}
+const refreshCall = globalThis.__fmModelRuntimeRefreshCalls?.at(-1);
+if (!refreshCall?.options?.signal?.aborted || refreshCall.options.allowNetwork !== false) {
+  throw new Error("the provider refresh did not observe bounded offline cancellation");
+}
+if ((globalThis.__fmSessions ?? []).length !== 0) throw new Error("a timed-out provider refresh built a branch session");
+if (mainUserMessages.length !== 0) throw new Error("the branch bypassed watcher-owned fallback delivery");
+process.exit(0);
+EOF
+  status=$?
+  out=$(cat "$TMP_ROOT/node-output")
+  expect_code 0 "$status" "a blocked provider refresh must reject promptly to watcher-owned fallback: $out"
+  pass "blocked extension-provider refreshes reject on a bounded deadline to watcher fallback"
+}
+
 test_extension_registered_provider_resolves_in_the_branch() {
   local repo home out status
   repo="$TMP_ROOT/extprov-root"
@@ -4873,6 +5063,8 @@ test_supervision_model_picker_is_bounded_searchable_and_branch_only
 test_branch_model_picker_keeps_follow_main_first_under_ranking
 test_branch_effort_pin_applies_and_absent_pin_follows_main
 test_unpinned_branch_follows_main_effort_changes_live
+test_effective_extension_provider_registration_precedes_model_lookup
+test_extension_provider_refresh_deadline_rejects_to_watcher_fallback
 test_extension_registered_provider_resolves_in_the_branch
 test_supervision_model_command_picks_effort_after_the_model
 test_unusable_model_pin_falls_back_to_main

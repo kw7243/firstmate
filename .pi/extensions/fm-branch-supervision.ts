@@ -168,6 +168,8 @@ const PROCESSING_TRIGGERED_ATTEMPTS = 2;
 const PROVIDER_ERROR_LATCH_THRESHOLD = 2;
 const PROVIDER_REPROBE_BASE_MS = 5 * 60 * 1000;
 const PROVIDER_REPROBE_MAX_MS = 60 * 60 * 1000;
+const EXTENSION_PROVIDER_REFRESH_TIMEOUT_MS = 5_000;
+class ExtensionProviderRefreshTimeoutError extends Error {}
 const PROCESSING_INSTRUCTION =
   "This is a supervision processing request delivered automatically by the supervision branch. " +
   "It was not typed by the captain. " +
@@ -718,9 +720,9 @@ export default function (pi: ExtensionAPI) {
   // A provider that exists only because an extension registered it into
   // main's runtime (pi-devin-auth's "devin", whose streamSimple is the custom
   // gRPC path no static catalog can express) is invisible to an isolated
-  // branch runtime until its registration is copied across. The config object
-  // carries that streamSimple and oauth wiring by reference, so copying it
-  // reuses the provider's own registration rather than reimplementing its
+  // branch runtime until its registration is copied across. The effective
+  // registration carries that streamSimple and oauth wiring by reference, so
+  // copying it reuses the provider's own registration rather than reimplementing its
   // wire protocol; the copy is never persisted and stays scoped to this one
   // runtime. One registration that fails to compose must not blind the rest,
   // so each copy is isolated. A just-registered provider's auth check has not
@@ -738,6 +740,12 @@ export default function (pi: ExtensionAPI) {
     const copied: string[] = [];
     for (const providerId of providerIds) {
       try {
+        const nativeProvider = mainModelRegistry.getRegisteredNativeProvider(providerId);
+        if (nativeProvider) {
+          modelRuntime.registerNativeProvider(nativeProvider);
+          copied.push(providerId);
+          continue;
+        }
         const config = mainModelRegistry.getRegisteredProviderConfig(providerId);
         if (config) {
           modelRuntime.registerProvider(providerId, config);
@@ -749,21 +757,27 @@ export default function (pi: ExtensionAPI) {
       }
     }
     if (copied.length === 0) return;
+    const controller = new AbortController();
+    const deadline = setTimeout(() => controller.abort(), EXTENSION_PROVIDER_REFRESH_TIMEOUT_MS);
     try {
-      await modelRuntime.refresh({ providers: copied, allowNetwork: false });
+      await modelRuntime.refresh({ providers: copied, allowNetwork: false, signal: controller.signal });
     } catch {
       // A failed availability refresh is answered by hasConfiguredAuth.
+    } finally {
+      clearTimeout(deadline);
+    }
+    if (controller.signal.aborted) {
+      throw new ExtensionProviderRefreshTimeoutError(
+        `extension-provider availability refresh exceeded ${EXTENSION_PROVIDER_REFRESH_TIMEOUT_MS}ms`,
+      );
     }
   }
 
   async function resolveBranchModel(provider: string, modelId: string): Promise<BranchModelResolution> {
     const label = `${provider}/${modelId}`;
     const modelRuntime = await ModelRuntime.create();
-    let model = modelRuntime.getModel(provider, modelId) as BranchModel | undefined;
-    if (!model) {
-      await copyExtensionProviders(modelRuntime);
-      model = modelRuntime.getModel(provider, modelId) as BranchModel | undefined;
-    }
+    await copyExtensionProviders(modelRuntime);
+    const model = modelRuntime.getModel(provider, modelId) as BranchModel | undefined;
     if (!model) return { ok: false, reason: `${label} is unavailable to the isolated branch runtime` };
     if (!modelRuntime.hasConfiguredAuth(provider)) {
       return { ok: false, reason: `${label} has no configured credentials in the isolated branch runtime` };
@@ -795,7 +809,8 @@ export default function (pi: ExtensionAPI) {
     try {
       const resolved = await resolveBranchModel(mainModel.provider, mainModel.id);
       return resolved.ok ? resolved.selection : undefined;
-    } catch {
+    } catch (error) {
+      if (error instanceof ExtensionProviderRefreshTimeoutError) throw error;
       return undefined;
     }
   }
