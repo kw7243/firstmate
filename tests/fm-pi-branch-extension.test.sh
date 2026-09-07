@@ -4866,6 +4866,73 @@ EOF
   pass "effective provider overrides and native registrations bind before branch model lookup"
 }
 
+test_cached_branch_rebinds_after_effective_provider_change() {
+  local repo home out status
+  repo="$TMP_ROOT/extprov-rebind-root"
+  home="$TMP_ROOT/extprov-rebind-home"
+  mkdir -p "$home/state" "$home/config"
+  install_pi_branch_extension_fixture "$repo"
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+const prelude = process.env.DRIVER_PRELUDE;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, registryModels, home }; })()`);
+const { fire, dispatch, settle, makeCtx, registryModels, home } = globalThis.__t;
+
+registryModels.push({ provider: "anthropic", id: "main-model", baseUrl: "https://api.anthropic.com" });
+globalThis.__fmExtensionProviderConfigs = new Map();
+globalThis.__fmExtensionNativeProviders = new Map();
+const entries = [];
+const ctx = makeCtx({
+  sessionManager: {
+    getSessionFile: () => `${home}/main.jsonl`,
+    getEntries: () => entries,
+  },
+});
+
+await fire("session_start", {}, ctx);
+const firstOffer = dispatch("signal: stock provider branch");
+await settle(
+  () => (globalThis.__fmSessions ?? []).length === 1 && globalThis.__fmSessions[0].ops.some((op) => op.kind === "prompt"),
+  "stock-provider branch prompt",
+);
+const first = globalThis.__fmSessions[0];
+if (first.options.model?.baseUrl !== "https://api.anthropic.com") {
+  throw new Error(`the initial branch did not use the stock provider: ${JSON.stringify(first.options.model)}`);
+}
+await firstOffer.settlement.then(() => null, () => null);
+
+globalThis.__fmExtensionProviderConfigs.set("anthropic", {
+  name: "Private Anthropic proxy",
+  api: "anthropic-messages",
+  baseUrl: "https://anthropic.proxy.invalid",
+  apiKey: "stored-proxy-credential",
+});
+const privatePrompt = "captain context added after private proxy registration";
+await fire("before_agent_start", { prompt: privatePrompt }, ctx);
+const reboundOffer = dispatch("signal: provider registration changed");
+await settle(
+  () => (globalThis.__fmSessions ?? []).length === 2 && globalThis.__fmSessions[1].ops.some((op) => op.kind === "prompt"),
+  "provider-rebound branch prompt",
+);
+const rebound = globalThis.__fmSessions[1];
+if (!first.disposed) throw new Error("the obsolete provider-bound branch remained live");
+if (rebound.options.model?.baseUrl !== "https://anthropic.proxy.invalid") {
+  throw new Error(`the replacement branch bypassed the new private proxy: ${JSON.stringify(rebound.options.model)}`);
+}
+if (first.ops.some((op) => JSON.stringify(op).includes(privatePrompt))) {
+  throw new Error("new private context reached the obsolete provider-bound branch");
+}
+const reboundMirror = rebound.ops.find((op) => op.kind === "custom" && op.message.content.includes(privatePrompt));
+if (!reboundMirror) throw new Error("the replacement branch did not receive the newly mirrored private context");
+await reboundOffer.settlement.then(() => null, () => null);
+process.exit(0);
+EOF
+  status=$?
+  out=$(cat "$TMP_ROOT/node-output")
+  expect_code 0 "$status" "a cached branch must rebind when its effective provider registration changes: $out"
+  pass "cached branches rebind before new mirrored context reaches a changed provider"
+}
+
 test_extension_provider_refresh_deadline_rejects_to_watcher_fallback() {
   local repo home out status
   repo="$TMP_ROOT/extprov-deadline-root"
@@ -4890,15 +4957,14 @@ globalThis.__fmExtensionProviderConfigs = new Map([
     },
   ],
 ]);
-globalThis.__fmModelRuntimeRefresh = async (_runtime, options) =>
-  new Promise((resolve, reject) => {
+let rejectLateRefresh;
+globalThis.__fmModelRuntimeRefresh = (_runtime, options) =>
+  new Promise((_resolve, reject) => {
     if (!options?.signal) {
       reject(new Error("provider refresh received no cancellation signal"));
       return;
     }
-    const finish = () => resolve({ aborted: true, errors: new Map() });
-    if (options.signal.aborted) finish();
-    else options.signal.addEventListener("abort", finish, { once: true });
+    rejectLateRefresh = reject;
   });
 
 await fire("session_start", {}, makeCtx());
@@ -4933,6 +4999,16 @@ const refreshCall = globalThis.__fmModelRuntimeRefreshCalls?.at(-1);
 if (!refreshCall?.options?.signal?.aborted || refreshCall.options.allowNetwork !== false) {
   throw new Error("the provider refresh did not observe bounded offline cancellation");
 }
+if (typeof rejectLateRefresh !== "function") throw new Error("the unresolved provider refresh was not started");
+const unhandled = [];
+const recordUnhandled = (error) => unhandled.push(error);
+process.on("unhandledRejection", recordUnhandled);
+rejectLateRefresh(new Error("late provider refresh failure"));
+await new Promise((resolve) => setImmediate(resolve));
+process.off("unhandledRejection", recordUnhandled);
+if (unhandled.length !== 0) {
+  throw new Error(`the late provider refresh escaped as an unhandled rejection: ${String(unhandled[0])}`);
+}
 if ((globalThis.__fmSessions ?? []).length !== 0) throw new Error("a timed-out provider refresh built a branch session");
 if (mainUserMessages.length !== 0) throw new Error("the branch bypassed watcher-owned fallback delivery");
 process.exit(0);
@@ -4941,6 +5017,84 @@ EOF
   out=$(cat "$TMP_ROOT/node-output")
   expect_code 0 "$status" "a blocked provider refresh must reject promptly to watcher-owned fallback: $out"
   pass "blocked extension-provider refreshes reject on a bounded deadline to watcher fallback"
+}
+
+test_selected_provider_resolution_avoids_unrelated_refresh() {
+  local repo home out status
+  repo="$TMP_ROOT/extprov-selected-root"
+  home="$TMP_ROOT/extprov-selected-home"
+  mkdir -p "$home/state" "$home/config"
+  install_pi_branch_extension_fixture "$repo"
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+const prelude = process.env.DRIVER_PRELUDE;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, registryModels, commands, uiPrompts }; })()`);
+const { fire, dispatch, settle, makeCtx, registryModels, commands, uiPrompts } = globalThis.__t;
+
+registryModels.push(
+  { provider: "anthropic", id: "main-model", baseUrl: "https://api.anthropic.com" },
+  { provider: "unrelated", id: "other-model", branchAvailable: false },
+);
+globalThis.__fmExtensionProviderConfigs = new Map([
+  [
+    "anthropic",
+    {
+      name: "Private Anthropic proxy",
+      api: "anthropic-messages",
+      baseUrl: "https://anthropic.proxy.invalid",
+      apiKey: "stored-proxy-credential",
+    },
+  ],
+  [
+    "unrelated",
+    {
+      name: "Unrelated dynamic provider",
+      api: "unrelated-api",
+      baseUrl: "https://unrelated.invalid",
+      apiKey: "stored-unrelated-credential",
+      models: [{ id: "other-model", name: "Other model" }],
+    },
+  ],
+]);
+globalThis.__fmExtensionNativeProviders = new Map();
+globalThis.__fmModelRuntimeRefresh = (_runtime, options) => {
+  if (options?.providers?.includes("unrelated")) return new Promise(() => {});
+  return undefined;
+};
+
+await fire("session_start", {}, makeCtx());
+const offer = dispatch("signal: selected provider only");
+await settle(
+  () => (globalThis.__fmSessions ?? []).length === 1 && globalThis.__fmSessions[0].ops.some((op) => op.kind === "prompt"),
+  "selected-provider branch prompt",
+);
+const selectedRefresh = globalThis.__fmModelRuntimeRefreshCalls?.at(-1);
+if (JSON.stringify(selectedRefresh?.options?.providers) !== JSON.stringify(["anthropic"])) {
+  throw new Error(`selected resolution refreshed unrelated providers: ${JSON.stringify(selectedRefresh?.options?.providers)}`);
+}
+if (globalThis.__fmSessions[0].options.model?.baseUrl !== "https://anthropic.proxy.invalid") {
+  throw new Error(`the selected private provider did not bind: ${JSON.stringify(globalThis.__fmSessions[0].options.model)}`);
+}
+await offer.settlement.then(() => null, () => null);
+
+delete globalThis.__fmModelRuntimeRefresh;
+const command = commands.get("supervision-model");
+if (!command) throw new Error("the supervision-model command was not registered");
+await command.handler("", makeCtx());
+const pickerRefresh = globalThis.__fmModelRuntimeRefreshCalls?.at(-1);
+const pickerProviders = [...(pickerRefresh?.options?.providers ?? [])].sort();
+if (JSON.stringify(pickerProviders) !== JSON.stringify(["anthropic", "unrelated"])) {
+  throw new Error(`the picker did not refresh the full provider registry: ${JSON.stringify(pickerProviders)}`);
+}
+if (!uiPrompts.at(-1)?.options.includes("unrelated/other-model")) {
+  throw new Error(`the picker omitted the unrelated registered model: ${JSON.stringify(uiPrompts.at(-1)?.options)}`);
+}
+process.exit(0);
+EOF
+  status=$?
+  out=$(cat "$TMP_ROOT/node-output")
+  expect_code 0 "$status" "selected model resolution must not wait on unrelated providers while discovery still enumerates them: $out"
+  pass "selected model resolution refreshes only its provider while discovery retains all providers"
 }
 
 test_extension_registered_provider_resolves_in_the_branch() {
@@ -5064,7 +5218,9 @@ test_branch_model_picker_keeps_follow_main_first_under_ranking
 test_branch_effort_pin_applies_and_absent_pin_follows_main
 test_unpinned_branch_follows_main_effort_changes_live
 test_effective_extension_provider_registration_precedes_model_lookup
+test_cached_branch_rebinds_after_effective_provider_change
 test_extension_provider_refresh_deadline_rejects_to_watcher_fallback
+test_selected_provider_resolution_avoids_unrelated_refresh
 test_extension_registered_provider_resolves_in_the_branch
 test_supervision_model_command_picks_effort_after_the_model
 test_unusable_model_pin_falls_back_to_main

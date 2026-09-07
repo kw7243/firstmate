@@ -234,7 +234,14 @@ function settledPromptProviderError(sessionManager: SessionManager, entryOffset:
 // surface Pi already hands this extension.
 type BranchModel = NonNullable<ReturnType<ModelRuntime["getModel"]>>;
 type BranchEffort = ReturnType<NonNullable<ExtensionAPI["getThinkingLevel"]>>;
-type PinnedBranchModel = { model: BranchModel; modelRuntime: ModelRuntime };
+type ExtensionProviderRegistration =
+  | { providerId: string; kind: "none" }
+  | { providerId: string; kind: "native" | "config"; registration: unknown };
+type PinnedBranchModel = {
+  model: BranchModel;
+  modelRuntime: ModelRuntime;
+  providerRegistration: ExtensionProviderRegistration;
+};
 type BranchModelResolution = { ok: true; selection: PinnedBranchModel } | { ok: false; reason: string };
 
 // Pi owns the effort vocabulary. The picker's options and every clamp still
@@ -558,6 +565,7 @@ export default function (pi: ExtensionAPI) {
     sessionManager: SessionManager;
     generation: number;
     selectionRevision: number;
+    providerRegistration?: ExtensionProviderRegistration;
   };
   let branch: BranchSession | null = null;
   let branchBroken = "";
@@ -729,13 +737,24 @@ export default function (pi: ExtensionAPI) {
   // run yet, so the copied providers are refreshed here and every caller's
   // hasConfiguredAuth verdict is real rather than the provisional entry
   // registration leaves behind.
-  async function copyExtensionProviders(modelRuntime: ModelRuntime): Promise<void> {
-    if (!mainModelRegistry) return;
-    let providerIds: readonly string[];
-    try {
-      providerIds = mainModelRegistry.getRegisteredProviderIds();
-    } catch {
-      return;
+  async function copyExtensionProviders(
+    modelRuntime: ModelRuntime,
+    selectedProviderIds?: readonly string[],
+  ): Promise<Map<string, ExtensionProviderRegistration>> {
+    const registrations = new Map<string, ExtensionProviderRegistration>();
+    if (!mainModelRegistry) {
+      for (const providerId of selectedProviderIds ?? []) {
+        registrations.set(providerId, { providerId, kind: "none" });
+      }
+      return registrations;
+    }
+    let providerIds = selectedProviderIds;
+    if (!providerIds) {
+      try {
+        providerIds = mainModelRegistry.getRegisteredProviderIds();
+      } catch {
+        return registrations;
+      }
     }
     const copied: string[] = [];
     for (const providerId of providerIds) {
@@ -743,46 +762,78 @@ export default function (pi: ExtensionAPI) {
         const nativeProvider = mainModelRegistry.getRegisteredNativeProvider(providerId);
         if (nativeProvider) {
           modelRuntime.registerNativeProvider(nativeProvider);
+          registrations.set(providerId, { providerId, kind: "native", registration: nativeProvider });
           copied.push(providerId);
           continue;
         }
         const config = mainModelRegistry.getRegisteredProviderConfig(providerId);
         if (config) {
           modelRuntime.registerProvider(providerId, config);
+          registrations.set(providerId, { providerId, kind: "config", registration: config });
           copied.push(providerId);
+        } else {
+          registrations.set(providerId, { providerId, kind: "none" });
         }
       } catch {
         // A registration that fails to compose in the isolated runtime leaves
         // that provider unavailable, exactly as if it were never copied.
       }
     }
-    if (copied.length === 0) return;
+    if (copied.length === 0) return registrations;
     const controller = new AbortController();
-    const deadline = setTimeout(() => controller.abort(), EXTENSION_PROVIDER_REFRESH_TIMEOUT_MS);
-    try {
-      await modelRuntime.refresh({ providers: copied, allowNetwork: false, signal: controller.signal });
-    } catch {
-      // A failed availability refresh is answered by hasConfiguredAuth.
-    } finally {
-      clearTimeout(deadline);
-    }
-    if (controller.signal.aborted) {
+    const refresh = modelRuntime
+      .refresh({ providers: copied, allowNetwork: false, signal: controller.signal })
+      .then(
+        () => "settled" as const,
+        () => "settled" as const,
+      );
+    let deadline: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<"timeout">((resolveTimeout) => {
+      deadline = setTimeout(() => {
+        resolveTimeout("timeout");
+        controller.abort();
+      }, EXTENSION_PROVIDER_REFRESH_TIMEOUT_MS);
+    });
+    const outcome = await Promise.race([refresh, timeout]);
+    if (deadline !== undefined) clearTimeout(deadline);
+    if (outcome === "timeout") {
       throw new ExtensionProviderRefreshTimeoutError(
         `extension-provider availability refresh exceeded ${EXTENSION_PROVIDER_REFRESH_TIMEOUT_MS}ms`,
       );
+    }
+    return registrations;
+  }
+
+  function extensionProviderRegistrationIsCurrent(snapshot: ExtensionProviderRegistration): boolean {
+    if (!mainModelRegistry) return snapshot.kind === "none";
+    try {
+      const nativeProvider = mainModelRegistry.getRegisteredNativeProvider(snapshot.providerId);
+      if (nativeProvider) return snapshot.kind === "native" && snapshot.registration === nativeProvider;
+      const providerConfig = mainModelRegistry.getRegisteredProviderConfig(snapshot.providerId);
+      if (providerConfig) return snapshot.kind === "config" && snapshot.registration === providerConfig;
+      return snapshot.kind === "none";
+    } catch {
+      return false;
     }
   }
 
   async function resolveBranchModel(provider: string, modelId: string): Promise<BranchModelResolution> {
     const label = `${provider}/${modelId}`;
     const modelRuntime = await ModelRuntime.create();
-    await copyExtensionProviders(modelRuntime);
+    const registrations = await copyExtensionProviders(modelRuntime, [provider]);
     const model = modelRuntime.getModel(provider, modelId) as BranchModel | undefined;
     if (!model) return { ok: false, reason: `${label} is unavailable to the isolated branch runtime` };
     if (!modelRuntime.hasConfiguredAuth(provider)) {
       return { ok: false, reason: `${label} has no configured credentials in the isolated branch runtime` };
     }
-    return { ok: true, selection: { model, modelRuntime } };
+    return {
+      ok: true,
+      selection: {
+        model,
+        modelRuntime,
+        providerRegistration: registrations.get(provider) ?? { providerId: provider, kind: "none" },
+      },
+    };
   }
 
   async function preparePinnedBranchModel(pin: { provider: string; modelId: string }): Promise<PinnedBranchModel> {
@@ -1190,7 +1241,11 @@ export default function (pi: ExtensionAPI) {
   async function createBranch(
     branchGeneration: number,
     selectionRevision: number,
-  ): Promise<{ session: AgentSession; sessionManager: SessionManager }> {
+  ): Promise<{
+    session: AgentSession;
+    sessionManager: SessionManager;
+    providerRegistration?: ExtensionProviderRegistration;
+  }> {
     // Resolved first, before any session file or prompt work: a model pin Pi
     // cannot honor must fail before this build leaves anything behind. Every
     // branch build goes through here - the new conversation each main session
@@ -1315,18 +1370,38 @@ ${context.command}
       // reopening reads the in-memory record above, so a failed write costs
       // neither the live session nor its replacement.
     }
-    return { session: created.session, sessionManager };
+    return {
+      session: created.session,
+      sessionManager,
+      ...(pinned ? { providerRegistration: pinned.providerRegistration } : {}),
+    };
   }
 
   async function ensureBranch(expectedGeneration: number, recoveryProbe = false): Promise<BranchSession> {
     if (!(await actingAsOwner(expectedGeneration))) throw new Error("supervision session was replaced or lost lock ownership");
     if (branchBroken && !(recoveryProbe && providerRecovery?.probeInFlight)) throw new Error(branchBroken);
+    if (branch?.providerRegistration && !extensionProviderRegistrationIsCurrent(branch.providerRegistration)) {
+      const stale = branch;
+      branch = null;
+      try {
+        stale.session.dispose();
+      } catch {}
+    }
     if (branch) return branch;
     while (true) {
       const buildRevision = branchSelectionRevision;
       try {
         const created = await createBranch(expectedGeneration, buildRevision);
         if (buildRevision !== branchSelectionRevision) {
+          try {
+            created.session.dispose();
+          } catch {}
+          continue;
+        }
+        if (
+          created.providerRegistration &&
+          !extensionProviderRegistrationIsCurrent(created.providerRegistration)
+        ) {
           try {
             created.session.dispose();
           } catch {}
