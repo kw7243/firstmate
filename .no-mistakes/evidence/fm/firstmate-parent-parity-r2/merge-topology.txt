@@ -1,0 +1,17 @@
+target_head=5c5d090fdd18c2ab23e8a93e11c76b835edbba21
+origin_fetch_url=https://github.com/kw7243/firstmate
+origin_main=fda869cf30f540eef8bb87ce3a0335f4aac06e34
+merged_parent_head=cf7e2fa81524397a3a36b31daab02cdd958983fe
+fork_parent_before_final_merge=f6cae5c2748653f220dcb98919feed2b86d4fd08
+origin_parent_merge_base=1cb900c28faf23fe23c9bb54e63f7c3b436ea096
+final_merge=516d2d75cb31c3d5853d600fedfca36bfe5610b2
+final_merge_parents=f6cae5c2748653f220dcb98919feed2b86d4fd08 cf7e2fa81524397a3a36b31daab02cdd958983fe
+accepted_research_notebook_commit_reachable=true
+accepted_completed_worker_commit_reachable=true
+exact_parent_head_reachable=true
+post-merge validation/fix commits:
+  2502097e15a922b3702fc1ea1357798027e69c71 no-mistakes(review): Replace source assertions with behavioral resolver coverage
+  f241634400a0cb483ced8551baa1ac9026dfad8b no-mistakes(document): Align trace verification with behavioral coverage
+  3dbee353993662e14e84fc34af64937bfcf68b40 no-mistakes(lint): Suppress intentional child-shell expansion warnings
+  08adc114710676cbd026aa264e777f1282de4b14 test(snapshot): keep large ledger fixture below transport cap
+  5c5d090fdd18c2ab23e8a93e11c76b835edbba21 no-mistakes(review): Restore parent stow docs and test helper

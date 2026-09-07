@@ -1,0 +1,7 @@
+fixture_records=400
+published_ledger_bytes=213339
+linux_per_argument_threshold=131072
+configured_summary_cap=262144
+{"schema":"fm-secondmate-home-summary.v1","valid":false,"state":"no_active_work","orphan_ids":400}
+{"selected":"structured-home","summary_source":"local-ledger","invalidity_kind":"orphan_in_flight","invalidity_ids":400}
+transport_window=PASS (above per-argument threshold, within production cap)

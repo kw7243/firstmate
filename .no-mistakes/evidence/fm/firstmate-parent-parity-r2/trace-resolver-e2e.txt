@@ -1,0 +1,5 @@
+case=disabled rc=0 elapsed_ms=17 output_bytes=0 valid_carrier=false stderr_bytes=0 prose_disclosed=false
+case=claude-tmux-ship rc=0 elapsed_ms=41 output_bytes=55 valid_carrier=true stderr_bytes=0 prose_disclosed=false
+case=codex-herdr-scout rc=0 elapsed_ms=48 output_bytes=55 valid_carrier=true stderr_bytes=0 prose_disclosed=false
+case=opencode-zellij-secondmate rc=0 elapsed_ms=39 output_bytes=55 valid_carrier=true stderr_bytes=0 prose_disclosed=false
+provider_called=false

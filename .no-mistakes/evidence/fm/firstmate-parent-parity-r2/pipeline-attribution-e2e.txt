@@ -1,0 +1,6 @@
+scenario=pipeline-owned newer head with older failed row
+state: working · source: run-step · validating (running)
+scenario=genuine failed head with no newer run
+state: failed · source: run-step · run failed
+scenario=durable runs-ledger continuation while axi reports another branch
+state: working · source: run-step · validating (background run)
