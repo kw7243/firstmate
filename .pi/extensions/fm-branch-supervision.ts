@@ -168,8 +168,34 @@ const PROCESSING_TRIGGERED_ATTEMPTS = 2;
 const PROVIDER_ERROR_LATCH_THRESHOLD = 2;
 const PROVIDER_REPROBE_BASE_MS = 5 * 60 * 1000;
 const PROVIDER_REPROBE_MAX_MS = 60 * 60 * 1000;
-const EXTENSION_PROVIDER_REFRESH_TIMEOUT_MS = 5_000;
-class ExtensionProviderRefreshTimeoutError extends Error {}
+const EXTENSION_PROVIDER_OPERATION_TIMEOUT_MS = 5_000;
+class ExtensionProviderTimeoutError extends Error {}
+async function withExtensionProviderDeadline<T>(
+  operation: Promise<T>,
+  phase: string,
+  onTimeout: () => void,
+): Promise<T> {
+  const settlement = operation.then(
+    (value) => ({ kind: "value" as const, value }),
+    (error: unknown) => ({ kind: "error" as const, error }),
+  );
+  let deadline: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<{ kind: "timeout" }>((resolveTimeout) => {
+    deadline = setTimeout(() => {
+      resolveTimeout({ kind: "timeout" });
+      onTimeout();
+    }, EXTENSION_PROVIDER_OPERATION_TIMEOUT_MS);
+  });
+  const outcome = await Promise.race([settlement, timeout]);
+  if (deadline !== undefined) clearTimeout(deadline);
+  if (outcome.kind === "timeout") {
+    throw new ExtensionProviderTimeoutError(
+      `extension-provider ${phase} exceeded ${EXTENSION_PROVIDER_OPERATION_TIMEOUT_MS}ms`,
+    );
+  }
+  if (outcome.kind === "error") throw outcome.error;
+  return outcome.value;
+}
 const PROCESSING_INSTRUCTION =
   "This is a supervision processing request delivered automatically by the supervision branch. " +
   "It was not typed by the captain. " +
@@ -566,6 +592,7 @@ export default function (pi: ExtensionAPI) {
     generation: number;
     selectionRevision: number;
     providerRegistration?: ExtensionProviderRegistration;
+    watchProviderRegistrationMismatch: (listener: (error: Error) => void) => () => void;
   };
   let branch: BranchSession | null = null;
   let branchBroken = "";
@@ -720,6 +747,16 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
+  async function createExtensionProviderRuntime(): Promise<ModelRuntime> {
+    const controller = new AbortController();
+    const options = { signal: controller.signal } as Parameters<typeof ModelRuntime.create>[0];
+    return withExtensionProviderDeadline(
+      ModelRuntime.create(options),
+      "runtime creation",
+      () => controller.abort(),
+    );
+  }
+
   // Resolves one model against the isolated branch runtime using only the
   // credentials that runtime already holds - the branch runs in the same home
   // and same user as main, so stored credentials keep their own semantics
@@ -781,25 +818,14 @@ export default function (pi: ExtensionAPI) {
     }
     if (copied.length === 0) return registrations;
     const controller = new AbortController();
-    const refresh = modelRuntime
-      .refresh({ providers: copied, allowNetwork: false, signal: controller.signal })
-      .then(
-        () => "settled" as const,
-        () => "settled" as const,
+    try {
+      await withExtensionProviderDeadline(
+        modelRuntime.refresh({ providers: copied, allowNetwork: false, signal: controller.signal }),
+        "availability refresh",
+        () => controller.abort(),
       );
-    let deadline: ReturnType<typeof setTimeout> | undefined;
-    const timeout = new Promise<"timeout">((resolveTimeout) => {
-      deadline = setTimeout(() => {
-        resolveTimeout("timeout");
-        controller.abort();
-      }, EXTENSION_PROVIDER_REFRESH_TIMEOUT_MS);
-    });
-    const outcome = await Promise.race([refresh, timeout]);
-    if (deadline !== undefined) clearTimeout(deadline);
-    if (outcome === "timeout") {
-      throw new ExtensionProviderRefreshTimeoutError(
-        `extension-provider availability refresh exceeded ${EXTENSION_PROVIDER_REFRESH_TIMEOUT_MS}ms`,
-      );
+    } catch (error) {
+      if (error instanceof ExtensionProviderTimeoutError) throw error;
     }
     return registrations;
   }
@@ -819,7 +845,7 @@ export default function (pi: ExtensionAPI) {
 
   async function resolveBranchModel(provider: string, modelId: string): Promise<BranchModelResolution> {
     const label = `${provider}/${modelId}`;
-    const modelRuntime = await ModelRuntime.create();
+    const modelRuntime = await createExtensionProviderRuntime();
     const registrations = await copyExtensionProviders(modelRuntime, [provider]);
     const model = modelRuntime.getModel(provider, modelId) as BranchModel | undefined;
     if (!model) return { ok: false, reason: `${label} is unavailable to the isolated branch runtime` };
@@ -861,7 +887,7 @@ export default function (pi: ExtensionAPI) {
       const resolved = await resolveBranchModel(mainModel.provider, mainModel.id);
       return resolved.ok ? resolved.selection : undefined;
     } catch (error) {
-      if (error instanceof ExtensionProviderRefreshTimeoutError) throw error;
+      if (error instanceof ExtensionProviderTimeoutError) throw error;
       return undefined;
     }
   }
@@ -1245,6 +1271,7 @@ export default function (pi: ExtensionAPI) {
     session: AgentSession;
     sessionManager: SessionManager;
     providerRegistration?: ExtensionProviderRegistration;
+    watchProviderRegistrationMismatch: (listener: (error: Error) => void) => () => void;
   }> {
     // Resolved first, before any session file or prompt work: a model pin Pi
     // cannot honor must fail before this build leaves anything behind. Every
@@ -1283,6 +1310,7 @@ export default function (pi: ExtensionAPI) {
     }
     branchSessionGeneration = branchGeneration;
     branchSessionFile = sessionManager.getSessionFile() ?? "";
+    let providerRegistrationMismatchListener: ((error: Error) => void) | null = null;
     // The branch loads no project resources at all: extensions off (so it can
     // never spawn its own branch), skills/context files off (they vary per
     // home and would destabilize the byte-stable prefix). Its whole standing
@@ -1300,7 +1328,15 @@ export default function (pi: ExtensionAPI) {
         {
           name: "fm-branch-cache-key",
           factory: (branchPi: ExtensionAPI) => {
-            branchPi.on("before_provider_request", (event) => {
+            branchPi.on("before_provider_request", (event, ctx) => {
+              if (pinned && !extensionProviderRegistrationIsCurrent(pinned.providerRegistration)) {
+                const providerRegistrationMismatch = new Error(
+                  `supervision branch provider registration changed before request for ${pinned.providerRegistration.providerId}`,
+                );
+                providerRegistrationMismatchListener?.(providerRegistrationMismatch);
+                ctx.abort();
+                throw providerRegistrationMismatch;
+              }
               const payload = event.payload;
               // Only providers whose request already carries Pi's default
               // per-session prompt_cache_key get the shared per-home override;
@@ -1374,6 +1410,12 @@ ${context.command}
       session: created.session,
       sessionManager,
       ...(pinned ? { providerRegistration: pinned.providerRegistration } : {}),
+      watchProviderRegistrationMismatch: (listener) => {
+        providerRegistrationMismatchListener = listener;
+        return () => {
+          if (providerRegistrationMismatchListener === listener) providerRegistrationMismatchListener = null;
+        };
+      },
     };
   }
 
@@ -1427,6 +1469,13 @@ ${context.command}
         throw error;
       }
     }
+  }
+
+  function invalidateProviderMismatchedBranch(candidate: BranchSession): void {
+    if (branch === candidate) branch = null;
+    try {
+      candidate.session.dispose();
+    } catch {}
   }
 
   async function flushMirror(session: AgentSession, expectedGeneration: number): Promise<void> {
@@ -1502,11 +1551,29 @@ ${context.command}
         const reportRevisionBeforePrompt = durableReportRevision;
         const entryOffset = sessionManager.getEntries().length;
         wakeTaskScope = heartbeat ? null : { rows: [...scope.eligibleSeqs], tasks: new Set(scope.eligibleTasks) };
+        let stopProviderRegistrationWatch = () => {};
+        const providerRegistrationMismatch = new Promise<{ kind: "mismatch"; error: Error }>((resolveMismatch) => {
+          stopProviderRegistrationWatch = branchForWake.watchProviderRegistrationMismatch((error) => {
+            resolveMismatch({ kind: "mismatch", error });
+          });
+        });
         try {
-          await session.prompt(
-            `FIRSTMATE SUPERVISION WAKE: ${message}\n\nHandle this per your operating procedure and finish with fm_branch_report.`,
-          );
+          const prompt = session
+            .prompt(
+              `FIRSTMATE SUPERVISION WAKE: ${message}\n\nHandle this per your operating procedure and finish with fm_branch_report.`,
+            )
+            .then(
+              () => ({ kind: "settled" as const }),
+              (error: unknown) => ({ kind: "error" as const, error }),
+            );
+          const promptOutcome = await Promise.race([prompt, providerRegistrationMismatch]);
+          if (promptOutcome.kind === "mismatch") {
+            invalidateProviderMismatchedBranch(branchForWake);
+            throw promptOutcome.error;
+          }
+          if (promptOutcome.kind === "error") throw promptOutcome.error;
         } finally {
+          stopProviderRegistrationWatch();
           wakeTaskScope = null;
         }
         const providerError = settledPromptProviderError(sessionManager, entryOffset);
@@ -1800,7 +1867,7 @@ ${context.command}
       const followMain = `Follow main${ctx.model ? ` (${modelLabel(ctx.model)})` : ""}`;
       let available: string[];
       try {
-        const modelRuntime = await ModelRuntime.create();
+        const modelRuntime = await createExtensionProviderRuntime();
         await copyExtensionProviders(modelRuntime);
         available = ctx.modelRegistry
           .getAvailable()

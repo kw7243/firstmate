@@ -112,7 +112,9 @@ export class ModelRuntime {
     // known once refresh() has run for it; registration alone is provisional.
     this.pendingAuth = new Set();
   }
-  static async create() {
+  static async create(options = {}) {
+    (globalThis.__fmModelRuntimeCreateCalls ??= []).push(options);
+    await globalThis.__fmModelRuntimeCreate?.(options);
     const queuedError = globalThis.__fmModelRuntimeErrors?.shift();
     if (queuedError) throw new Error(queuedError);
     if (globalThis.__fmModelRuntimeError) throw new Error(globalThis.__fmModelRuntimeError);
@@ -4933,6 +4935,178 @@ EOF
   pass "cached branches rebind before new mirrored context reaches a changed provider"
 }
 
+test_provider_change_at_request_boundary_aborts_to_watcher_fallback() {
+  local repo home out status
+  repo="$TMP_ROOT/extprov-request-boundary-root"
+  home="$TMP_ROOT/extprov-request-boundary-home"
+  mkdir -p "$home/state" "$home/config"
+  install_pi_branch_extension_fixture "$repo"
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+const prelude = process.env.DRIVER_PRELUDE;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, registryModels, home }; })()`);
+const { fire, dispatch, settle, makeCtx, registryModels, home } = globalThis.__t;
+
+registryModels.push({ provider: "anthropic", id: "main-model", baseUrl: "https://api.anthropic.com" });
+globalThis.__fmExtensionProviderConfigs = new Map();
+globalThis.__fmExtensionNativeProviders = new Map();
+const entries = [];
+const ctx = makeCtx({
+  sessionManager: {
+    getSessionFile: () => `${home}/main.jsonl`,
+    getEntries: () => entries,
+  },
+});
+
+await fire("session_start", {}, ctx);
+const firstOffer = dispatch("signal: establish stock provider branch");
+await settle(
+  () => (globalThis.__fmSessions ?? []).length === 1 && globalThis.__fmSessions[0].ops.some((op) => op.kind === "prompt"),
+  "stock-provider branch prompt",
+);
+await firstOffer.settlement.then(() => null, () => null);
+const first = globalThis.__fmSessions[0];
+const factoryEntry = first.options.resourceLoader.options.extensionFactories[0];
+const factory = typeof factoryEntry === "function" ? factoryEntry : factoryEntry.factory;
+let beforeProviderRequest;
+factory({
+  on(event, handler) {
+    if (event === "before_provider_request") beforeProviderRequest = handler;
+  },
+});
+if (typeof beforeProviderRequest !== "function") throw new Error("the branch request hook was not registered");
+
+const privatePrompt = "captain context awaiting the newly registered private proxy";
+await fire("before_agent_start", { prompt: privatePrompt }, ctx);
+let providerAborted = false;
+let providerSent = false;
+let hookError;
+globalThis.__fmOnBranchPrompt = async () => {
+  globalThis.__fmExtensionProviderConfigs.set("anthropic", {
+    name: "Private Anthropic proxy",
+    api: "anthropic-messages",
+    baseUrl: "https://anthropic.proxy.invalid",
+    apiKey: "stored-proxy-credential",
+  });
+  try {
+    await beforeProviderRequest(
+      { type: "before_provider_request", payload: { prompt_cache_key: "stock-session" } },
+      { abort: () => { providerAborted = true; } },
+    );
+  } catch (error) {
+    hookError = error;
+  }
+  if (!providerAborted) providerSent = true;
+  return new Promise(() => {});
+};
+
+const staleOffer = dispatch("signal: registration changes at provider boundary");
+const staleFailure = await staleOffer.settlement.then(
+  () => null,
+  (error) => error,
+);
+if (!staleOffer.accepted) throw new Error("the provider-boundary wake was not accepted for settlement");
+if (!providerAborted || providerSent) throw new Error("the obsolete provider request was not aborted before dispatch");
+if (!(hookError instanceof Error) || !hookError.message.includes("provider registration changed before request")) {
+  throw new Error(`the request hook did not expose the registration mismatch: ${String(hookError)}`);
+}
+if (!(staleFailure instanceof Error) || !staleFailure.message.includes("provider registration changed before request")) {
+  throw new Error(`the registration mismatch did not reject to watcher fallback: ${String(staleFailure)}`);
+}
+if (!first.disposed) throw new Error("the provider-mismatched branch remained live");
+if (!first.ops.some((op) => op.kind === "custom" && op.message.content.includes(privatePrompt))) {
+  throw new Error("the request-boundary case did not cross the intervening mirror delivery");
+}
+
+delete globalThis.__fmOnBranchPrompt;
+const reboundOffer = dispatch("signal: rebuild after request-boundary mismatch");
+await settle(
+  () => (globalThis.__fmSessions ?? []).length === 2 && globalThis.__fmSessions[1].ops.some((op) => op.kind === "prompt"),
+  "request-boundary replacement prompt",
+);
+if (globalThis.__fmSessions[1].options.model?.baseUrl !== "https://anthropic.proxy.invalid") {
+  throw new Error(`the replacement branch bypassed the private proxy: ${JSON.stringify(globalThis.__fmSessions[1].options.model)}`);
+}
+await reboundOffer.settlement.then(() => null, () => null);
+process.exit(0);
+EOF
+  status=$?
+  out=$(cat "$TMP_ROOT/node-output")
+  expect_code 0 "$status" "a provider change at request time must abort before disclosure and reject to watcher fallback: $out"
+  pass "request-boundary provider changes abort before disclosure and rebuild on the private route"
+}
+
+test_model_runtime_create_deadline_rejects_to_watcher_fallback() {
+  local repo home out status
+  repo="$TMP_ROOT/extprov-create-deadline-root"
+  home="$TMP_ROOT/extprov-create-deadline-home"
+  mkdir -p "$home/state" "$home/config"
+  install_pi_branch_extension_fixture "$repo"
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+const prelude = process.env.DRIVER_PRELUDE;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, makeCtx, registryModels }; })()`);
+const { fire, dispatch, makeCtx, registryModels } = globalThis.__t;
+
+registryModels.push({ provider: "anthropic", id: "main-model", baseUrl: "https://api.anthropic.com" });
+let rejectLateCreate;
+globalThis.__fmModelRuntimeCreate = (_options) =>
+  new Promise((_resolve, reject) => {
+    rejectLateCreate = reject;
+  });
+
+await fire("session_start", {}, makeCtx());
+const realSetTimeout = globalThis.setTimeout;
+let deadlineMs = null;
+globalThis.setTimeout = (callback, delay, ...args) => {
+  if (deadlineMs === null) {
+    deadlineMs = Number(delay);
+    return realSetTimeout(callback, 0, ...args);
+  }
+  return realSetTimeout(callback, delay, ...args);
+};
+let offer;
+let failure;
+try {
+  offer = dispatch("signal: blocked model runtime creation");
+  failure = await offer.settlement.then(
+    () => null,
+    (error) => error,
+  );
+} finally {
+  globalThis.setTimeout = realSetTimeout;
+}
+if (!offer?.accepted) throw new Error("the runtime-creation wake was not accepted for settlement");
+if (!Number.isFinite(deadlineMs) || deadlineMs <= 0) {
+  throw new Error(`model runtime creation had no positive finite deadline: ${String(deadlineMs)}`);
+}
+if (!(failure instanceof Error) || !failure.message.includes("extension-provider runtime creation exceeded")) {
+  throw new Error(`the blocked model runtime creation did not reject to watcher fallback: ${String(failure)}`);
+}
+const createCall = globalThis.__fmModelRuntimeCreateCalls?.at(-1);
+if (!createCall?.signal?.aborted) throw new Error("the timed-out model runtime creation did not receive cancellation");
+if (typeof rejectLateCreate !== "function") throw new Error("the unresolved model runtime creation was not started");
+const unhandled = [];
+const recordUnhandled = (error) => unhandled.push(error);
+process.on("unhandledRejection", recordUnhandled);
+rejectLateCreate(new Error("late model runtime creation failure"));
+await new Promise((resolve) => setImmediate(resolve));
+process.off("unhandledRejection", recordUnhandled);
+if (unhandled.length !== 0) {
+  throw new Error(`the late model runtime creation escaped as an unhandled rejection: ${String(unhandled[0])}`);
+}
+if ((globalThis.__fmSessions ?? []).length !== 0) throw new Error("a timed-out model runtime creation built a branch session");
+if ((globalThis.__fmModelRuntimeRefreshCalls ?? []).length !== 0) {
+  throw new Error("a timed-out model runtime creation reached provider refresh");
+}
+process.exit(0);
+EOF
+  status=$?
+  out=$(cat "$TMP_ROOT/node-output")
+  expect_code 0 "$status" "a blocked model runtime creation must reject promptly to watcher-owned fallback: $out"
+  pass "blocked model runtime creation rejects on a bounded deadline to watcher fallback"
+}
+
 test_extension_provider_refresh_deadline_rejects_to_watcher_fallback() {
   local repo home out status
   repo="$TMP_ROOT/extprov-deadline-root"
@@ -4969,10 +5143,10 @@ globalThis.__fmModelRuntimeRefresh = (_runtime, options) =>
 
 await fire("session_start", {}, makeCtx());
 const realSetTimeout = globalThis.setTimeout;
-let deadlineMs = null;
+const deadlineMs = [];
 globalThis.setTimeout = (callback, delay, ...args) => {
-  if (deadlineMs === null) {
-    deadlineMs = Number(delay);
+  deadlineMs.push(Number(delay));
+  if (deadlineMs.length === 2) {
     return realSetTimeout(callback, 0, ...args);
   }
   return realSetTimeout(callback, delay, ...args);
@@ -4989,8 +5163,8 @@ try {
   globalThis.setTimeout = realSetTimeout;
 }
 if (!offer?.accepted) throw new Error("the refresh-deadline wake was not accepted for settlement");
-if (!Number.isFinite(deadlineMs) || deadlineMs <= 0) {
-  throw new Error(`provider refresh had no positive finite deadline: ${String(deadlineMs)}`);
+if (deadlineMs.length < 2 || deadlineMs.some((value) => !Number.isFinite(value) || value <= 0)) {
+  throw new Error(`provider setup had no positive finite deadlines: ${JSON.stringify(deadlineMs)}`);
 }
 if (!(failure instanceof Error) || !failure.message.includes("extension-provider availability refresh exceeded")) {
   throw new Error(`the blocked provider refresh did not reject to watcher fallback: ${String(failure)}`);
@@ -5219,6 +5393,8 @@ test_branch_effort_pin_applies_and_absent_pin_follows_main
 test_unpinned_branch_follows_main_effort_changes_live
 test_effective_extension_provider_registration_precedes_model_lookup
 test_cached_branch_rebinds_after_effective_provider_change
+test_provider_change_at_request_boundary_aborts_to_watcher_fallback
+test_model_runtime_create_deadline_rejects_to_watcher_fallback
 test_extension_provider_refresh_deadline_rejects_to_watcher_fallback
 test_selected_provider_resolution_avoids_unrelated_refresh
 test_extension_registered_provider_resolves_in_the_branch
