@@ -4935,7 +4935,7 @@ EOF
   pass "cached branches rebind before new mirrored context reaches a changed provider"
 }
 
-test_provider_change_at_request_boundary_aborts_to_watcher_fallback() {
+test_provider_change_at_header_boundary_blocks_custom_stream() {
   local repo home out status
   repo="$TMP_ROOT/extprov-request-boundary-root"
   home="$TMP_ROOT/extprov-request-boundary-home"
@@ -4946,10 +4946,36 @@ test_provider_change_at_request_boundary_aborts_to_watcher_fallback() {
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, registryModels, home }; })()`);
 const { fire, dispatch, settle, makeCtx, registryModels, home } = globalThis.__t;
+import { writeFileSync } from "node:fs";
 
-registryModels.push({ provider: "anthropic", id: "main-model", baseUrl: "https://api.anthropic.com" });
+registryModels.push({ provider: "native-proxy", id: "native-model", branchAvailable: false });
 globalThis.__fmExtensionProviderConfigs = new Map();
-globalThis.__fmExtensionNativeProviders = new Map();
+let providerACalls = 0;
+let providerBCalls = 0;
+const providerA = {
+  id: "native-proxy",
+  name: "Native private proxy A",
+  api: "native-private-api",
+  baseUrl: "https://native-a.proxy.invalid",
+  apiKey: "stored-native-credential-a",
+  models: [{ id: "native-model", name: "Native model" }],
+  streamSimple() {
+    providerACalls += 1;
+  },
+};
+const providerB = {
+  id: "native-proxy",
+  name: "Native private proxy B",
+  api: "native-private-api",
+  baseUrl: "https://native-b.proxy.invalid",
+  apiKey: "stored-native-credential-b",
+  models: [{ id: "native-model", name: "Native model" }],
+  streamSimple() {
+    providerBCalls += 1;
+  },
+};
+globalThis.__fmExtensionNativeProviders = new Map([["native-proxy", providerA]]);
+writeFileSync(`${home}/config/supervision-branch-model`, "native-proxy/native-model\n");
 const entries = [];
 const ctx = makeCtx({
   sessionManager: {
@@ -4959,44 +4985,58 @@ const ctx = makeCtx({
 });
 
 await fire("session_start", {}, ctx);
-const firstOffer = dispatch("signal: establish stock provider branch");
+const firstOffer = dispatch("signal: establish native provider branch");
 await settle(
   () => (globalThis.__fmSessions ?? []).length === 1 && globalThis.__fmSessions[0].ops.some((op) => op.kind === "prompt"),
-  "stock-provider branch prompt",
+  "native-provider branch prompt",
 );
 await firstOffer.settlement.then(() => null, () => null);
 const first = globalThis.__fmSessions[0];
-const factoryEntry = first.options.resourceLoader.options.extensionFactories[0];
-const factory = typeof factoryEntry === "function" ? factoryEntry : factoryEntry.factory;
-let beforeProviderRequest;
-factory({
-  on(event, handler) {
-    if (event === "before_provider_request") beforeProviderRequest = handler;
-  },
-});
-if (typeof beforeProviderRequest !== "function") throw new Error("the branch request hook was not registered");
+if (first.options.model?.baseUrl !== "https://native-a.proxy.invalid") {
+  throw new Error(`the initial branch bypassed native provider A: ${JSON.stringify(first.options.model)}`);
+}
+
+function providerHooks(session) {
+  const factoryEntry = session.options.resourceLoader.options.extensionFactories[0];
+  const factory = typeof factoryEntry === "function" ? factoryEntry : factoryEntry.factory;
+  let beforeProviderHeaders;
+  let beforeProviderRequest;
+  factory({
+    on(event, handler) {
+      if (event === "before_provider_headers") beforeProviderHeaders = handler;
+      if (event === "before_provider_request") beforeProviderRequest = handler;
+    },
+  });
+  if (typeof beforeProviderHeaders !== "function") throw new Error("the branch header hook was not registered");
+  if (typeof beforeProviderRequest !== "function") throw new Error("the branch cache-key hook was not registered");
+  return { beforeProviderHeaders, beforeProviderRequest };
+}
+
+async function streamWithoutPayloadHook(session) {
+  const { beforeProviderHeaders } = providerHooks(session);
+  let aborted = false;
+  let error;
+  try {
+    await beforeProviderHeaders(
+      { type: "before_provider_headers", headers: {} },
+      { abort: () => { aborted = true; } },
+    );
+  } catch (caught) {
+    error = caught;
+  }
+  if (!aborted) {
+    const provider = session.options.modelRuntime.registeredNativeProviders.get("native-proxy");
+    provider.streamSimple(session.options.model, { messages: [] }, {});
+  }
+  return { aborted, error };
+}
 
 const privatePrompt = "captain context awaiting the newly registered private proxy";
 await fire("before_agent_start", { prompt: privatePrompt }, ctx);
-let providerAborted = false;
-let providerSent = false;
-let hookError;
-globalThis.__fmOnBranchPrompt = async () => {
-  globalThis.__fmExtensionProviderConfigs.set("anthropic", {
-    name: "Private Anthropic proxy",
-    api: "anthropic-messages",
-    baseUrl: "https://anthropic.proxy.invalid",
-    apiKey: "stored-proxy-credential",
-  });
-  try {
-    await beforeProviderRequest(
-      { type: "before_provider_request", payload: { prompt_cache_key: "stock-session" } },
-      { abort: () => { providerAborted = true; } },
-    );
-  } catch (error) {
-    hookError = error;
-  }
-  if (!providerAborted) providerSent = true;
+let staleDispatch;
+globalThis.__fmOnBranchPrompt = async ({ session }) => {
+  globalThis.__fmExtensionNativeProviders.set("native-proxy", providerB);
+  staleDispatch = await streamWithoutPayloadHook(session);
   return new Promise(() => {});
 };
 
@@ -5006,34 +5046,43 @@ const staleFailure = await staleOffer.settlement.then(
   (error) => error,
 );
 if (!staleOffer.accepted) throw new Error("the provider-boundary wake was not accepted for settlement");
-if (!providerAborted || providerSent) throw new Error("the obsolete provider request was not aborted before dispatch");
-if (!(hookError instanceof Error) || !hookError.message.includes("provider registration changed before request")) {
-  throw new Error(`the request hook did not expose the registration mismatch: ${String(hookError)}`);
+if (!staleDispatch?.aborted || providerACalls !== 0) {
+  throw new Error(`the obsolete custom stream was reached: aborted=${staleDispatch?.aborted} calls=${providerACalls}`);
+}
+if (!(staleDispatch.error instanceof Error) || !staleDispatch.error.message.includes("provider registration changed before request")) {
+  throw new Error(`the header hook did not expose the registration mismatch: ${String(staleDispatch?.error)}`);
 }
 if (!(staleFailure instanceof Error) || !staleFailure.message.includes("provider registration changed before request")) {
   throw new Error(`the registration mismatch did not reject to watcher fallback: ${String(staleFailure)}`);
 }
 if (!first.disposed) throw new Error("the provider-mismatched branch remained live");
 if (!first.ops.some((op) => op.kind === "custom" && op.message.content.includes(privatePrompt))) {
-  throw new Error("the request-boundary case did not cross the intervening mirror delivery");
+  throw new Error("the header-boundary case did not cross the intervening mirror delivery");
 }
 
-delete globalThis.__fmOnBranchPrompt;
-const reboundOffer = dispatch("signal: rebuild after request-boundary mismatch");
+let reboundDispatch;
+globalThis.__fmOnBranchPrompt = async ({ session }) => {
+  reboundDispatch = await streamWithoutPayloadHook(session);
+};
+const reboundOffer = dispatch("signal: rebuild after header-boundary mismatch");
 await settle(
-  () => (globalThis.__fmSessions ?? []).length === 2 && globalThis.__fmSessions[1].ops.some((op) => op.kind === "prompt"),
-  "request-boundary replacement prompt",
+  () => (globalThis.__fmSessions ?? []).length === 2 && providerBCalls === 1,
+  "header-boundary replacement prompt",
 );
-if (globalThis.__fmSessions[1].options.model?.baseUrl !== "https://anthropic.proxy.invalid") {
+if (reboundDispatch?.aborted) throw new Error("the current native provider B request was aborted");
+if (globalThis.__fmSessions[1].options.model?.baseUrl !== "https://native-b.proxy.invalid") {
   throw new Error(`the replacement branch bypassed the private proxy: ${JSON.stringify(globalThis.__fmSessions[1].options.model)}`);
+}
+if (providerACalls !== 0 || providerBCalls !== 1) {
+  throw new Error(`custom stream routing was not fail-closed then rebound: A=${providerACalls} B=${providerBCalls}`);
 }
 await reboundOffer.settlement.then(() => null, () => null);
 process.exit(0);
 EOF
   status=$?
   out=$(cat "$TMP_ROOT/node-output")
-  expect_code 0 "$status" "a provider change at request time must abort before disclosure and reject to watcher fallback: $out"
-  pass "request-boundary provider changes abort before disclosure and rebuild on the private route"
+  expect_code 0 "$status" "a provider change at header time must abort before disclosure and reject to watcher fallback: $out"
+  pass "header-boundary provider changes block stale custom streams and rebuild on the private route"
 }
 
 test_model_runtime_create_deadline_rejects_to_watcher_fallback() {
@@ -5393,7 +5442,7 @@ test_branch_effort_pin_applies_and_absent_pin_follows_main
 test_unpinned_branch_follows_main_effort_changes_live
 test_effective_extension_provider_registration_precedes_model_lookup
 test_cached_branch_rebinds_after_effective_provider_change
-test_provider_change_at_request_boundary_aborts_to_watcher_fallback
+test_provider_change_at_header_boundary_blocks_custom_stream
 test_model_runtime_create_deadline_rejects_to_watcher_fallback
 test_extension_provider_refresh_deadline_rejects_to_watcher_fallback
 test_selected_provider_resolution_avoids_unrelated_refresh

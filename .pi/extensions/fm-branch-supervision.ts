@@ -1328,7 +1328,7 @@ export default function (pi: ExtensionAPI) {
         {
           name: "fm-branch-cache-key",
           factory: (branchPi: ExtensionAPI) => {
-            branchPi.on("before_provider_request", (event, ctx) => {
+            branchPi.on("before_provider_headers", (_event, ctx) => {
               if (pinned && !extensionProviderRegistrationIsCurrent(pinned.providerRegistration)) {
                 const providerRegistrationMismatch = new Error(
                   `supervision branch provider registration changed before request for ${pinned.providerRegistration.providerId}`,
@@ -1337,6 +1337,8 @@ export default function (pi: ExtensionAPI) {
                 ctx.abort();
                 throw providerRegistrationMismatch;
               }
+            });
+            branchPi.on("before_provider_request", (event) => {
               const payload = event.payload;
               // Only providers whose request already carries Pi's default
               // per-session prompt_cache_key get the shared per-home override;
