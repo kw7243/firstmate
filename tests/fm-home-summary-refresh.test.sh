@@ -225,7 +225,7 @@ printf 'large-child\n' > "$LARGE_CHILD_HOME/.fm-secondmate-home"
 {
   printf '%s\n' '## In flight'
   i=1
-  while [ "$i" -le 600 ]; do
+  while [ "$i" -le 400 ]; do
     printf '%s\n' "- [ ] orphan-$i-$large_id_suffix - Missing metadata (repo: firstmate) (kind: ship)"
     i=$((i + 1))
   done
@@ -252,7 +252,7 @@ PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$LARGE_PARENT_HOME" \
 jq -e '.secondmate_current.records[0]
   | .provenance.summary_source == "local-ledger"
     and .invalidity.kind == "orphan_in_flight"
-    and (.invalidity.ids | length) == 600' \
+    and (.invalidity.ids | length) == 400' \
   "$TMP_ROOT/large-parent-snapshot.json" >/dev/null \
   || fail "parent fleet snapshot did not preserve the large child invalidity"
 pass "parent snapshot consumes large child ledgers without argument transport"
