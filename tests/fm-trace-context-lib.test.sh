@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# tests/fm-trace-context-lib.test.sh - unit tests for the native, default-off
-# W3C trace-context library (bin/fm-trace-context-lib.sh) plus structural checks
-# that bin/fm-spawn.sh wires it in at the pre-launch injection seam and that the
-# capability is inherited into secondmate homes. Pure functions, no backend and
+# Behavior tests for the native, default-off W3C trace-context library and its
+# inherited secondmate configuration contract. Pure functions, no backend and
 # no live spawn required.
 set -u
 
@@ -213,32 +211,113 @@ ef_res=$(FM_TRACE_CONTEXT=on fm_trace_context_resolve "$CFG_ON" "$NOMETA"); ef_r
 [ -z "$ef_res" ] && [ "$ef_res_rc" -eq 0 ] || fail "resolve must omit and STILL return 0 on entropy failure (rc=$ef_res_rc out='$ef_res')"
 pass "entropy failure omits telemetry safely: mint reports failure, resolve returns success with no carrier"
 
-# --- fail-independent timing: no hang source, always returns 0 ---------------
+# --- resolver deadline and output contract -----------------------------------
 
-assert_no_grep 'sleep' "$ROOT/bin/fm-trace-context-lib.sh" "trace-context lib must not sleep on the spawn path"
-assert_no_grep 'timeout' "$ROOT/bin/fm-trace-context-lib.sh" "trace-context lib must not depend on an external timeout"
-assert_no_grep 'command:' "$ROOT/bin/fm-trace-context-lib.sh" "trace-context lib must not run an arbitrary command provider"
-fm_trace_context_resolve "$CFG_OFF" "$NOMETA" >/dev/null || fail "resolve must return 0 when off"
-pass "the resolver has no sleep/timeout/command hang source and always returns success"
+RESOLVER_CALLS=0
+RESOLVER_STATUS=
+RESOLVER_STDOUT=
+RESOLVER_STDERR=
 
-# --- harness/backend/kind independence (code only, comments stripped) ---------
+run_resolver_before_deadline() {  # <case-name> <config-dir> <meta-file> [ENV=VALUE...]
+  local case_name=$1 config_dir=$2 meta=$3
+  local stdout_file="$WORK/$case_name.stdout" stderr_file="$WORK/$case_name.stderr"
+  local pid deadline
+  shift 3
 
-LIB_CODE=$(sed 's/#.*$//' "$ROOT/bin/fm-trace-context-lib.sh")
-for tok in harness backend tmux herdr zellij orca cmux claude codex opencode grok kind ship scout secondmate ; do
-  case "$LIB_CODE" in
-    *"$tok"*) fail "trace-context lib code must be harness/backend/kind agnostic, but references '$tok'" ;;
+  RESOLVER_CALLS=$((RESOLVER_CALLS + 1))
+  (
+    env "$@" bash -c '
+      . "$1"
+      fm_trace_context_resolve "$2" "$3"
+    ' _ "$ROOT/bin/fm-trace-context-lib.sh" "$config_dir" "$meta"
+  ) > "$stdout_file" 2> "$stderr_file" &
+  pid=$!
+  deadline=$((SECONDS + 5))
+  while kill -0 "$pid" 2>/dev/null; do
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      kill "$pid" 2>/dev/null || true
+      wait "$pid" 2>/dev/null || true
+      fail "resolver call '$case_name' exceeded its five-second test deadline"
+    fi
+    sleep 0.05
+  done
+  wait "$pid"
+  RESOLVER_STATUS=$?
+  RESOLVER_STDOUT=$(sed -n '1,$p' "$stdout_file")
+  RESOLVER_STDERR=$(sed -n '1,$p' "$stderr_file")
+}
+
+run_resolver_before_deadline disabled "$CFG_OFF" "$NOMETA" FM_TRACE_CONTEXT=
+[ "$RESOLVER_CALLS" -eq 1 ] || fail "disabled resolver call was not observed"
+[ "$RESOLVER_STATUS" -eq 0 ] || fail "disabled resolver must return 0, got $RESOLVER_STATUS"
+[ -z "$RESOLVER_STDOUT" ] || fail "disabled resolver must omit output, got '$RESOLVER_STDOUT'"
+[ -z "$RESOLVER_STDERR" ] || fail "disabled resolver wrote stderr: $RESOLVER_STDERR"
+pass "the disabled resolver call returns successful empty output before its deadline"
+
+# --- harness/backend/kind-independent resolver behavior ----------------------
+
+MATRIX_DIR="$WORK/resolver-matrix"
+PROVIDER="$MATRIX_DIR/task-provider"
+PROVIDER_MARKER="$MATRIX_DIR/provider-called"
+TASK_PROSE="task-prose-must-not-escape-$$"
+DISCLOSED=
+mkdir -p "$MATRIX_DIR"
+printf '%s\n' \
+  '#!/usr/bin/env bash' \
+  'printf "called\n" > "$TRACE_PROVIDER_MARKER"' > "$PROVIDER"
+chmod 0700 "$PROVIDER"
+
+while IFS='|' read -r harness backend kind; do
+  case_dir="$MATRIX_DIR/$harness-$backend-$kind"
+  meta="$case_dir/task.meta"
+  mkdir -p "$case_dir"
+  for prose_file in brief prompt report status; do
+    printf '%s in %s\n' "$TASK_PROSE" "$prose_file" > "$case_dir/$prose_file"
+  done
+  printf '%s\n' \
+    "harness=$harness" \
+    "backend=$backend" \
+    "kind=$kind" \
+    "brief=$case_dir/brief" \
+    "prompt=$case_dir/prompt" \
+    "report=$case_dir/report" \
+    "status=$case_dir/status" \
+    "command=$PROVIDER" > "$meta"
+
+  run_resolver_before_deadline "$harness-$backend-$kind" "$CFG_ON" "$meta" \
+    FM_TRACE_CONTEXT=on \
+    TRACEPARENT="$PRIMARY_TP" \
+    TRACE_PROVIDER_MARKER="$PROVIDER_MARKER" \
+    FM_TRACE_CONTEXT_COMMAND="$PROVIDER" \
+    FM_TASK_PROSE="$TASK_PROSE"
+  [ "$RESOLVER_STATUS" -eq 0 ] \
+    || fail "$harness/$backend/$kind resolver returned $RESOLVER_STATUS"
+  [ -z "$RESOLVER_STDERR" ] \
+    || fail "$harness/$backend/$kind resolver wrote stderr: $RESOLVER_STDERR"
+  fm_trace_context_valid "$RESOLVER_STDOUT" \
+    || fail "$harness/$backend/$kind resolver did not mint a valid carrier: $RESOLVER_STDOUT"
+  [ "${RESOLVER_STDOUT:53:2}" = 01 ] \
+    || fail "$harness/$backend/$kind resolver did not mint a sampled root: $RESOLVER_STDOUT"
+  case "$RESOLVER_STDOUT$RESOLVER_STDERR" in
+    *"$TASK_PROSE"*) DISCLOSED=$harness/$backend/$kind ;;
   esac
-done
-pass "the carrier is minted identically for every harness, backend, and spawn kind (no such branching in the lib code)"
+done <<'CASES'
+claude|tmux|ship
+codex|herdr|scout
+opencode|zellij|secondmate
+grok|orca|ship
+cursor|cmux|scout
+CASES
 
-# --- no prompt / task-prose reads (code only, comments stripped) --------------
+[ "$RESOLVER_CALLS" -eq 6 ] \
+  || fail "expected six observed resolver calls, got $RESOLVER_CALLS"
+pass "resolver calls finish before their deadlines with valid sampled output across harness, backend, and kind metadata"
 
-for tok in brief prompt report status ; do
-  case "$LIB_CODE" in
-    *"$tok"*) fail "trace-context lib code must never read task prose, but references '$tok'" ;;
-  esac
-done
-pass "the lib code never reads a brief, prompt, report, or status - it cannot leak content"
+[ -z "$DISCLOSED" ] \
+  || fail "resolver disclosed task prose for $DISCLOSED"
+[ ! -e "$PROVIDER_MARKER" ] \
+  || fail "resolver executed a command supplied through task metadata or environment"
+pass "resolver output and errors disclose no task prose and execute no task-supplied provider"
 
 # --- secondmate inheritance wires the nested chain ---------------------------
 
