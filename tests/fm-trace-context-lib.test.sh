@@ -226,6 +226,7 @@ run_resolver_before_deadline() {  # <case-name> <config-dir> <meta-file> [ENV=VA
 
   RESOLVER_CALLS=$((RESOLVER_CALLS + 1))
   (
+    # shellcheck disable=SC2016 # Positional parameters expand in the child shell.
     env "$@" bash -c '
       . "$1"
       fm_trace_context_resolve "$2" "$3"
@@ -262,6 +263,7 @@ PROVIDER_MARKER="$MATRIX_DIR/provider-called"
 TASK_PROSE="task-prose-must-not-escape-$$"
 DISCLOSED=
 mkdir -p "$MATRIX_DIR"
+# shellcheck disable=SC2016 # TRACE_PROVIDER_MARKER expands in the generated provider.
 printf '%s\n' \
   '#!/usr/bin/env bash' \
   'printf "called\n" > "$TRACE_PROVIDER_MARKER"' > "$PROVIDER"
