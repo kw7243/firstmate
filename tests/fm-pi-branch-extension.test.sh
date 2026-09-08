@@ -4936,46 +4936,108 @@ EOF
 }
 
 test_provider_change_at_header_boundary_blocks_custom_stream() {
-  local repo home out status
+  if ! command -v node >/dev/null 2>&1; then
+    echo "skip: node not found for the Pi provider dispatch test"
+    return
+  fi
+  local package_dir repo home out status
+  package_dir=${FM_PI_PACKAGE_DIR:-"$(npm root -g 2>/dev/null)/@earendil-works/pi-coding-agent"}
+  if [ ! -f "$package_dir/package.json" ]; then
+    echo "skip: installed @earendil-works/pi-coding-agent package not found"
+    return
+  fi
   repo="$TMP_ROOT/extprov-request-boundary-root"
   home="$TMP_ROOT/extprov-request-boundary-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" PI_PACKAGE_DIR="$package_dir" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, registryModels, home }; })()`);
 const { fire, dispatch, settle, makeCtx, registryModels, home } = globalThis.__t;
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
-registryModels.push({ provider: "native-proxy", id: "native-model", branchAvailable: false });
-globalThis.__fmExtensionProviderConfigs = new Map();
+const packageRoot = resolve(process.env.PI_PACKAGE_DIR);
+const {
+  DefaultResourceLoader: RealDefaultResourceLoader,
+  ModelRuntime: RealModelRuntime,
+  SessionManager: RealSessionManager,
+  SettingsManager: RealSettingsManager,
+  createAgentSession: createRealAgentSession,
+} = await import(pathToFileURL(`${packageRoot}/dist/index.js`).href);
+const { createAssistantMessageEventStream } = await import(
+  pathToFileURL(`${packageRoot}/node_modules/@earendil-works/pi-ai/dist/index.js`).href
+);
+
+const modelDefinition = {
+  id: "private-model",
+  name: "Private model",
+  reasoning: false,
+  input: ["text"],
+  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  contextWindow: 4096,
+  maxTokens: 128,
+};
+registryModels.push({ provider: "private-proxy", id: "private-model", branchAvailable: false });
 let providerACalls = 0;
 let providerBCalls = 0;
+function completedStream(model, text) {
+  const stream = createAssistantMessageEventStream();
+  const output = {
+    role: "assistant",
+    content: [],
+    api: model.api,
+    provider: model.provider,
+    model: model.id,
+    usage: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 0,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    },
+    stopReason: "stop",
+    timestamp: Date.now(),
+  };
+  queueMicrotask(() => {
+    stream.push({ type: "start", partial: output });
+    output.content.push({ type: "text", text });
+    stream.push({ type: "text_start", contentIndex: 0, partial: output });
+    stream.push({ type: "text_delta", contentIndex: 0, delta: text, partial: output });
+    stream.push({ type: "text_end", contentIndex: 0, content: text, partial: output });
+    stream.push({ type: "done", reason: "stop", message: output });
+    stream.end();
+  });
+  return stream;
+}
 const providerA = {
-  id: "native-proxy",
-  name: "Native private proxy A",
-  api: "native-private-api",
-  baseUrl: "https://native-a.proxy.invalid",
-  apiKey: "stored-native-credential-a",
-  models: [{ id: "native-model", name: "Native model" }],
-  streamSimple() {
+  name: "Private proxy A",
+  api: "private-proxy-api",
+  baseUrl: "https://private-a.proxy.invalid",
+  apiKey: "stored-private-credential-a",
+  models: [modelDefinition],
+  streamSimple(model) {
     providerACalls += 1;
+    return completedStream(model, "provider A");
   },
 };
 const providerB = {
-  id: "native-proxy",
-  name: "Native private proxy B",
-  api: "native-private-api",
-  baseUrl: "https://native-b.proxy.invalid",
-  apiKey: "stored-native-credential-b",
-  models: [{ id: "native-model", name: "Native model" }],
-  streamSimple() {
+  name: "Private proxy B",
+  api: "private-proxy-api",
+  baseUrl: "https://private-b.proxy.invalid",
+  apiKey: "stored-private-credential-b",
+  models: [modelDefinition],
+  streamSimple(model) {
     providerBCalls += 1;
+    return completedStream(model, "provider B");
   },
 };
-globalThis.__fmExtensionNativeProviders = new Map([["native-proxy", providerA]]);
-writeFileSync(`${home}/config/supervision-branch-model`, "native-proxy/native-model\n");
+globalThis.__fmExtensionProviderConfigs = new Map([["private-proxy", providerA]]);
+globalThis.__fmExtensionNativeProviders = new Map();
+writeFileSync(`${home}/config/supervision-branch-model`, "private-proxy/private-model\n");
 const entries = [];
 const ctx = makeCtx({
   sessionManager: {
@@ -4985,59 +5047,82 @@ const ctx = makeCtx({
 });
 
 await fire("session_start", {}, ctx);
-const firstOffer = dispatch("signal: establish native provider branch");
+const firstOffer = dispatch("signal: establish private provider branch");
 await settle(
   () => (globalThis.__fmSessions ?? []).length === 1 && globalThis.__fmSessions[0].ops.some((op) => op.kind === "prompt"),
-  "native-provider branch prompt",
+  "private-provider branch prompt",
 );
 await firstOffer.settlement.then(() => null, () => null);
 const first = globalThis.__fmSessions[0];
-if (first.options.model?.baseUrl !== "https://native-a.proxy.invalid") {
-  throw new Error(`the initial branch bypassed native provider A: ${JSON.stringify(first.options.model)}`);
+if (first.options.model?.baseUrl !== "https://private-a.proxy.invalid") {
+  throw new Error(`the initial branch bypassed provider A: ${JSON.stringify(first.options.model)}`);
 }
 
-function providerHooks(session) {
+function copiedProviderConfig(session) {
+  const config = session.options.modelRuntime.registeredProviderConfigs.get("private-proxy");
+  if (!config || typeof config.streamSimple !== "function") {
+    throw new Error("the branch runtime did not retain the copied custom stream");
+  }
+  return config;
+}
+
+function providerFactory(session) {
   const factoryEntry = session.options.resourceLoader.options.extensionFactories[0];
-  const factory = typeof factoryEntry === "function" ? factoryEntry : factoryEntry.factory;
-  let beforeProviderHeaders;
-  let beforeProviderRequest;
-  factory({
-    on(event, handler) {
-      if (event === "before_provider_headers") beforeProviderHeaders = handler;
-      if (event === "before_provider_request") beforeProviderRequest = handler;
-    },
+  return typeof factoryEntry === "function" ? factoryEntry : factoryEntry.factory;
+}
+
+async function createRealProviderSession(config, factory, label) {
+  const agentDir = `${home}/real-agent-${label}`;
+  const sessionsDir = `${home}/real-sessions-${label}`;
+  mkdirSync(agentDir, { recursive: true });
+  mkdirSync(sessionsDir, { recursive: true });
+  const settingsManager = RealSettingsManager.create(home, agentDir);
+  const resourceLoader = new RealDefaultResourceLoader({
+    cwd: home,
+    agentDir,
+    settingsManager,
+    noExtensions: true,
+    noSkills: true,
+    noPromptTemplates: true,
+    noThemes: true,
+    noContextFiles: true,
+    systemPrompt: "provider routing regression",
+    extensionFactories: [{ name: `provider-routing-${label}`, factory }],
   });
-  if (typeof beforeProviderHeaders !== "function") throw new Error("the branch header hook was not registered");
-  if (typeof beforeProviderRequest !== "function") throw new Error("the branch cache-key hook was not registered");
-  return { beforeProviderHeaders, beforeProviderRequest };
+  await resourceLoader.reload();
+  const modelRuntime = await RealModelRuntime.create({
+    authPath: `${agentDir}/auth.json`,
+    modelsPath: null,
+    refreshOnCreate: false,
+  });
+  modelRuntime.registerProvider("private-proxy", config);
+  await modelRuntime.refresh({ providers: ["private-proxy"], allowNetwork: false });
+  const model = modelRuntime.getModel("private-proxy", "private-model");
+  if (!model) throw new Error(`the real runtime did not resolve provider ${label}`);
+  const sessionManager = RealSessionManager.create(home, sessionsDir);
+  const { session } = await createRealAgentSession({
+    cwd: home,
+    sessionManager,
+    settingsManager,
+    resourceLoader,
+    modelRuntime,
+    model,
+    noTools: "builtin",
+  });
+  return { session, sessionManager };
 }
 
-async function streamWithoutPayloadHook(session) {
-  const { beforeProviderHeaders } = providerHooks(session);
-  let aborted = false;
-  let error;
-  try {
-    await beforeProviderHeaders(
-      { type: "before_provider_headers", headers: {} },
-      { abort: () => { aborted = true; } },
-    );
-  } catch (caught) {
-    error = caught;
-  }
-  if (!aborted) {
-    const provider = session.options.modelRuntime.registeredNativeProviders.get("native-proxy");
-    provider.streamSimple(session.options.model, { messages: [] }, {});
-  }
-  return { aborted, error };
-}
-
+const realA = await createRealProviderSession(copiedProviderConfig(first), providerFactory(first), "a");
 const privatePrompt = "captain context awaiting the newly registered private proxy";
 await fire("before_agent_start", { prompt: privatePrompt }, ctx);
-let staleDispatch;
-globalThis.__fmOnBranchPrompt = async ({ session }) => {
-  globalThis.__fmExtensionNativeProviders.set("native-proxy", providerB);
-  staleDispatch = await streamWithoutPayloadHook(session);
-  return new Promise(() => {});
+let realAPrompt;
+globalThis.__fmOnBranchPrompt = () => {
+  globalThis.__fmExtensionProviderConfigs.set("private-proxy", providerB);
+  realAPrompt = realA.session.prompt(privatePrompt).then(
+    () => null,
+    (error) => error,
+  );
+  return realAPrompt;
 };
 
 const staleOffer = dispatch("signal: registration changes at provider boundary");
@@ -5046,37 +5131,44 @@ const staleFailure = await staleOffer.settlement.then(
   (error) => error,
 );
 if (!staleOffer.accepted) throw new Error("the provider-boundary wake was not accepted for settlement");
-if (!staleDispatch?.aborted || providerACalls !== 0) {
-  throw new Error(`the obsolete custom stream was reached: aborted=${staleDispatch?.aborted} calls=${providerACalls}`);
-}
-if (!(staleDispatch.error instanceof Error) || !staleDispatch.error.message.includes("provider registration changed before request")) {
-  throw new Error(`the header hook did not expose the registration mismatch: ${String(staleDispatch?.error)}`);
-}
 if (!(staleFailure instanceof Error) || !staleFailure.message.includes("provider registration changed before request")) {
   throw new Error(`the registration mismatch did not reject to watcher fallback: ${String(staleFailure)}`);
+}
+if (!realAPrompt) throw new Error("the real provider dispatch did not start");
+const realAResult = await realAPrompt;
+if (providerACalls !== 0) throw new Error(`the real runtime invoked obsolete provider A ${providerACalls} time(s)`);
+const realAEntries = JSON.stringify(realA.sessionManager.getEntries());
+const realAError = realAResult instanceof Error ? `${realAResult.message}\n${realAEntries}` : realAEntries;
+if (!realAError.includes("provider registration changed before request")) {
+  throw new Error(`the real runtime did not surface the guarded-stream mismatch: ${realAError}`);
 }
 if (!first.disposed) throw new Error("the provider-mismatched branch remained live");
 if (!first.ops.some((op) => op.kind === "custom" && op.message.content.includes(privatePrompt))) {
   throw new Error("the header-boundary case did not cross the intervening mirror delivery");
 }
+realA.session.dispose();
 
-let reboundDispatch;
-globalThis.__fmOnBranchPrompt = async ({ session }) => {
-  reboundDispatch = await streamWithoutPayloadHook(session);
-};
+globalThis.__fmOnBranchPrompt = undefined;
 const reboundOffer = dispatch("signal: rebuild after header-boundary mismatch");
 await settle(
-  () => (globalThis.__fmSessions ?? []).length === 2 && providerBCalls === 1,
+  () => (globalThis.__fmSessions ?? []).length === 2 && globalThis.__fmSessions[1].ops.some((op) => op.kind === "prompt"),
   "header-boundary replacement prompt",
 );
-if (reboundDispatch?.aborted) throw new Error("the current native provider B request was aborted");
-if (globalThis.__fmSessions[1].options.model?.baseUrl !== "https://native-b.proxy.invalid") {
+await reboundOffer.settlement.then(() => null, () => null);
+const replacement = globalThis.__fmSessions[1];
+if (replacement.options.model?.baseUrl !== "https://private-b.proxy.invalid") {
   throw new Error(`the replacement branch bypassed the private proxy: ${JSON.stringify(globalThis.__fmSessions[1].options.model)}`);
 }
+const realB = await createRealProviderSession(copiedProviderConfig(replacement), providerFactory(replacement), "b");
+const realBResult = await realB.session.prompt("replacement provider dispatch").then(
+  () => null,
+  (error) => error,
+);
+if (realBResult instanceof Error) throw new Error(`the current provider B request failed: ${realBResult.message}`);
 if (providerACalls !== 0 || providerBCalls !== 1) {
   throw new Error(`custom stream routing was not fail-closed then rebound: A=${providerACalls} B=${providerBCalls}`);
 }
-await reboundOffer.settlement.then(() => null, () => null);
+realB.session.dispose();
 process.exit(0);
 EOF
   status=$?

@@ -263,6 +263,8 @@ type BranchEffort = ReturnType<NonNullable<ExtensionAPI["getThinkingLevel"]>>;
 type ExtensionProviderRegistration =
   | { providerId: string; kind: "none" }
   | { providerId: string; kind: "native" | "config"; registration: unknown };
+type ExtensionProviderConfig = NonNullable<ReturnType<ModelRuntime["getRegisteredProviderConfig"]>>;
+type ExtensionProviderStreamSimple = NonNullable<ExtensionProviderConfig["streamSimple"]>;
 type PinnedBranchModel = {
   model: BranchModel;
   modelRuntime: ModelRuntime;
@@ -798,15 +800,42 @@ export default function (pi: ExtensionAPI) {
       try {
         const nativeProvider = mainModelRegistry.getRegisteredNativeProvider(providerId);
         if (nativeProvider) {
-          modelRuntime.registerNativeProvider(nativeProvider);
-          registrations.set(providerId, { providerId, kind: "native", registration: nativeProvider });
+          const registration: ExtensionProviderRegistration = {
+            providerId,
+            kind: "native",
+            registration: nativeProvider,
+          };
+          modelRuntime.registerNativeProvider({
+            ...nativeProvider,
+            streamSimple: guardedExtensionProviderStreamSimple(
+              registration,
+              nativeProvider.streamSimple.bind(nativeProvider),
+            ),
+          });
+          registrations.set(providerId, registration);
           copied.push(providerId);
           continue;
         }
         const config = mainModelRegistry.getRegisteredProviderConfig(providerId);
         if (config) {
-          modelRuntime.registerProvider(providerId, config);
-          registrations.set(providerId, { providerId, kind: "config", registration: config });
+          const registration: ExtensionProviderRegistration = {
+            providerId,
+            kind: "config",
+            registration: config,
+          };
+          modelRuntime.registerProvider(
+            providerId,
+            config.streamSimple
+              ? {
+                  ...config,
+                  streamSimple: guardedExtensionProviderStreamSimple(
+                    registration,
+                    config.streamSimple.bind(config),
+                  ),
+                }
+              : config,
+          );
+          registrations.set(providerId, registration);
           copied.push(providerId);
         } else {
           registrations.set(providerId, { providerId, kind: "none" });
@@ -841,6 +870,22 @@ export default function (pi: ExtensionAPI) {
     } catch {
       return false;
     }
+  }
+
+  function extensionProviderRegistrationMismatch(snapshot: ExtensionProviderRegistration): Error | null {
+    if (extensionProviderRegistrationIsCurrent(snapshot)) return null;
+    return new Error(`supervision branch provider registration changed before request for ${snapshot.providerId}`);
+  }
+
+  function guardedExtensionProviderStreamSimple(
+    snapshot: ExtensionProviderRegistration,
+    streamSimple: ExtensionProviderStreamSimple,
+  ): ExtensionProviderStreamSimple {
+    return (model, context, options) => {
+      const mismatch = extensionProviderRegistrationMismatch(snapshot);
+      if (mismatch) throw mismatch;
+      return streamSimple(model, context, options);
+    };
   }
 
   async function resolveBranchModel(provider: string, modelId: string): Promise<BranchModelResolution> {
@@ -1329,10 +1374,10 @@ export default function (pi: ExtensionAPI) {
           name: "fm-branch-cache-key",
           factory: (branchPi: ExtensionAPI) => {
             branchPi.on("before_provider_headers", (_event, ctx) => {
-              if (pinned && !extensionProviderRegistrationIsCurrent(pinned.providerRegistration)) {
-                const providerRegistrationMismatch = new Error(
-                  `supervision branch provider registration changed before request for ${pinned.providerRegistration.providerId}`,
-                );
+              const providerRegistrationMismatch = pinned
+                ? extensionProviderRegistrationMismatch(pinned.providerRegistration)
+                : null;
+              if (providerRegistrationMismatch) {
                 providerRegistrationMismatchListener?.(providerRegistrationMismatch);
                 ctx.abort();
                 throw providerRegistrationMismatch;
