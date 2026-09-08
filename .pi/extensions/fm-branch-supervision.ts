@@ -2004,19 +2004,26 @@ ${context.command}
         // reporting a state that did not take effect.
         try {
           const following = mainModel ? await resolveBranchModel(mainModel.provider, mainModel.id) : null;
-          if (following?.ok) branchModel = following.selection.model;
-          modelReport = following?.ok
-            ? {
-                message: `Supervision branch follows main's model (${modelLabel(following.selection.model)}).`,
-                warning: false,
-              }
-            : {
-                message: `Supervision branch pin cleared, but main's model could not be applied (${following ? following.reason : "main's model is not known yet"}); the branch keeps the model its own session recorded until that conversation is replaced.`,
-                warning: true,
-              };
+          if (!following) {
+            modelReport = {
+              message: `Supervision branch pin cleared, but main's model could not be applied (main's model is not known yet); the branch keeps the model its own session recorded until that conversation is replaced.`,
+              warning: true,
+            };
+          } else if (following.ok) {
+            branchModel = following.selection.model;
+            modelReport = {
+              message: `Supervision branch follows main's model (${modelLabel(following.selection.model)}).`,
+              warning: false,
+            };
+          } else {
+            modelReport = {
+              message: `Supervision branch pin cleared, but main's model could not be applied (${following.reason}); supervision falls back safely to main until the branch can use that model.`,
+              warning: true,
+            };
+          }
         } catch (error) {
           modelReport = {
-            message: `Supervision branch pin cleared, but main's model could not be applied (${error instanceof Error ? error.message : String(error)}); the branch keeps the model its own session recorded until that conversation is replaced.`,
+            message: `Supervision branch pin cleared, but main's model could not be applied (${error instanceof Error ? error.message : String(error)}); supervision falls back safely to main until the branch can use that model.`,
             warning: true,
           };
         }

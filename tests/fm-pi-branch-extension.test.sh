@@ -2795,6 +2795,20 @@ registryModels.push(
 const command = commands.get("supervision-model");
 if (!command) throw new Error("the supervision-model command was not registered");
 
+uiSelections.push("Follow main");
+await command.handler("", makeCtx({ model: undefined }));
+if (
+  notices.length !== 1 ||
+  notices[0].type !== "warning" ||
+  !notices[0].message.includes("main's model is not known yet") ||
+  !notices[0].message.includes("the branch keeps the model its own session recorded") ||
+  notices[0].message.includes("falls back safely to main")
+) {
+  throw new Error(`an unknown main model lost its recorded-model notice: ${JSON.stringify(notices)}`);
+}
+uiPrompts.length = 0;
+notices.length = 0;
+
 await fire("session_start", {}, makeCtx());
 dispatch("signal: before the pick");
 await settle(() => (globalThis.__fmSessions ?? []).length === 1, "pre-pick branch build");
@@ -2904,15 +2918,20 @@ if (newNotices.length !== 1 || newNotices[0].type !== "error") {
 // cleared and the captain receives an honest warning rather than a rejection
 // or a false success notice.
 const clearFailureNoticeCount = notices.length;
-globalThis.__fmModelRuntimeErrors = [null, "synthetic post-clear runtime failure"];
+const knownMain = registryModels.find((model) => model.provider === "anthropic" && model.id === "main-model");
+if (!knownMain) throw new Error("the known main model fixture is missing");
+knownMain.storedAuth = false;
 uiSelections.push("Follow main (anthropic/main-model)");
 await command.handler("", makeCtx());
+delete knownMain.storedAuth;
 if (existsSync(pinFile)) throw new Error("following main did not clear the pin before its resolution warning");
 const clearFailureNotices = notices.slice(clearFailureNoticeCount);
 if (
   clearFailureNotices.length !== 1 ||
   clearFailureNotices[0].type !== "warning" ||
-  !clearFailureNotices[0].message.includes("synthetic post-clear runtime failure")
+  !clearFailureNotices[0].message.includes("has no configured credentials") ||
+  !clearFailureNotices[0].message.includes("supervision falls back safely to main") ||
+  clearFailureNotices[0].message.includes("the branch keeps the model its own session recorded")
 ) {
   throw new Error(`post-clear resolution failure was not reported honestly: ${JSON.stringify(clearFailureNotices)}`);
 }
