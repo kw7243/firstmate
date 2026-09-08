@@ -954,20 +954,15 @@ export default function (pi: ExtensionAPI) {
   // main's own model is applied EXPLICITLY - otherwise clearing the pin would
   // report that the branch follows main while the reopened session quietly
   // restored the model an earlier pin left behind. Only when main's model is
-  // genuinely unknown, or the isolated runtime cannot run it, does the build
-  // fall back to passing no override at all, which is the pre-feature
-  // behavior; an unpinned branch is never refused over model choice alone.
+  // genuinely unknown does the build fall back to passing no override at all,
+  // which is the pre-feature behavior.
   async function branchModelSelection(): Promise<PinnedBranchModel | undefined> {
     const pin = readModelPin();
     if (pin) return preparePinnedBranchModel(pin);
     if (!mainModel) return undefined;
-    try {
-      const resolved = await resolveBranchModel(mainModel.provider, mainModel.id);
-      return resolved.ok ? resolved.selection : undefined;
-    } catch (error) {
-      if (error instanceof ExtensionProviderTimeoutError || error instanceof ExtensionProviderResolutionError) throw error;
-      return undefined;
-    }
+    const resolved = await resolveBranchModel(mainModel.provider, mainModel.id);
+    if (!resolved.ok) throw new ExtensionProviderResolutionError(resolved.reason);
+    return resolved.selection;
   }
 
   async function effectiveBranchModel(selected: BranchModel | undefined): Promise<BranchModel | undefined> {

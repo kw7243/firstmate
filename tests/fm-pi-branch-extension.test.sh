@@ -518,9 +518,15 @@ let mainThinkingLevel = "medium";
 function setMainThinkingLevel(level) {
   mainThinkingLevel = level;
 }
-globalThis.__fmBranchStaticModels = () => registryModels
-  .filter((model) => model.branchAvailable !== false)
-  .map((model) => ({ ...model }));
+globalThis.__fmBranchStaticModels = () => {
+  const models = registryModels
+    .filter((model) => model.branchAvailable !== false)
+    .map((model) => ({ ...model }));
+  if (!registryModels.some((model) => model.provider === mainModel.provider && model.id === mainModel.id)) {
+    models.push({ ...mainModel });
+  }
+  return models;
+};
 const modelRegistry = {
   getAvailable: () => registryModels.filter((model) => model.mainAvailable !== false).slice(),
   find: (provider, id) => registryModels.find((model) => model.provider === provider && model.id === id),
@@ -2198,8 +2204,10 @@ test_selection_change_does_not_corrupt_inflight_provider_state() {
   PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
-await eval(`(async () => { ${prelude}; globalThis.__t = { dispatch, fire, settle, home, mainUserMessages }; })()`);
-const { dispatch, fire, settle, home, mainUserMessages } = globalThis.__t;
+await eval(`(async () => { ${prelude}; globalThis.__t = { dispatch, fire, settle, home, mainUserMessages, registryModels }; })()`);
+const { dispatch, fire, settle, home, mainUserMessages, registryModels } = globalThis.__t;
+
+registryModels.push({ provider: "anthropic", id: "replacement-model" });
 
 const entries = [];
 const mainSession = {
@@ -5433,6 +5441,88 @@ EOF
   pass "invocation guard survives registration microtasks, late refreshes, and prototype-native providers"
 }
 
+test_runtime_only_main_credential_rejects_branch_construction() {
+  if ! command -v node >/dev/null 2>&1; then
+    echo "skip: node not found for the Pi runtime-only credential test"
+    return
+  fi
+  local package_dir repo home out status
+  package_dir=${FM_PI_PACKAGE_DIR:-"$(npm root -g 2>/dev/null)/@earendil-works/pi-coding-agent"}
+  if [ ! -f "$package_dir/package.json" ]; then
+    echo "skip: installed @earendil-works/pi-coding-agent package not found"
+    return
+  fi
+  repo="$TMP_ROOT/runtime-only-main-root"
+  home="$TMP_ROOT/runtime-only-main-home"
+  mkdir -p "$home/state" "$home/config" "$home/pi-agent" "$home/main-agent"
+  install_pi_branch_extension_fixture "$repo"
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    PI_PACKAGE_DIR="$package_dir" PI_CODING_AGENT_DIR="$home/pi-agent" PI_OFFLINE=1 \
+    OPENAI_API_KEY=unselected-provider-test FM_TEST_REAL_MODEL_RUNTIME=1 \
+    DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+for (const name of ["ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_OAUTH_TOKEN", "ANTHROPIC_API_KEY"]) {
+  delete process.env[name];
+}
+const prelude = process.env.DRIVER_PRELUDE;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, makeCtx, home }; })()`);
+const { fire, dispatch, makeCtx, home } = globalThis.__t;
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+
+const packageRoot = resolve(process.env.PI_PACKAGE_DIR);
+const { ModelRuntime: RealModelRuntime } = await import(pathToFileURL(`${packageRoot}/dist/index.js`).href);
+const isolatedRuntime = await RealModelRuntime.create({
+  authPath: `${home}/pi-agent/auth.json`,
+  modelsPath: null,
+});
+if (isolatedRuntime.hasConfiguredAuth("anthropic")) {
+  throw new Error("the isolated runtime unexpectedly inherited main's Anthropic credential");
+}
+if (
+  !isolatedRuntime.hasConfiguredAuth("openai") ||
+  !isolatedRuntime.getAvailableSnapshot().some((model) => model.provider === "openai")
+) {
+  throw new Error("the unselected OpenAI provider was not available to the isolated runtime");
+}
+
+const mainRuntime = await RealModelRuntime.create({
+  authPath: `${home}/main-agent/auth.json`,
+  modelsPath: null,
+  refreshOnCreate: false,
+});
+const selected = mainRuntime.getModels("anthropic").find((model) => model.input.includes("text"));
+if (!selected) throw new Error("the real runtime exposed no Anthropic text model");
+await mainRuntime.setRuntimeApiKey("anthropic", "main-runtime-only-key");
+const authStatus = mainRuntime.getProviderAuthStatus("anthropic");
+if (!authStatus.configured || authStatus.source !== "runtime") {
+  throw new Error(`the main credential was not runtime-only: ${JSON.stringify(authStatus)}`);
+}
+
+const ctx = makeCtx({ model: selected, modelRegistry: mainRuntime });
+await fire("session_start", {}, ctx);
+const offer = dispatch("signal: selected stock provider has only a main-runtime credential");
+const failure = await offer.settlement.then(
+  () => null,
+  (error) => error,
+);
+if (!offer.accepted) throw new Error("the runtime-only credential wake was not accepted for settlement");
+if (
+  !(failure instanceof Error) ||
+  !failure.message.includes(`${selected.provider}/${selected.id} has no configured credentials in the isolated branch runtime`)
+) {
+  throw new Error(`the known unresolved main model did not reject to watcher fallback: ${String(failure)}`);
+}
+if ((globalThis.__fmSessions ?? []).length !== 0) {
+  throw new Error("a known main model with only a runtime credential built an unpinned branch session");
+}
+process.exit(0);
+EOF
+  status=$?
+  out=$(cat "$TMP_ROOT/node-output")
+  expect_code 0 "$status" "a main-runtime-only credential must reject branch construction: $out"
+  pass "runtime-only main credentials reject unsafe unpinned branch construction"
+}
+
 test_model_runtime_create_deadline_rejects_to_watcher_fallback() {
   local repo home out status
   repo="$TMP_ROOT/extprov-create-deadline-root"
@@ -5875,6 +5965,7 @@ test_unpinned_branch_follows_main_effort_changes_live
 test_effective_extension_provider_registration_precedes_model_lookup
 test_cached_branch_rebinds_after_effective_provider_change
 test_provider_change_at_header_boundary_blocks_all_effective_streams
+test_runtime_only_main_credential_rejects_branch_construction
 test_model_runtime_create_deadline_rejects_to_watcher_fallback
 test_extension_provider_refresh_deadline_rejects_to_watcher_fallback
 test_selected_provider_refresh_error_rejects_to_watcher_fallback
