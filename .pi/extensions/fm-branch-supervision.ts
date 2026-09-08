@@ -263,8 +263,7 @@ type BranchEffort = ReturnType<NonNullable<ExtensionAPI["getThinkingLevel"]>>;
 type ExtensionProviderRegistration =
   | { providerId: string; kind: "none" }
   | { providerId: string; kind: "native" | "config"; registration: unknown };
-type ExtensionProviderConfig = NonNullable<ReturnType<ModelRuntime["getRegisteredProviderConfig"]>>;
-type ExtensionProviderStreamSimple = NonNullable<ExtensionProviderConfig["streamSimple"]>;
+type ExtensionProviderStreamSimple = NonNullable<ReturnType<ModelRuntime["getProvider"]>>["streamSimple"];
 type PinnedBranchModel = {
   model: BranchModel;
   modelRuntime: ModelRuntime;
@@ -805,13 +804,7 @@ export default function (pi: ExtensionAPI) {
             kind: "native",
             registration: nativeProvider,
           };
-          modelRuntime.registerNativeProvider({
-            ...nativeProvider,
-            streamSimple: guardedExtensionProviderStreamSimple(
-              registration,
-              nativeProvider.streamSimple.bind(nativeProvider),
-            ),
-          });
+          modelRuntime.registerNativeProvider({ ...nativeProvider });
           registrations.set(providerId, registration);
           copied.push(providerId);
           continue;
@@ -823,18 +816,7 @@ export default function (pi: ExtensionAPI) {
             kind: "config",
             registration: config,
           };
-          modelRuntime.registerProvider(
-            providerId,
-            config.streamSimple
-              ? {
-                  ...config,
-                  streamSimple: guardedExtensionProviderStreamSimple(
-                    registration,
-                    config.streamSimple.bind(config),
-                  ),
-                }
-              : config,
-          );
+          modelRuntime.registerProvider(providerId, config);
           registrations.set(providerId, registration);
           copied.push(providerId);
         } else {
@@ -877,11 +859,14 @@ export default function (pi: ExtensionAPI) {
     return new Error(`supervision branch provider registration changed before request for ${snapshot.providerId}`);
   }
 
-  function guardedExtensionProviderStreamSimple(
+  function guardExtensionProviderStreamSimple(
+    modelRuntime: ModelRuntime,
     snapshot: ExtensionProviderRegistration,
-    streamSimple: ExtensionProviderStreamSimple,
-  ): ExtensionProviderStreamSimple {
-    return (model, context, options) => {
+  ): void {
+    const provider = modelRuntime.getProvider(snapshot.providerId);
+    if (!provider) return;
+    const streamSimple: ExtensionProviderStreamSimple = provider.streamSimple.bind(provider);
+    provider.streamSimple = (model, context, options) => {
       const mismatch = extensionProviderRegistrationMismatch(snapshot);
       if (mismatch) throw mismatch;
       return streamSimple(model, context, options);
@@ -897,12 +882,14 @@ export default function (pi: ExtensionAPI) {
     if (!modelRuntime.hasConfiguredAuth(provider)) {
       return { ok: false, reason: `${label} has no configured credentials in the isolated branch runtime` };
     }
+    const providerRegistration = registrations.get(provider) ?? { providerId: provider, kind: "none" as const };
+    guardExtensionProviderStreamSimple(modelRuntime, providerRegistration);
     return {
       ok: true,
       selection: {
         model,
         modelRuntime,
-        providerRegistration: registrations.get(provider) ?? { providerId: provider, kind: "none" },
+        providerRegistration,
       },
     };
   }

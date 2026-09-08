@@ -66,6 +66,7 @@ install_pi_branch_extension_fixture() {
 JSON
   cat > "$repo/node_modules/@earendil-works/pi-coding-agent/index.js" <<'JS'
 import { writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 
 export function getAgentDir() {
   return "/stub-agent-dir";
@@ -102,12 +103,21 @@ export class DynamicBorder {
   }
 }
 
-export class ModelRuntime {
+class StubModelRuntime {
   constructor() {
     this.models = (globalThis.__fmBranchStaticModels?.() ?? []).map((model) => ({ ...model }));
     this.authenticated = new Set(this.models.filter((model) => model.storedAuth !== false).map((model) => model.provider));
     this.registeredProviderConfigs = new Map();
     this.registeredNativeProviders = new Map();
+    this.providers = new Map(
+      this.models.map((model) => [
+        model.provider,
+        {
+          id: model.provider,
+          streamSimple: (...args) => globalThis.__fmStockProviderStreamSimple?.(...args),
+        },
+      ]),
+    );
     // Like the real runtime, a registered provider's credentials are only
     // known once refresh() has run for it; registration alone is provisional.
     this.pendingAuth = new Set();
@@ -118,13 +128,18 @@ export class ModelRuntime {
     const queuedError = globalThis.__fmModelRuntimeErrors?.shift();
     if (queuedError) throw new Error(queuedError);
     if (globalThis.__fmModelRuntimeError) throw new Error(globalThis.__fmModelRuntimeError);
-    const runtime = new ModelRuntime();
+    const runtime = new StubModelRuntime();
     (globalThis.__fmModelRuntimes ??= []).push(runtime);
     return runtime;
   }
   registerProvider(providerId, config) {
     this.registeredNativeProviders.delete(providerId);
     this.registeredProviderConfigs.set(providerId, config);
+    const inheritedProvider = this.providers.get(providerId);
+    this.providers.set(providerId, {
+      id: providerId,
+      streamSimple: config.streamSimple?.bind(config) ?? inheritedProvider?.streamSimple ?? (() => undefined),
+    });
     const inherited = this.models.filter((model) => model.provider === providerId);
     this.models = this.models.filter((model) => model.provider !== providerId);
     for (const model of config.models ?? inherited) {
@@ -143,6 +158,7 @@ export class ModelRuntime {
     const providerId = provider.id;
     this.registeredProviderConfigs.delete(providerId);
     this.registeredNativeProviders.set(providerId, provider);
+    this.providers.set(providerId, provider);
     this.models = this.models.filter((model) => model.provider !== providerId);
     for (const model of provider.models ?? []) {
       this.models.push({
@@ -168,10 +184,16 @@ export class ModelRuntime {
   getModel(provider, id) {
     return this.models.find((model) => model.provider === provider && model.id === id);
   }
+  getProvider(provider) {
+    return this.providers.get(provider);
+  }
   hasConfiguredAuth(provider) {
     return this.authenticated.has(provider);
   }
 }
+export const ModelRuntime = process.env.FM_TEST_REAL_MODEL_RUNTIME === "1"
+  ? (await import(pathToFileURL(`${process.env.PI_PACKAGE_DIR}/dist/index.js`).href)).ModelRuntime
+  : StubModelRuntime;
 export class DefaultResourceLoader {
   constructor(options) {
     this.options = options;
@@ -4935,7 +4957,7 @@ EOF
   pass "cached branches rebind before new mirrored context reaches a changed provider"
 }
 
-test_provider_change_at_header_boundary_blocks_custom_stream() {
+test_provider_change_at_header_boundary_blocks_all_effective_streams() {
   if ! command -v node >/dev/null 2>&1; then
     echo "skip: node not found for the Pi provider dispatch test"
     return
@@ -4948,9 +4970,11 @@ test_provider_change_at_header_boundary_blocks_custom_stream() {
   fi
   repo="$TMP_ROOT/extprov-request-boundary-root"
   home="$TMP_ROOT/extprov-request-boundary-home"
-  mkdir -p "$home/state" "$home/config"
+  mkdir -p "$home/state" "$home/config" "$home/pi-agent"
   install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" PI_PACKAGE_DIR="$package_dir" \
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    PI_PACKAGE_DIR="$package_dir" PI_CODING_AGENT_DIR="$home/pi-agent" PI_OFFLINE=1 \
+    ANTHROPIC_API_KEY=firstmate-provider-routing-test FM_TEST_REAL_MODEL_RUNTIME=1 \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, registryModels, home }; })()`);
@@ -5013,65 +5037,13 @@ function completedStream(model, text) {
   });
   return stream;
 }
-const providerA = {
-  name: "Private proxy A",
-  api: "private-proxy-api",
-  baseUrl: "https://private-a.proxy.invalid",
-  apiKey: "stored-private-credential-a",
-  models: [modelDefinition],
-  streamSimple(model) {
-    providerACalls += 1;
-    return completedStream(model, "provider A");
-  },
-};
-const providerB = {
-  name: "Private proxy B",
-  api: "private-proxy-api",
-  baseUrl: "https://private-b.proxy.invalid",
-  apiKey: "stored-private-credential-b",
-  models: [modelDefinition],
-  streamSimple(model) {
-    providerBCalls += 1;
-    return completedStream(model, "provider B");
-  },
-};
-globalThis.__fmExtensionProviderConfigs = new Map([["private-proxy", providerA]]);
-globalThis.__fmExtensionNativeProviders = new Map();
-writeFileSync(`${home}/config/supervision-branch-model`, "private-proxy/private-model\n");
-const entries = [];
-const ctx = makeCtx({
-  sessionManager: {
-    getSessionFile: () => `${home}/main.jsonl`,
-    getEntries: () => entries,
-  },
-});
-
-await fire("session_start", {}, ctx);
-const firstOffer = dispatch("signal: establish private provider branch");
-await settle(
-  () => (globalThis.__fmSessions ?? []).length === 1 && globalThis.__fmSessions[0].ops.some((op) => op.kind === "prompt"),
-  "private-provider branch prompt",
-);
-await firstOffer.settlement.then(() => null, () => null);
-const first = globalThis.__fmSessions[0];
-if (first.options.model?.baseUrl !== "https://private-a.proxy.invalid") {
-  throw new Error(`the initial branch bypassed provider A: ${JSON.stringify(first.options.model)}`);
-}
-
-function copiedProviderConfig(session) {
-  const config = session.options.modelRuntime.registeredProviderConfigs.get("private-proxy");
-  if (!config || typeof config.streamSimple !== "function") {
-    throw new Error("the branch runtime did not retain the copied custom stream");
-  }
-  return config;
-}
 
 function providerFactory(session) {
   const factoryEntry = session.options.resourceLoader.options.extensionFactories[0];
   return typeof factoryEntry === "function" ? factoryEntry : factoryEntry.factory;
 }
 
-async function createRealProviderSession(config, factory, label) {
+async function createRealProviderSession(branchSession, label) {
   const agentDir = `${home}/real-agent-${label}`;
   const sessionsDir = `${home}/real-sessions-${label}`;
   mkdirSync(agentDir, { recursive: true });
@@ -5087,18 +5059,13 @@ async function createRealProviderSession(config, factory, label) {
     noThemes: true,
     noContextFiles: true,
     systemPrompt: "provider routing regression",
-    extensionFactories: [{ name: `provider-routing-${label}`, factory }],
+    extensionFactories: [{ name: `provider-routing-${label}`, factory: providerFactory(branchSession) }],
   });
   await resourceLoader.reload();
-  const modelRuntime = await RealModelRuntime.create({
-    authPath: `${agentDir}/auth.json`,
-    modelsPath: null,
-    refreshOnCreate: false,
-  });
-  modelRuntime.registerProvider("private-proxy", config);
-  await modelRuntime.refresh({ providers: ["private-proxy"], allowNetwork: false });
-  const model = modelRuntime.getModel("private-proxy", "private-model");
-  if (!model) throw new Error(`the real runtime did not resolve provider ${label}`);
+  const modelRuntime = branchSession.options.modelRuntime;
+  const selected = branchSession.options.model;
+  const model = modelRuntime.getModel(selected.provider, selected.id);
+  if (!model) throw new Error(`the real runtime did not retain ${selected.provider}/${selected.id} for ${label}`);
   const sessionManager = RealSessionManager.create(home, sessionsDir);
   const { session } = await createRealAgentSession({
     cwd: home,
@@ -5112,69 +5079,209 @@ async function createRealProviderSession(config, factory, label) {
   return { session, sessionManager };
 }
 
-const realA = await createRealProviderSession(copiedProviderConfig(first), providerFactory(first), "a");
-const privatePrompt = "captain context awaiting the newly registered private proxy";
-await fire("before_agent_start", { prompt: privatePrompt }, ctx);
-let realAPrompt;
-globalThis.__fmOnBranchPrompt = () => {
-  globalThis.__fmExtensionProviderConfigs.set("private-proxy", providerB);
-  realAPrompt = realA.session.prompt(privatePrompt).then(
+const discoveryRuntime = await RealModelRuntime.create({
+  authPath: `${home}/pi-agent/auth.json`,
+  modelsPath: null,
+  refreshOnCreate: false,
+});
+const anthropicModel = discoveryRuntime.getModels("anthropic").find((model) => model.input.includes("text"));
+if (!anthropicModel) throw new Error("the real runtime exposed no Anthropic text model for stock-route coverage");
+
+const transportUrls = [];
+globalThis.fetch = async (input) => {
+  transportUrls.push(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
+  return new Response(JSON.stringify({ type: "error", error: { type: "authentication_error", message: "probe" } }), {
+    status: 401,
+    headers: { "content-type": "application/json" },
+  });
+};
+
+async function runProviderCase(options) {
+  const entries = [];
+  const ctx = makeCtx({
+    sessionManager: {
+      getSessionFile: () => `${home}/main-${options.label}.jsonl`,
+      getEntries: () => entries,
+    },
+  });
+  globalThis.__fmExtensionProviderConfigs = new Map(
+    options.initialConfig ? [[options.providerId, options.initialConfig]] : [],
+  );
+  globalThis.__fmExtensionNativeProviders = new Map();
+  writeFileSync(`${home}/config/supervision-branch-model`, `${options.providerId}/${options.modelId}\n`);
+
+  await fire("session_start", {}, ctx);
+  const firstIndex = (globalThis.__fmSessions ?? []).length;
+  const firstOffer = dispatch(`signal: establish ${options.label} provider branch`);
+  await settle(
+    () =>
+      (globalThis.__fmSessions ?? []).length === firstIndex + 1 &&
+      globalThis.__fmSessions[firstIndex].ops.some((op) => op.kind === "prompt"),
+    `${options.label} provider branch prompt`,
+  );
+  await firstOffer.settlement.then(() => null, () => null);
+  const first = globalThis.__fmSessions[firstIndex];
+  if (options.initialBaseUrl && first.options.model?.baseUrl !== options.initialBaseUrl) {
+    throw new Error(`${options.label} initial route bypassed its endpoint: ${JSON.stringify(first.options.model)}`);
+  }
+
+  if (options.initialTransportHost) {
+    const control = await createRealProviderSession(first, `${options.label}-control`);
+    const transportBefore = transportUrls.length;
+    await control.session.prompt(`${options.label} current-route control`).then(() => null, () => null);
+    const controlUrls = transportUrls.slice(transportBefore);
+    if (!controlUrls.some((url) => url.includes(options.initialTransportHost))) {
+      throw new Error(`${options.label} control never reached its effective transport: ${JSON.stringify(controlUrls)}`);
+    }
+    control.session.dispose();
+  }
+
+  const stale = await createRealProviderSession(first, `${options.label}-stale`);
+  const privatePrompt = `captain context mirrored before ${options.label} registration changed`;
+  await fire("before_agent_start", { prompt: privatePrompt }, ctx);
+  const staleCallsBefore = options.staleCallCount();
+  let stalePrompt;
+  globalThis.__fmOnBranchPrompt = () => {
+    globalThis.__fmExtensionProviderConfigs = new Map([[options.providerId, options.replacementConfig]]);
+    stalePrompt = stale.session.prompt(privatePrompt).then(
+      () => null,
+      (error) => error,
+    );
+    return stalePrompt;
+  };
+
+  const staleOffer = dispatch(`signal: ${options.label} registration changes at provider boundary`);
+  const staleFailure = await staleOffer.settlement.then(
     () => null,
     (error) => error,
   );
-  return realAPrompt;
+  if (!staleOffer.accepted) throw new Error(`${options.label} provider-boundary wake was not accepted`);
+  if (!(staleFailure instanceof Error) || !staleFailure.message.includes("provider registration changed before request")) {
+    throw new Error(`${options.label} mismatch did not reject to watcher fallback: ${String(staleFailure)}`);
+  }
+  if (!stalePrompt) throw new Error(`${options.label} real provider dispatch did not start`);
+  const staleResult = await stalePrompt;
+  if (options.staleCallCount() !== staleCallsBefore) {
+    throw new Error(`${options.label} invoked its obsolete effective provider`);
+  }
+  const staleEntries = JSON.stringify(stale.sessionManager.getEntries());
+  const staleError = staleResult instanceof Error ? `${staleResult.message}\n${staleEntries}` : staleEntries;
+  if (!staleError.includes("provider registration changed before request")) {
+    throw new Error(`${options.label} real runtime did not surface the guarded mismatch: ${staleError}`);
+  }
+  if (!first.disposed) throw new Error(`${options.label} provider-mismatched branch remained live`);
+  if (!first.ops.some((op) => op.kind === "custom" && op.message.content.includes(privatePrompt))) {
+    throw new Error(`${options.label} mismatch did not cross the intervening mirror delivery`);
+  }
+  stale.session.dispose();
+
+  globalThis.__fmOnBranchPrompt = undefined;
+  const replacementIndex = (globalThis.__fmSessions ?? []).length;
+  const reboundOffer = dispatch(`signal: rebuild ${options.label} after provider mismatch`);
+  await settle(
+    () =>
+      (globalThis.__fmSessions ?? []).length === replacementIndex + 1 &&
+      globalThis.__fmSessions[replacementIndex].ops.some((op) => op.kind === "prompt"),
+    `${options.label} replacement branch prompt`,
+  );
+  await reboundOffer.settlement.then(() => null, () => null);
+  const replacement = globalThis.__fmSessions[replacementIndex];
+  if (options.replacementBaseUrl && replacement.options.model?.baseUrl !== options.replacementBaseUrl) {
+    throw new Error(`${options.label} replacement bypassed its endpoint: ${JSON.stringify(replacement.options.model)}`);
+  }
+  const realReplacement = await createRealProviderSession(replacement, `${options.label}-replacement`);
+  const replacementCallsBefore = options.replacementCallCount();
+  await realReplacement.session.prompt(`${options.label} replacement provider dispatch`).then(() => null, () => null);
+  if (options.replacementCallCount() <= replacementCallsBefore) {
+    throw new Error(`${options.label} replacement did not reach the current provider`);
+  }
+  if (options.replacementTransportHost) {
+    const replacementUrls = transportUrls.slice(replacementCallsBefore);
+    if (!replacementUrls.some((url) => url.includes(options.replacementTransportHost))) {
+      throw new Error(`${options.label} replacement missed its endpoint: ${JSON.stringify(replacementUrls)}`);
+    }
+  }
+  realReplacement.session.dispose();
+  await fire("session_shutdown", {});
+}
+
+const customProviderA = {
+  name: "Private proxy A",
+  api: "private-proxy-api",
+  baseUrl: "https://private-a.proxy.invalid",
+  apiKey: "stored-private-credential-a",
+  models: [modelDefinition],
+  streamSimple(model) {
+    providerACalls += 1;
+    return completedStream(model, "provider A");
+  },
 };
+const customProviderB = {
+  name: "Private proxy B",
+  api: "private-proxy-api",
+  baseUrl: "https://private-b.proxy.invalid",
+  apiKey: "stored-private-credential-b",
+  models: [modelDefinition],
+  streamSimple(model) {
+    providerBCalls += 1;
+    return completedStream(model, "provider B");
+  },
+};
+await runProviderCase({
+  label: "custom-stream",
+  providerId: "private-proxy",
+  modelId: "private-model",
+  initialConfig: customProviderA,
+  replacementConfig: customProviderB,
+  initialBaseUrl: customProviderA.baseUrl,
+  replacementBaseUrl: customProviderB.baseUrl,
+  staleCallCount: () => providerACalls,
+  replacementCallCount: () => providerBCalls,
+});
 
-const staleOffer = dispatch("signal: registration changes at provider boundary");
-const staleFailure = await staleOffer.settlement.then(
-  () => null,
-  (error) => error,
-);
-if (!staleOffer.accepted) throw new Error("the provider-boundary wake was not accepted for settlement");
-if (!(staleFailure instanceof Error) || !staleFailure.message.includes("provider registration changed before request")) {
-  throw new Error(`the registration mismatch did not reject to watcher fallback: ${String(staleFailure)}`);
-}
-if (!realAPrompt) throw new Error("the real provider dispatch did not start");
-const realAResult = await realAPrompt;
-if (providerACalls !== 0) throw new Error(`the real runtime invoked obsolete provider A ${providerACalls} time(s)`);
-const realAEntries = JSON.stringify(realA.sessionManager.getEntries());
-const realAError = realAResult instanceof Error ? `${realAResult.message}\n${realAEntries}` : realAEntries;
-if (!realAError.includes("provider registration changed before request")) {
-  throw new Error(`the real runtime did not surface the guarded-stream mismatch: ${realAError}`);
-}
-if (!first.disposed) throw new Error("the provider-mismatched branch remained live");
-if (!first.ops.some((op) => op.kind === "custom" && op.message.content.includes(privatePrompt))) {
-  throw new Error("the header-boundary case did not cross the intervening mirror delivery");
-}
-realA.session.dispose();
+const configOnlyA = { baseUrl: "https://config-a.proxy.invalid" };
+const configOnlyB = { baseUrl: "https://config-b.proxy.invalid" };
+await runProviderCase({
+  label: "config-only",
+  providerId: "anthropic",
+  modelId: anthropicModel.id,
+  initialConfig: configOnlyA,
+  replacementConfig: configOnlyB,
+  initialBaseUrl: configOnlyA.baseUrl,
+  replacementBaseUrl: configOnlyB.baseUrl,
+  initialTransportHost: "config-a.proxy.invalid",
+  replacementTransportHost: "config-b.proxy.invalid",
+  staleCallCount: () => transportUrls.length,
+  replacementCallCount: () => transportUrls.length,
+});
 
-globalThis.__fmOnBranchPrompt = undefined;
-const reboundOffer = dispatch("signal: rebuild after header-boundary mismatch");
-await settle(
-  () => (globalThis.__fmSessions ?? []).length === 2 && globalThis.__fmSessions[1].ops.some((op) => op.kind === "prompt"),
-  "header-boundary replacement prompt",
-);
-await reboundOffer.settlement.then(() => null, () => null);
-const replacement = globalThis.__fmSessions[1];
-if (replacement.options.model?.baseUrl !== "https://private-b.proxy.invalid") {
-  throw new Error(`the replacement branch bypassed the private proxy: ${JSON.stringify(globalThis.__fmSessions[1].options.model)}`);
-}
-const realB = await createRealProviderSession(copiedProviderConfig(replacement), providerFactory(replacement), "b");
-const realBResult = await realB.session.prompt("replacement provider dispatch").then(
-  () => null,
-  (error) => error,
-);
-if (realBResult instanceof Error) throw new Error(`the current provider B request failed: ${realBResult.message}`);
-if (providerACalls !== 0 || providerBCalls !== 1) {
-  throw new Error(`custom stream routing was not fail-closed then rebound: A=${providerACalls} B=${providerBCalls}`);
-}
-realB.session.dispose();
+let stockReplacementCalls = 0;
+const stockReplacement = {
+  api: anthropicModel.api,
+  baseUrl: "https://stock-replacement.proxy.invalid",
+  streamSimple(model) {
+    stockReplacementCalls += 1;
+    return completedStream(model, "stock replacement");
+  },
+};
+await runProviderCase({
+  label: "stock",
+  providerId: "anthropic",
+  modelId: anthropicModel.id,
+  initialConfig: null,
+  replacementConfig: stockReplacement,
+  replacementBaseUrl: stockReplacement.baseUrl,
+  initialTransportHost: "anthropic.com",
+  staleCallCount: () => transportUrls.length,
+  replacementCallCount: () => stockReplacementCalls,
+});
+
 process.exit(0);
 EOF
   status=$?
   out=$(cat "$TMP_ROOT/node-output")
-  expect_code 0 "$status" "a provider change at header time must abort before disclosure and reject to watcher fallback: $out"
-  pass "header-boundary provider changes block stale custom streams and rebuild on the private route"
+  expect_code 0 "$status" "provider changes must block every stale selected stream before disclosure: $out"
+  pass "header-boundary provider changes block custom, config-only, and stock streams"
 }
 
 test_model_runtime_create_deadline_rejects_to_watcher_fallback() {
@@ -5534,7 +5641,7 @@ test_branch_effort_pin_applies_and_absent_pin_follows_main
 test_unpinned_branch_follows_main_effort_changes_live
 test_effective_extension_provider_registration_precedes_model_lookup
 test_cached_branch_rebinds_after_effective_provider_change
-test_provider_change_at_header_boundary_blocks_custom_stream
+test_provider_change_at_header_boundary_blocks_all_effective_streams
 test_model_runtime_create_deadline_rejects_to_watcher_fallback
 test_extension_provider_refresh_deadline_rejects_to_watcher_fallback
 test_selected_provider_resolution_avoids_unrelated_refresh
