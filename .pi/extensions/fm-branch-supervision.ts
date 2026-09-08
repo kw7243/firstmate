@@ -884,6 +884,7 @@ export default function (pi: ExtensionAPI) {
   function guardExtensionProviderStreamSimple(
     modelRuntime: ModelRuntime,
     snapshot: ExtensionProviderRegistration,
+    model: BranchModel,
   ): void {
     const provider = modelRuntime.getProvider(snapshot.providerId);
     if (!provider) {
@@ -897,6 +898,15 @@ export default function (pi: ExtensionAPI) {
       if (mismatch) throw mismatch;
       return streamSimple(model, context, options);
     };
+    if (snapshot.kind === "config") {
+      const config = snapshot.registration as Parameters<ModelRuntime["registerProvider"]>[1];
+      modelRuntime.registerProvider(snapshot.providerId, {
+        ...config,
+        api: model.api,
+        streamSimple: guardedStreamSimple,
+      });
+      return;
+    }
     const boundMethods = new WeakMap<Function, Function>();
     const guardedProvider = new Proxy(provider, {
       get(target, property) {
@@ -929,7 +939,7 @@ export default function (pi: ExtensionAPI) {
       if (providerRegistration.kind !== "none") throw new ExtensionProviderResolutionError(reason);
       return { ok: false, reason };
     }
-    guardExtensionProviderStreamSimple(modelRuntime, providerRegistration);
+    guardExtensionProviderStreamSimple(modelRuntime, providerRegistration, model);
     return {
       ok: true,
       selection: {

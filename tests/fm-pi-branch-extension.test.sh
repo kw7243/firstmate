@@ -5127,9 +5127,11 @@ RealModelRuntime.prototype.refresh = function (options) {
   return runtimeRefresh.call(this, options);
 };
 
-const transportUrls = [];
-globalThis.fetch = async (input) => {
-  transportUrls.push(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
+const transportRequests = [];
+globalThis.fetch = async (input, init) => {
+  const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  const headers = new Headers(input instanceof Request ? input.headers : init?.headers);
+  transportRequests.push({ url, headers: Object.fromEntries(headers.entries()) });
   return new Response(JSON.stringify({ type: "error", error: { type: "authentication_error", message: "probe" } }), {
     status: 401,
     headers: { "content-type": "application/json" },
@@ -5191,8 +5193,9 @@ async function runProviderCase(options) {
       );
     });
     let raceFailure = null;
+    let raceResult = null;
     try {
-      await capturedProvider
+      raceResult = await capturedProvider
         .streamSimple(first.options.model, { systemPrompt: "provider invocation race", messages: [], tools: [] })
         .result();
     } catch (error) {
@@ -5201,8 +5204,12 @@ async function runProviderCase(options) {
     if (options.staleCallCount() !== callsBefore) {
       throw new Error(`${options.label} invoked a provider captured before the registration microtask`);
     }
-    if (!(raceFailure instanceof Error) || !raceFailure.message.includes("provider registration changed before request")) {
-      throw new Error(`${options.label} invocation-adjacent guard missed the registration microtask: ${String(raceFailure)}`);
+    const raceError = raceFailure instanceof Error ? raceFailure.message : raceResult?.errorMessage;
+    if (raceResult && raceResult.stopReason !== "error") {
+      throw new Error(`${options.label} registration microtask did not produce a provider error: ${JSON.stringify(raceResult)}`);
+    }
+    if (!raceError?.includes("provider registration changed before request")) {
+      throw new Error(`${options.label} invocation-adjacent guard missed the registration microtask: ${String(raceError)}`);
     }
     globalThis.__fmExtensionProviderConfigs = new Map(
       options.initialConfig ? [[options.providerId, options.initialConfig]] : [],
@@ -5214,11 +5221,19 @@ async function runProviderCase(options) {
 
   if (options.initialTransportHost) {
     const control = await createRealProviderSession(first, `${options.label}-control`);
-    const transportBefore = transportUrls.length;
+    const transportBefore = transportRequests.length;
     await control.session.prompt(`${options.label} current-route control`).then(() => null, () => null);
-    const controlUrls = transportUrls.slice(transportBefore);
-    if (!controlUrls.some((url) => url.includes(options.initialTransportHost))) {
-      throw new Error(`${options.label} control never reached its effective transport: ${JSON.stringify(controlUrls)}`);
+    const controlRequests = transportRequests.slice(transportBefore);
+    if (!controlRequests.some((request) => request.url.includes(options.initialTransportHost))) {
+      throw new Error(`${options.label} control never reached its effective transport: ${JSON.stringify(controlRequests)}`);
+    }
+    if (
+      options.initialModelHeader &&
+      !controlRequests.some(
+        (request) => request.headers[options.initialModelHeader.name.toLowerCase()] === options.initialModelHeader.value,
+      )
+    ) {
+      throw new Error(`${options.label} control lost its model-specific header: ${JSON.stringify(controlRequests)}`);
     }
     control.session.dispose();
   }
@@ -5288,9 +5303,17 @@ async function runProviderCase(options) {
     throw new Error(`${options.label} replacement did not reach the current provider`);
   }
   if (options.replacementTransportHost) {
-    const replacementUrls = transportUrls.slice(replacementCallsBefore);
-    if (!replacementUrls.some((url) => url.includes(options.replacementTransportHost))) {
-      throw new Error(`${options.label} replacement missed its endpoint: ${JSON.stringify(replacementUrls)}`);
+    const replacementRequests = transportRequests.slice(replacementCallsBefore);
+    if (!replacementRequests.some((request) => request.url.includes(options.replacementTransportHost))) {
+      throw new Error(`${options.label} replacement missed its endpoint: ${JSON.stringify(replacementRequests)}`);
+    }
+    if (
+      options.replacementModelHeader &&
+      !replacementRequests.some(
+        (request) => request.headers[options.replacementModelHeader.name.toLowerCase()] === options.replacementModelHeader.value,
+      )
+    ) {
+      throw new Error(`${options.label} replacement lost its model-specific header: ${JSON.stringify(replacementRequests)}`);
     }
   }
   realReplacement.session.dispose();
@@ -5395,8 +5418,19 @@ await runProviderCase({
   replacementCallCount: () => nativeProviderBCalls,
 });
 
-const configOnlyA = { baseUrl: "https://config-a.proxy.invalid" };
-const configOnlyB = { baseUrl: "https://config-b.proxy.invalid" };
+const modelHeaderName = "X-Firstmate-Model-Route";
+const configOnlyModel = { ...anthropicModel };
+delete configOnlyModel.provider;
+delete configOnlyModel.baseUrl;
+delete configOnlyModel.headers;
+const configOnlyA = {
+  baseUrl: "https://config-a.proxy.invalid",
+  models: [{ ...configOnlyModel, headers: { [modelHeaderName]: "config-a" } }],
+};
+const configOnlyB = {
+  baseUrl: "https://config-b.proxy.invalid",
+  models: [{ ...configOnlyModel, headers: { [modelHeaderName]: "config-b" } }],
+};
 await runProviderCase({
   label: "config-only",
   providerId: "anthropic",
@@ -5407,8 +5441,10 @@ await runProviderCase({
   replacementBaseUrl: configOnlyB.baseUrl,
   initialTransportHost: "config-a.proxy.invalid",
   replacementTransportHost: "config-b.proxy.invalid",
-  staleCallCount: () => transportUrls.length,
-  replacementCallCount: () => transportUrls.length,
+  initialModelHeader: { name: modelHeaderName, value: "config-a" },
+  replacementModelHeader: { name: modelHeaderName, value: "config-b" },
+  staleCallCount: () => transportRequests.length,
+  replacementCallCount: () => transportRequests.length,
 });
 
 let stockReplacementCalls = 0;
@@ -5428,7 +5464,7 @@ await runProviderCase({
   replacementConfig: stockReplacement,
   replacementBaseUrl: stockReplacement.baseUrl,
   initialTransportHost: "anthropic.com",
-  staleCallCount: () => transportUrls.length,
+  staleCallCount: () => transportRequests.length,
   replacementCallCount: () => stockReplacementCalls,
 });
 
