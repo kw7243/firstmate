@@ -752,7 +752,10 @@ export default function (pi: ExtensionAPI) {
 
   async function createExtensionProviderRuntime(): Promise<ModelRuntime> {
     const controller = new AbortController();
-    const options = { signal: controller.signal } as Parameters<typeof ModelRuntime.create>[0];
+    const options = {
+      signal: controller.signal,
+      refreshOnCreate: false,
+    } as Parameters<typeof ModelRuntime.create>[0];
     return withExtensionProviderDeadline(
       ModelRuntime.create(options),
       "runtime creation",
@@ -772,40 +775,42 @@ export default function (pi: ExtensionAPI) {
   // registration carries that streamSimple and oauth wiring by reference, so
   // copying it reuses the provider's own registration rather than reimplementing its
   // wire protocol; the copy is never persisted and stays scoped to this one
-  // runtime. The picker gives each registration its own runtime, so one that
-  // fails to compose cannot blind the rest. A just-registered provider's auth
-  // check has not run yet, so the copied provider is refreshed here and every caller's
+  // runtime. The picker gives each provider its own runtime, so one that fails
+  // to compose cannot blind the rest. The selected provider's auth check has
+  // not run yet, so that provider is refreshed here and every caller's
   // hasConfiguredAuth verdict is real rather than the provisional entry
   // registration leaves behind.
   async function copyExtensionProvider(
     modelRuntime: ModelRuntime,
     providerId: string,
   ): Promise<ExtensionProviderRegistration> {
-    if (!mainModelRegistry) return { providerId, kind: "none" };
-    let registration: ExtensionProviderRegistration;
-    try {
-      const nativeProvider = mainModelRegistry.getRegisteredNativeProvider(providerId);
-      if (nativeProvider) {
-        registration = {
-          providerId,
-          kind: "native",
-          registration: nativeProvider,
-        };
-        modelRuntime.registerNativeProvider(nativeProvider);
-      } else {
-        const config = mainModelRegistry.getRegisteredProviderConfig(providerId);
-        if (!config) return { providerId, kind: "none" };
-        registration = {
-          providerId,
-          kind: "config",
-          registration: config,
-        };
-        modelRuntime.registerProvider(providerId, config);
+    let registration: ExtensionProviderRegistration = { providerId, kind: "none" };
+    if (mainModelRegistry) {
+      try {
+        const nativeProvider = mainModelRegistry.getRegisteredNativeProvider(providerId);
+        if (nativeProvider) {
+          registration = {
+            providerId,
+            kind: "native",
+            registration: nativeProvider,
+          };
+          modelRuntime.registerNativeProvider(nativeProvider);
+        } else {
+          const config = mainModelRegistry.getRegisteredProviderConfig(providerId);
+          if (config) {
+            registration = {
+              providerId,
+              kind: "config",
+              registration: config,
+            };
+            modelRuntime.registerProvider(providerId, config);
+          }
+        }
+      } catch (error) {
+        throw new ExtensionProviderResolutionError(
+          `extension-provider registration failed for ${providerId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
-    } catch (error) {
-      throw new ExtensionProviderResolutionError(
-        `extension-provider registration failed for ${providerId}: ${error instanceof Error ? error.message : String(error)}`,
-      );
     }
     const controller = new AbortController();
     try {
@@ -832,16 +837,9 @@ export default function (pi: ExtensionAPI) {
   async function availableBranchModelLabels(
     models: readonly { provider: string; id: string }[],
   ): Promise<string[]> {
-    let registeredProviderIds: readonly string[] = [];
-    if (mainModelRegistry) {
-      try {
-        registeredProviderIds = mainModelRegistry.getRegisteredProviderIds();
-      } catch {}
-    }
-    const registered = new Set(registeredProviderIds);
+    let firstFailure: unknown;
     const providerRuntimes = new Map<string, Promise<ModelRuntime | null>>();
     for (const providerId of new Set(models.map((model) => model.provider))) {
-      if (!registered.has(providerId)) continue;
       providerRuntimes.set(
         providerId,
         (async () => {
@@ -849,24 +847,27 @@ export default function (pi: ExtensionAPI) {
             const modelRuntime = await createExtensionProviderRuntime();
             await copyExtensionProvider(modelRuntime, providerId);
             return modelRuntime;
-          } catch {
+          } catch (error) {
+            firstFailure ??= error;
             return null;
           }
         })(),
       );
     }
-    const needsStockRuntime = models.some((model) => !registered.has(model.provider));
-    const stockRuntime = needsStockRuntime ? await createExtensionProviderRuntime() : null;
-    const labels = await Promise.all(
-      models.map(async (model) => {
-        const modelRuntime = registered.has(model.provider)
-          ? await providerRuntimes.get(model.provider)
-          : stockRuntime;
-        return modelRuntime?.getModel(model.provider, model.id) && modelRuntime.hasConfiguredAuth(model.provider)
-          ? modelLabel(model)
-          : null;
-      }),
+    const settledRuntimes = new Map(
+      await Promise.all(
+        [...providerRuntimes].map(async ([providerId, modelRuntime]) => [providerId, await modelRuntime] as const),
+      ),
     );
+    if (settledRuntimes.size > 0 && [...settledRuntimes.values()].every((modelRuntime) => modelRuntime === null)) {
+      throw firstFailure;
+    }
+    const labels = models.map((model) => {
+      const modelRuntime = settledRuntimes.get(model.provider);
+      return modelRuntime?.getModel(model.provider, model.id) && modelRuntime.hasConfiguredAuth(model.provider)
+        ? modelLabel(model)
+        : null;
+    });
     return labels.filter((label): label is string => label !== null);
   }
 
@@ -979,6 +980,30 @@ export default function (pi: ExtensionAPI) {
     const resolved = await resolveBranchModel(mainModel.provider, mainModel.id);
     if (!resolved.ok) throw new ExtensionProviderResolutionError(resolved.reason);
     return resolved.selection;
+  }
+
+  async function guardEffectiveDefaultBranchModel(session: AgentSession): Promise<PinnedBranchModel> {
+    const selected = session.model as BranchModel | undefined;
+    if (!selected) {
+      throw new ExtensionProviderResolutionError("Pi selected no effective model for the supervision branch");
+    }
+    const modelRuntime = session.modelRuntime;
+    const providerRegistration = await copyExtensionProvider(modelRuntime, selected.provider);
+    const model = modelRuntime.getModel(selected.provider, selected.id) as BranchModel | undefined;
+    if (!model) {
+      throw new ExtensionProviderResolutionError(
+        `${selected.provider}/${selected.id} is unavailable to the isolated branch runtime`,
+      );
+    }
+    if (!modelRuntime.hasConfiguredAuth(selected.provider)) {
+      throw new ExtensionProviderResolutionError(
+        `${selected.provider}/${selected.id} has no configured credentials in the isolated branch runtime`,
+      );
+    }
+    guardExtensionProviderStreamSimple(modelRuntime, providerRegistration, model);
+    const guardedModel = (modelRuntime.getModel(selected.provider, selected.id) as BranchModel | undefined) ?? model;
+    await session.setModel(guardedModel);
+    return { model: guardedModel, modelRuntime, providerRegistration };
   }
 
   async function effectiveBranchModel(selected: BranchModel | undefined): Promise<BranchModel | undefined> {
@@ -1368,7 +1393,7 @@ export default function (pi: ExtensionAPI) {
     // start opens, and the reopen after a model or effort change inside one
     // session - so resolving the model and the effort here is what makes the
     // captain's current choices authoritative on all of them.
-    const pinned = await branchModelSelection();
+    let pinned = await branchModelSelection();
     const effort = branchEffortSelection(pinned?.model);
     const prompt = await runCommandAsync("bash", [promptScript], {
       cwd: fmRoot,
@@ -1483,6 +1508,16 @@ ${context.command}
       ...(pinned ? { model: pinned.model, modelRuntime: pinned.modelRuntime } : {}),
       ...(effort === undefined ? {} : { thinkingLevel: effort }),
     });
+    if (!pinned) {
+      try {
+        pinned = await guardEffectiveDefaultBranchModel(created.session);
+      } catch (error) {
+        try {
+          created.session.dispose();
+        } catch {}
+        throw error;
+      }
+    }
     if (!(await actingAsOwner(branchGeneration))) {
       try {
         created.session.dispose();
@@ -1500,7 +1535,7 @@ ${context.command}
     return {
       session: created.session,
       sessionManager,
-      ...(pinned ? { providerRegistration: pinned.providerRegistration } : {}),
+      providerRegistration: pinned.providerRegistration,
       watchProviderRegistrationMismatch: (listener) => {
         providerRegistrationMismatchListener = listener;
         return () => {
