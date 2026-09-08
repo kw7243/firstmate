@@ -1,0 +1,12 @@
+not ok - header auth resolution must recheck registration kind and composition: file:///home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M20VSY1MN7GT9HEQQJP3T0DA/[eval1]:74
+    throw new Error(`${label} did not fail closed at the header boundary: ${String(failure)}`);
+          ^
+
+Error: registration kind changes during auth resolution did not fail closed at the header boundary: Error: supervision branch prompt settled but produced no durable outcome for its claimed wake rows
+    at runRace (file:///home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M20VSY1MN7GT9HEQQJP3T0DA/[eval1]:74:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M20VSY1MN7GT9HEQQJP3T0DA/[eval1]:85:1
+
+Node.js v24.18.0: expected exit 0, got 1
+expected_before_fix_exit=nonzero
+actual_before_fix_exit=1
