@@ -2143,7 +2143,7 @@ ${context.command}
   });
 
   // Step one of /supervision-model's dialog. Pi's generic extension selector
-  // renders every option at once with no search box, so a real eligible
+  // renders every option at once with no search box, so a full reported
   // catalog ran off the top of the terminal; this shows the same rows through
   // Pi's own SelectList - the bounded, scrolling primitive behind Pi's /model
   // picker - with Pi's own Input and fuzzy filter above it for search.

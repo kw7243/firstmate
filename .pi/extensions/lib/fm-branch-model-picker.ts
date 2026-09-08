@@ -31,8 +31,8 @@ export const BRANCH_PICKER_MAX_VISIBLE = 10;
 export const FOLLOW_MAIN_VALUE = "\0follow-main";
 
 /**
- * Builds the picker's rows: "follow main" first, then the eligible models in
- * the order the caller resolved them. The current choice is marked so the
+ * Builds the picker's rows: "follow main" first, then the catalog models in
+ * the order Pi reported them. The current choice is marked so the
  * captain can see what is pinned without leaving the dialog.
  */
 export function buildBranchModelItems(
