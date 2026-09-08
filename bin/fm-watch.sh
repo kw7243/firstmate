@@ -737,11 +737,7 @@ EOF
     episode_alerted=0
     if [ -e "$marker" ] || [ -L "$marker" ]; then
       [ -f "$marker" ] && [ ! -L "$marker" ] || return 1
-      if [ "$(cat "$marker" 2>/dev/null || true)" = "$row_key" ]; then
-        episode_alerted=1
-      else
-        rm -f "$marker" || return 1
-      fi
+      episode_alerted=1
     fi
     progress=$(cat "$progress_marker" 2>/dev/null || true)
     observed_at=${progress%%[[:space:]]*}
