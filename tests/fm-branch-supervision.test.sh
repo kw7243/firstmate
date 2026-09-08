@@ -805,6 +805,62 @@ test_release_actor_drops_only_that_actors_leases() {
   pass "release commands authorize the caller and bulk release drops only that actor's leases"
 }
 
+test_old_generation_cleanup_cannot_delete_same_pid_replacement() {
+  local home fakebin real_sleep lock_holder_pid cleanup_pid cleanup_status generation
+  local -x PI_CODING_AGENT=true
+  home="$TMP_ROOT/release-generation-home"
+  fakebin="$home/fakebin"
+  real_sleep=$(command -v sleep)
+  mkdir -p "$home/state" "$fakebin"
+  cat > "$fakebin/sleep" <<'SH'
+#!/bin/sh
+: > "$FM_TEST_CLEANUP_WAITING"
+while [ ! -e "$FM_TEST_RELEASE_CLEANUP" ]; do "$FM_TEST_REAL_SLEEP" 0.01; done
+SH
+  chmod +x "$fakebin/sleep"
+  printf '%s\n' "$$" > "$home/state/.lock"
+  FM_HOME="$home" FM_SUPERVISION_ACTOR=branch FM_LEASE_HOLDER_PID=$$ FM_LEASE_GENERATION=old-generation \
+    "$ROOT/bin/fm-lease.sh" claim task-generation --actor branch || fail "old-generation claim failed"
+
+  STATE="$home/state" FM_TEST_READY="$home/lock-ready" FM_TEST_RELEASE="$home/lock-release" \
+    bash -c '
+      . "$1"
+      fm_lock_acquire_wait "$STATE/.fm-lease-command.lock"
+      trap '\''fm_lock_release "$STATE/.fm-lease-command.lock"'\'' EXIT
+      : > "$FM_TEST_READY"
+      while [ ! -e "$FM_TEST_RELEASE" ]; do sleep 0.01; done
+    ' _ "$ROOT/bin/fm-wake-lib.sh" &
+  lock_holder_pid=$!
+  for _ in $(seq 1 250); do
+    [ -e "$home/lock-ready" ] && break
+    sleep 0.01
+  done
+  [ -e "$home/lock-ready" ] || fail "lease-lock holder did not start"
+
+  PATH="$fakebin:$PATH" FM_HOME="$home" FM_SUPERVISION_ACTOR=branch \
+    FM_TEST_CLEANUP_WAITING="$home/cleanup-waiting" FM_TEST_RELEASE_CLEANUP="$home/release-cleanup" \
+    FM_TEST_REAL_SLEEP="$real_sleep" \
+    "$ROOT/bin/fm-lease.sh" release-actor --actor branch --holder-pid $$ --generation old-generation &
+  cleanup_pid=$!
+  for _ in $(seq 1 250); do
+    [ -e "$home/cleanup-waiting" ] && break
+    sleep 0.01
+  done
+  [ -e "$home/cleanup-waiting" ] || fail "old-generation cleanup did not block on the lease lock"
+  : > "$home/lock-release"
+  wait "$lock_holder_pid" || fail "lease-lock holder fixture failed"
+
+  FM_HOME="$home" FM_SUPERVISION_ACTOR=branch FM_LEASE_HOLDER_PID=$$ FM_LEASE_GENERATION=new-generation \
+    "$ROOT/bin/fm-lease.sh" claim task-generation --actor branch || fail "replacement-generation claim failed"
+  : > "$home/release-cleanup"
+  wait "$cleanup_pid"; cleanup_status=$?
+  [ "$cleanup_status" -eq 0 ] || fail "old-generation cleanup exited $cleanup_status"
+  [ -e "$home/state/.lease-task-generation" ] || fail "old cleanup deleted the same-pid replacement lease"
+  generation=$(cut -f4 "$home/state/.lease-task-generation")
+  [ "$generation" = new-generation ] || fail "replacement lease generation changed: $generation"
+  pass "old generation cleanup preserves a same-pid replacement lease"
+}
+
 # --- role-partition refinements ----------------------------------------------
 
 test_branch_cannot_force_teardown_or_directly_relaunch() {
@@ -856,4 +912,5 @@ test_guard_stale_clear_cannot_delete_a_new_claim
 test_guard_holds_exclusivity_through_mutation
 test_claim_refuses_the_other_actors_name_loudly
 test_release_actor_drops_only_that_actors_leases
+test_old_generation_cleanup_cannot_delete_same_pid_replacement
 test_branch_cannot_force_teardown_or_directly_relaunch

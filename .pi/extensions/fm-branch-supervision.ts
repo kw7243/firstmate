@@ -78,7 +78,7 @@ import {
   getAgentDir,
   keyHint,
   ModelRuntime,
-  type ModelRegistry,
+  ModelRegistry,
   SessionManager,
   SettingsManager,
   ToolExecutionComponent,
@@ -274,7 +274,7 @@ function settledPromptProviderError(sessionManager: SessionManager, entryOffset:
 // surface Pi already hands this extension.
 type BranchModel = NonNullable<ReturnType<ModelRuntime["getModel"]>>;
 type BranchEffort = ReturnType<NonNullable<ExtensionAPI["getThinkingLevel"]>>;
-type ExtensionProviderRegistration = { providerId: string };
+type ExtensionProviderRegistration = { providerId: string; modelId: string; compositionDigest: string };
 type PinnedBranchModel = {
   model: BranchModel;
   modelRuntime: ModelRuntime;
@@ -605,6 +605,7 @@ export default function (pi: ExtensionAPI) {
     generation: number;
     selectionRevision: number;
     leaseHolderPid: string;
+    leaseGeneration: string;
     providerRegistration: ExtensionProviderRegistration;
     watchProviderRegistrationMismatch: (listener: (error: Error) => void) => () => void;
   };
@@ -629,6 +630,7 @@ export default function (pi: ExtensionAPI) {
   // Bumps at every session replacement so a stale chain continuation from the
   // prior generation cannot act into the new one.
   let generation = 0;
+  let leaseGeneration = randomUUID();
   // One-time per-generation activation work (marker write + stray branch
   // lease cleanup); ownership itself is re-read lazily at every boundary.
   let activatedGeneration = -1;
@@ -797,14 +799,13 @@ export default function (pi: ExtensionAPI) {
 
   async function prepareExtensionProviderRuntime(
     providerId: string,
-  ): Promise<{ modelRuntime: ModelRuntime; providerRegistration: ExtensionProviderRegistration }> {
+  ): Promise<ModelRuntime> {
     if (extensionProviderRegistrationKind(providerId)) {
       throw new ExtensionProviderResolutionError(
         `Pi ${VERSION} exposes no provider-scoped registration boundary for extension provider ${providerId}`,
       );
     }
     const modelRuntime = await createExtensionProviderRuntime();
-    const providerRegistration = { providerId };
     const controller = new AbortController();
     try {
       const result = await withExtensionProviderDeadline(
@@ -824,63 +825,98 @@ export default function (pi: ExtensionAPI) {
         `extension-provider availability refresh failed for ${providerId}: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
-    return { modelRuntime, providerRegistration };
+    return modelRuntime;
   }
 
-  async function availableBranchModelLabels(
-    models: readonly { provider: string; id: string }[],
-  ): Promise<string[]> {
-    let firstFailure: unknown;
-    const providerRuntimes = new Map<string, Promise<ModelRuntime | null>>();
-    for (const providerId of new Set(models.map((model) => model.provider))) {
-      providerRuntimes.set(
-        providerId,
-        (async () => {
-          try {
-            const { modelRuntime } = await prepareExtensionProviderRuntime(providerId);
-            return modelRuntime;
-          } catch (error) {
-            firstFailure ??= error;
-            return null;
-          }
-        })(),
+  function stableProviderComposition(value: unknown, seen = new Set<object>()): string {
+    if (value === null) return "null";
+    if (typeof value === "function") return `function:${Function.prototype.toString.call(value)}`;
+    if (typeof value === "undefined") return "undefined";
+    if (typeof value === "bigint") return `bigint:${value.toString()}`;
+    if (typeof value === "symbol") return `symbol:${String(value.description ?? "")}`;
+    if (typeof value !== "object") return `${typeof value}:${JSON.stringify(value)}`;
+    if (seen.has(value)) throw new ExtensionProviderResolutionError("provider composition contains a cycle");
+    seen.add(value);
+    let serialized: string;
+    if (Array.isArray(value)) {
+      serialized = `[${value.map((item) => stableProviderComposition(item, seen)).join(",")}]`;
+    } else {
+      const record = value as Record<string, unknown>;
+      serialized = `{${Object.keys(record)
+        .sort()
+        .map((key) => `${JSON.stringify(key)}:${stableProviderComposition(record[key], seen)}`)
+        .join(",")}}`;
+    }
+    seen.delete(value);
+    return serialized;
+  }
+
+  async function captureProviderComposition(
+    registry: ModelRegistry,
+    providerId: string,
+    modelId: string,
+  ): Promise<ExtensionProviderRegistration> {
+    const model = registry.find(providerId, modelId);
+    const provider = registry.getProvider(providerId);
+    if (!model || !provider) {
+      throw new ExtensionProviderResolutionError(`${providerId}/${modelId} has no effective provider composition`);
+    }
+    const requestAuth = await withExtensionProviderDeadline(
+      registry.getApiKeyAndHeaders(model),
+      "request-auth resolution",
+      () => undefined,
+    );
+    if (!requestAuth.ok) {
+      throw new ExtensionProviderResolutionError(
+        `request-auth resolution failed for ${providerId}/${modelId}: ${requestAuth.error}`,
       );
     }
-    const settledRuntimes = new Map(
-      await Promise.all(
-        [...providerRuntimes].map(async ([providerId, modelRuntime]) => [providerId, await modelRuntime] as const),
-      ),
-    );
-    if (settledRuntimes.size > 0 && [...settledRuntimes.values()].every((modelRuntime) => modelRuntime === null)) {
-      throw firstFailure;
-    }
-    const labels = models.map((model) => {
-      const modelRuntime = settledRuntimes.get(model.provider);
-      return modelRuntime?.getModel(model.provider, model.id) && modelRuntime.hasConfiguredAuth(model.provider)
-        ? modelLabel(model)
-        : null;
-    });
-    return labels.filter((label): label is string => label !== null);
+    const providerRecord = provider as unknown as Record<string, unknown>;
+    const composition = {
+      model,
+      requestAuth,
+      provider: {
+        id: providerRecord.id,
+        name: providerRecord.name,
+        baseUrl: providerRecord.baseUrl,
+        headers: providerRecord.headers,
+        stream: providerRecord.stream,
+        streamSimple: providerRecord.streamSimple,
+        fetchDeferred: providerRecord.fetchDeferred,
+        cancelDeferred: providerRecord.cancelDeferred,
+      },
+    };
+    return {
+      providerId,
+      modelId,
+      compositionDigest: createHash("sha256").update(stableProviderComposition(composition)).digest("hex"),
+    };
   }
 
-  function extensionProviderRegistrationIsCurrent(snapshot: ExtensionProviderRegistration): boolean {
-    if (!mainModelRegistry) return true;
+  async function extensionProviderRegistrationIsCurrent(snapshot: ExtensionProviderRegistration): Promise<boolean> {
+    if (!mainModelRegistry) return false;
     try {
-      return !mainModelRegistry.getRegisteredNativeProvider(snapshot.providerId)
-        && !mainModelRegistry.getRegisteredProviderConfig(snapshot.providerId);
+      if (
+        mainModelRegistry.getRegisteredNativeProvider(snapshot.providerId) ||
+        mainModelRegistry.getRegisteredProviderConfig(snapshot.providerId)
+      ) {
+        return false;
+      }
+      const current = await captureProviderComposition(mainModelRegistry, snapshot.providerId, snapshot.modelId);
+      return current.compositionDigest === snapshot.compositionDigest;
     } catch {
       return false;
     }
   }
 
-  function extensionProviderRegistrationMismatch(snapshot: ExtensionProviderRegistration): Error | null {
-    if (extensionProviderRegistrationIsCurrent(snapshot)) return null;
+  async function extensionProviderRegistrationMismatch(snapshot: ExtensionProviderRegistration): Promise<Error | null> {
+    if (await extensionProviderRegistrationIsCurrent(snapshot)) return null;
     return new Error(`supervision branch provider registration changed before request for ${snapshot.providerId}`);
   }
 
   async function resolveBranchModel(provider: string, modelId: string): Promise<BranchModelResolution> {
     const label = `${provider}/${modelId}`;
-    const { modelRuntime, providerRegistration } = await prepareExtensionProviderRuntime(provider);
+    const modelRuntime = await prepareExtensionProviderRuntime(provider);
     const model = modelRuntime.getModel(provider, modelId) as BranchModel | undefined;
     if (!model) {
       const reason = `${label} is unavailable to the isolated branch runtime`;
@@ -890,6 +926,7 @@ export default function (pi: ExtensionAPI) {
       const reason = `${label} has no configured credentials in the isolated branch runtime`;
       return { ok: false, reason };
     }
+    const providerRegistration = await captureProviderComposition(new ModelRegistry(modelRuntime), provider, modelId);
     return {
       ok: true,
       selection: {
@@ -1030,11 +1067,17 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
-  async function releaseBranchLeases(expectedGeneration: number, holderPid?: string): Promise<boolean> {
+  async function releaseBranchLeases(
+    expectedGeneration: number,
+    holderPid?: string,
+    expectedLeaseGeneration?: string,
+  ): Promise<boolean> {
     if (!(await generationOwnsLock(expectedGeneration))) return false;
     if (holderPid && ownedLockPid !== holderPid) return false;
+    if (expectedLeaseGeneration && expectedLeaseGeneration !== leaseGeneration) return false;
     const args = [leaseScript, "release-actor", "--actor", "branch"];
     if (holderPid) args.push("--holder-pid", holderPid);
+    if (expectedLeaseGeneration) args.push("--generation", expectedLeaseGeneration);
     const result = await runCommandAsync("bash", args, {
       cwd: fmRoot,
       env: { ...scriptEnv, FM_SUPERVISION_ACTOR: "branch" },
@@ -1354,6 +1397,7 @@ export default function (pi: ExtensionAPI) {
     session: AgentSession;
     sessionManager: SessionManager;
     leaseHolderPid: string;
+    leaseGeneration: string;
     providerRegistration: ExtensionProviderRegistration;
     watchProviderRegistrationMismatch: (listener: (error: Error) => void) => () => void;
   }> {
@@ -1414,8 +1458,8 @@ export default function (pi: ExtensionAPI) {
         {
           name: "fm-branch-cache-key",
           factory: (branchPi: ExtensionAPI) => {
-            branchPi.on("before_provider_headers", (_event, ctx) => {
-              const providerRegistrationMismatch = extensionProviderRegistrationMismatch(providerRegistration);
+            branchPi.on("before_provider_headers", async (_event, ctx) => {
+              const providerRegistrationMismatch = await extensionProviderRegistrationMismatch(providerRegistration);
               if (providerRegistrationMismatch) {
                 providerRegistrationMismatchListener?.(providerRegistrationMismatch);
                 ctx.abort();
@@ -1438,6 +1482,7 @@ export default function (pi: ExtensionAPI) {
     await loader.reload();
     if (!(await actingAsOwner(branchGeneration))) throw new Error("supervision session was replaced or lost lock ownership");
     const leaseHolderPid = ownedLockPid;
+    const branchLeaseGeneration = leaseGeneration;
     const bashTool = createBashToolDefinition(fmRoot, {
       spawnHook: (context) => {
         // Activation has always already happened by the time the branch can
@@ -1453,7 +1498,7 @@ export default function (pi: ExtensionAPI) {
           // accidental in-shell reassignment fails loudly instead of silently
           // impersonating main. Confused-agent-grade by design; the threat
           // model lives in bin/fm-lease-lib.sh.
-          command: `readonly FM_SUPERVISION_ACTOR FM_LEASE_HOLDER_PID
+          command: `readonly FM_SUPERVISION_ACTOR FM_LEASE_HOLDER_PID FM_LEASE_GENERATION
 (
 ${context.command}
 )`,
@@ -1462,6 +1507,7 @@ ${context.command}
             ...scriptEnv,
             FM_SUPERVISION_ACTOR: "branch",
             FM_LEASE_HOLDER_PID: leaseHolderPid,
+            FM_LEASE_GENERATION: branchLeaseGeneration,
           },
         };
       },
@@ -1511,6 +1557,7 @@ ${context.command}
       session: created.session,
       sessionManager,
       leaseHolderPid,
+      leaseGeneration: branchLeaseGeneration,
       providerRegistration,
       watchProviderRegistrationMismatch: (listener) => {
         providerRegistrationMismatchListener = listener;
@@ -1524,7 +1571,7 @@ ${context.command}
   async function ensureBranch(expectedGeneration: number, recoveryProbe = false): Promise<BranchSession> {
     if (!(await actingAsOwner(expectedGeneration))) throw new Error("supervision session was replaced or lost lock ownership");
     if (branchBroken && !(recoveryProbe && providerRecovery?.probeInFlight)) throw new Error(branchBroken);
-    if (branch && !extensionProviderRegistrationIsCurrent(branch.providerRegistration)) {
+    if (branch && !(await extensionProviderRegistrationIsCurrent(branch.providerRegistration))) {
       const stale = branch;
       branch = null;
       try {
@@ -1542,11 +1589,12 @@ ${context.command}
           } catch {}
           continue;
         }
-        if (!extensionProviderRegistrationIsCurrent(created.providerRegistration)) {
+        const providerRegistrationMismatch = await extensionProviderRegistrationMismatch(created.providerRegistration);
+        if (providerRegistrationMismatch) {
           try {
             created.session.dispose();
           } catch {}
-          continue;
+          throw providerRegistrationMismatch;
         }
         if (!(await actingAsOwner(expectedGeneration))) {
           try {
@@ -1598,7 +1646,7 @@ ${context.command}
 
   function enqueueWake(message: string, acceptedGeneration: number, recoveryProbe = false): Promise<void> {
     const acceptedSelectionRevision = branchSelectionRevision;
-    let failedTurnLeaseHolderPid = "";
+    let providerFallbackLease: { holderPid: string; leaseGeneration: string } | null = null;
     const delivery = branchChain
       .then(async () => {
         if (shuttingDown || acceptedGeneration !== generation) {
@@ -1618,7 +1666,6 @@ ${context.command}
           throw new Error("could not reconcile unread supervision outcomes into main");
         }
         const branchForWake = await ensureBranch(acceptedGeneration, recoveryProbe);
-        failedTurnLeaseHolderPid = branchForWake.leaseHolderPid;
         const { session, sessionManager } = branchForWake;
         await flushMirror(session, acceptedGeneration);
         if (!(await actingAsOwner(acceptedGeneration))) throw new Error("supervision session no longer owns the fleet lock");
@@ -1669,6 +1716,10 @@ ${context.command}
             );
           const promptOutcome = await Promise.race([prompt, providerRegistrationMismatch]);
           if (promptOutcome.kind === "mismatch") {
+            providerFallbackLease = {
+              holderPid: branchForWake.leaseHolderPid,
+              leaseGeneration: branchForWake.leaseGeneration,
+            };
             invalidateProviderMismatchedBranch(branchForWake);
             throw promptOutcome.error;
           }
@@ -1679,6 +1730,10 @@ ${context.command}
         }
         const providerError = settledPromptProviderError(sessionManager, entryOffset);
         if (providerError) {
+          providerFallbackLease = {
+            holderPid: branchForWake.leaseHolderPid,
+            leaseGeneration: branchForWake.leaseGeneration,
+          };
           const detail = `supervision branch provider failed after construction: ${providerError}`;
           if (
             branchForWake.generation === generation &&
@@ -1697,8 +1752,12 @@ ${context.command}
         }
       })
       .catch(async (error: unknown) => {
-        if (failedTurnLeaseHolderPid) {
-          await releaseBranchLeases(acceptedGeneration, failedTurnLeaseHolderPid);
+        if (providerFallbackLease) {
+          await releaseBranchLeases(
+            acceptedGeneration,
+            providerFallbackLease.holderPid,
+            providerFallbackLease.leaseGeneration,
+          );
         }
         await releaseEligibleRowsSnapshot(state, wakeGrantScript, String(acceptedGeneration));
         throw error;
@@ -1887,6 +1946,7 @@ ${context.command}
     branchBroken = "";
     consecutiveProviderErrors = 0;
     providerRecovery = null;
+    leaseGeneration = randomUUID();
     generation += 1;
     mirrorCollection.collectAnchor = null;
     mirrorCollection.pendingCursor = null;
@@ -1934,6 +1994,7 @@ ${context.command}
     // new from being accepted while the release runs.
     const closingGeneration = generation;
     shuttingDown = true;
+    leaseGeneration = randomUUID();
     generation += 1;
     processing = null;
     pendingMirror.length = 0;
@@ -1955,7 +2016,7 @@ ${context.command}
   // Pi keeps /model and its own thinking selector for the captain's own
   // conversation and exposes no hook an extension can use to open either
   // picker, so this is the smallest supported equivalent: Pi's own catalog
-  // intersected with the isolated branch runtime, then Pi's own supported
+  // followed by selected-value preparation, then Pi's own supported
   // thinking levels for the model just chosen, with no parallel Firstmate
   // model or effort list. The model step shows that catalog through the same
   // bounded, searchable SelectList primitive Pi's own /model dialog scrolls
@@ -1971,13 +2032,13 @@ ${context.command}
       const followMain = `Follow main${ctx.model ? ` (${modelLabel(ctx.model)})` : ""}`;
       let available: string[];
       try {
-        available = await availableBranchModelLabels(ctx.modelRegistry.getAvailable());
+        available = ctx.modelRegistry.getAvailable().map(modelLabel);
       } catch (error) {
         ctx.ui.notify(
           `Could not read the supervision branch models: ${error instanceof Error ? error.message : String(error)}`,
-          "error",
+          "warning",
         );
-        return;
+        available = [];
       }
       const picked = await pickBranchModel(
         ctx,
@@ -2073,7 +2134,7 @@ ${context.command}
   // handler writes the captain's default model through Pi's settings manager,
   // which would move main's conversation as a side effect of pinning the
   // branch, and it has no room for the "follow main" row or for Firstmate's
-  // branch-runtime eligibility filter. Ordering and filtering live in
+  // branch-only selection state. Ordering and search filtering live in
   // lib/fm-branch-model-picker.ts; everything here is Pi's own rendering.
   // Returns the chosen item's value, or undefined when the captain cancels.
   // Non-TUI modes have no custom component surface, so they keep Pi's generic

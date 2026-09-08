@@ -12,7 +12,7 @@
 # actor while it exists.
 #
 # CONTRACT.
-#   - Lease file: $STATE/.lease-<task>, one line "<actor>\t<pid>\t<epoch>".
+#   - Lease file: $STATE/.lease-<task>, one line "<actor>\t<pid>\t<epoch>[\t<generation>]".
 #     Written atomically (temp + ln for claim, temp + mv for a same-actor
 #     refresh), with inspection and mutation serialized by the home-local
 #     lease-command lock; leases never coordinate across firstmate homes.
@@ -30,7 +30,9 @@
 #     Pi session goes stale even if its pid was recycled by an unrelated
 #     process, and a non-Pi home never honors a leftover Pi lease. A lease held by the
 #     live current session but an abandoned branch conversation is recovered
-#     by the branch extension's generation-activation cleanup.
+#     by the branch extension's generation-activation cleanup. Branch claims
+#     carry the current conversation generation so failed-turn cleanup cannot
+#     delete a same-process replacement conversation's lease.
 #
 # THREAT MODEL (deliberate, captain-decided): these guards are
 # CONFUSED-AGENT-GRADE, the same grade bin/fm-gate-refuse-lib.sh documents
@@ -107,7 +109,8 @@ fm_lease_path() {
 }
 
 # fm_lease_read <task>: read the lease into FM_LEASE_ACTOR/FM_LEASE_PID/
-# FM_LEASE_EPOCH. Returns 1 when no lease file exists. A malformed lease
+# FM_LEASE_EPOCH/FM_LEASE_RECORD_GENERATION. Returns 1 when no lease file
+# exists. A malformed lease
 # (unreadable actor or pid) reads as actor "" so callers treat it as stale
 # rather than blocking forever on a torn record.
 fm_lease_read() {
@@ -116,18 +119,24 @@ fm_lease_read() {
   FM_LEASE_ACTOR=
   FM_LEASE_PID=
   FM_LEASE_EPOCH=
+  FM_LEASE_RECORD_GENERATION=
   [ -e "$file" ] || return 1
   IFS= read -r line < "$file" 2>/dev/null || line=
   FM_LEASE_ACTOR=$(printf '%s' "$line" | cut -f1)
   FM_LEASE_PID=$(printf '%s' "$line" | cut -f2)
   # shellcheck disable=SC2034 # Consumed by sourcing callers (bin/fm-lease.sh check).
   FM_LEASE_EPOCH=$(printf '%s' "$line" | cut -f3)
+  # shellcheck disable=SC2034 # Consumed by sourcing callers (bin/fm-lease.sh release-actor).
+  FM_LEASE_RECORD_GENERATION=$(printf '%s' "$line" | cut -f4)
   case "$FM_LEASE_ACTOR" in
     main|branch) ;;
     *) FM_LEASE_ACTOR= ;;
   esac
   case "$FM_LEASE_PID" in
     '' | *[!0-9]*) FM_LEASE_PID= ;;
+  esac
+  case "$FM_LEASE_RECORD_GENERATION" in
+    *[!A-Za-z0-9._-]*) FM_LEASE_RECORD_GENERATION= ;;
   esac
   return 0
 }

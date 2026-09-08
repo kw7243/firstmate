@@ -52,14 +52,14 @@ A no-change heartbeat outcome explicitly reported with `task=fleet` and `silent=
 
 Supervision is an easier job than the captain's own conversation, so the branch can run on a cheaper model than main.
 It is also an easier job than the captain's own conversation needs reasoning for, so the branch can run at a shallower effort than main as well.
-The Pi `/supervision-model` command settles both in one flow: it opens a selector over the models that Pi reports with configured credentials and that this home's stored credentials let the isolated supervision branch resolve, plus a first "Follow main" entry, and then a second picker for the branch's reasoning effort.
+The Pi `/supervision-model` command settles both in one flow: it opens a selector over the full model catalog Pi already reports as available, plus a first "Follow main" entry, prepares only the selected provider, and then opens a second picker for the branch's reasoning effort.
 In Pi's terminal TUI, the model step uses Pi's bounded scrolling list with its input and fuzzy filtering primitives, the same list primitive Pi's `/model` picker scrolls: typing filters the entries, "Follow main" stays the first entry whenever it still matches, and a long catalog scrolls inside the dialog instead of running off the terminal.
 The non-TUI RPC, JSON, and print modes have no custom-component surface and keep Pi's generic selector without search, where terminal overflow does not apply.
 The effort list is a handful of levels and stays on Pi's plain selector dialog.
 Both picks change the supervision branch alone and never the captain's own conversation model or effort.
 It persists the model pick in gitignored `config/supervision-branch-model` and the effort pick in gitignored `config/supervision-branch-effort`, both under the effective Firstmate home, resolved from `FM_HOME`, then `FM_ROOT_OVERRIDE`, then the tracked code root derived from the extension path, or under `FM_CONFIG_OVERRIDE` when that test and specialized-setup override is present.
-Firstmate keeps no model catalog of its own; the list is the intersection of what Pi reports when the picker opens and what a fresh isolated branch runtime can run.
-A provider that exists only because an extension registered it inside the captain's session is omitted from the picker and falls safely back to main because supported Pi releases expose no public provider-scoped registration boundary.
+Firstmate keeps no model catalog of its own, and opening the picker neither constructs nor refreshes a provider runtime.
+A provider that exists only because an extension registered it inside the captain's session remains visible when Pi reports it, but selecting it fails safely before persistence because supported Pi releases expose no public provider-scoped registration boundary.
 Static Pi configuration, including model-specific headers, remains available through the isolated runtime without copying a live registration.
 Stored OAuth and API-key credentials retain their native credential type because Firstmate never copies, converts, installs, or overwrites credentials for the branch runtime.
 The file holds one `<provider>/<model-id>` line followed by one newline, split at the first `/` so a provider-qualified model id such as `openrouter/anthropic/claude-sonnet-4-5` survives intact.

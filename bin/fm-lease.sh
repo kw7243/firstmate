@@ -21,11 +21,12 @@
 #   fm-lease.sh check <task>
 #       Print "<actor> <pid> <epoch> <live|stale>" for a held lease, or
 #       nothing (exit 1) when the task is unleased.
-#   fm-lease.sh release-actor --actor main|branch [--holder-pid <pid>]
+#   fm-lease.sh release-actor --actor main|branch [--holder-pid <pid>] [--generation <token>]
 #       Drop every lease the named actor holds; the Pi branch extension runs
 #       this at generation activation so a replaced branch conversation's
 #       leases never outlive it. With --holder-pid, drop only leases matching
-#       that holder.
+#       that holder. With --generation, also require that exact branch
+#       conversation generation.
 #   fm-lease.sh sweep
 #       Remove every provably stale lease in this home. Run at session start
 #       (a lease held by a dead actor is cleared at session start); safe to
@@ -51,7 +52,7 @@ fm_lock_acquire_wait "$LEASE_COMMAND_LOCK"
 trap 'fm_lock_release "$LEASE_COMMAND_LOCK"' EXIT
 
 usage() {
-  echo "usage: fm-lease.sh claim|release <task> [--actor main|branch] | release-actor --actor main|branch [--holder-pid <pid>] | check <task> | sweep" >&2
+  echo "usage: fm-lease.sh claim|release <task> [--actor main|branch] | release-actor --actor main|branch [--holder-pid <pid>] [--generation <token>] | check <task> | sweep" >&2
   exit 2
 }
 
@@ -87,6 +88,8 @@ case "$CMD" in
     ACTOR=
     HOLDER_PID=
     HOLDER_PID_SET=0
+    GENERATION=
+    GENERATION_SET=0
     while [ "$#" -gt 0 ]; do
       case "$1" in
         --actor)
@@ -98,12 +101,22 @@ case "$CMD" in
           HOLDER_PID_SET=1
           shift 2 || usage
           ;;
+        --generation)
+          GENERATION=${2:-}
+          GENERATION_SET=1
+          shift 2 || usage
+          ;;
         *) usage ;;
       esac
     done
     case "$ACTOR" in main|branch) ;; *) usage ;; esac
     if [ "$HOLDER_PID_SET" = 1 ]; then
       case "$HOLDER_PID" in ""|0|1|*[!0-9]*) usage ;; esac
+    fi
+    if [ "$GENERATION_SET" = 1 ]; then
+      [ "$HOLDER_PID_SET" = 1 ] || usage
+      [ "$ACTOR" = branch ] || usage
+      fm_lease_valid_id "$GENERATION" || usage
     fi
     ;;
   sweep)
@@ -138,8 +151,15 @@ case "$CMD" in
       HOLDER_PID=$(head -n 1 "$STATE/.lock" 2>/dev/null | tr -cd '0-9' || true)
     fi
     [ -n "$HOLDER_PID" ] || HOLDER_PID=$$
+    LEASE_GENERATION=
+    if [ "$ACTOR" = branch ]; then LEASE_GENERATION=${FM_LEASE_GENERATION:-}; fi
+    [ -z "$LEASE_GENERATION" ] || fm_lease_valid_id "$LEASE_GENERATION" || usage
     TMP=$(mktemp "$STATE/.fm-lease-tmp.XXXXXX")
-    printf '%s\t%s\t%s\n' "$ACTOR" "$HOLDER_PID" "$(date +%s)" > "$TMP"
+    if [ -n "$LEASE_GENERATION" ]; then
+      printf '%s\t%s\t%s\t%s\n' "$ACTOR" "$HOLDER_PID" "$(date +%s)" "$LEASE_GENERATION" > "$TMP"
+    else
+      printf '%s\t%s\t%s\n' "$ACTOR" "$HOLDER_PID" "$(date +%s)" > "$TMP"
+    fi
     if [ -e "$LEASE" ]; then
       # Same-actor refresh, or a stale/torn record: replace atomically.
       mv -f -- "$TMP" "$LEASE"
@@ -151,7 +171,11 @@ case "$CMD" in
         exit "$FM_LEASE_REFUSE_EXIT"
       fi
       TMP=$(mktemp "$STATE/.fm-lease-tmp.XXXXXX")
-      printf '%s\t%s\t%s\n' "$ACTOR" "$HOLDER_PID" "$(date +%s)" > "$TMP"
+      if [ -n "$LEASE_GENERATION" ]; then
+        printf '%s\t%s\t%s\t%s\n' "$ACTOR" "$HOLDER_PID" "$(date +%s)" "$LEASE_GENERATION" > "$TMP"
+      else
+        printf '%s\t%s\t%s\n' "$ACTOR" "$HOLDER_PID" "$(date +%s)" > "$TMP"
+      fi
       mv -f -- "$TMP" "$LEASE"
     else
       rm -f -- "$TMP"
@@ -184,7 +208,8 @@ case "$CMD" in
       TASK=${LEASE##*/.lease-}
       fm_lease_valid_id "$TASK" || continue
       if fm_lease_read "$TASK" && [ "$FM_LEASE_ACTOR" = "$ACTOR" ] \
-        && { [ "$HOLDER_PID_SET" = 0 ] || [ "$FM_LEASE_PID" = "$HOLDER_PID" ]; }; then
+        && { [ "$HOLDER_PID_SET" = 0 ] || [ "$FM_LEASE_PID" = "$HOLDER_PID" ]; } \
+        && { [ "$GENERATION_SET" = 0 ] || [ "$FM_LEASE_RECORD_GENERATION" = "$GENERATION" ]; }; then
         rm -f -- "$LEASE"
       fi
     done

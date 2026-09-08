@@ -198,6 +198,18 @@ class StubModelRuntime {
   getProvider(provider) {
     return this.providers.get(provider);
   }
+  async getAuth(model) {
+    const headers = { ...(model.providerHeaders ?? {}), ...(model.headers ?? {}) };
+    return {
+      auth: {
+        apiKey: model.apiKey ?? `${model.provider}-stub-key`,
+        ...(Object.keys(headers).length > 0 ? { headers } : {}),
+        ...(model.authBaseUrl ? { baseUrl: model.authBaseUrl } : {}),
+      },
+      ...(model.authEnv ? { env: model.authEnv } : {}),
+      source: "stub",
+    };
+  }
   hasConfiguredAuth(provider) {
     return this.authenticated.has(provider);
   }
@@ -210,6 +222,29 @@ const realCodingAgent = process.env.FM_TEST_REAL_MODEL_RUNTIME === "1"
   : null;
 export const VERSION = realCodingAgent?.VERSION ?? process.env.FM_TEST_PI_VERSION ?? "0.85.1";
 export const ModelRuntime = realCodingAgent?.ModelRuntime ?? StubModelRuntime;
+class StubModelRegistry {
+  constructor(runtime) {
+    this.runtime = runtime;
+  }
+  find(provider, id) {
+    return this.runtime.getModel(provider, id);
+  }
+  getProvider(provider) {
+    return this.runtime.getProvider(provider);
+  }
+  async getApiKeyAndHeaders(model) {
+    const resolution = await this.runtime.getAuth(model);
+    if (!resolution) return { ok: true };
+    return {
+      ok: true,
+      apiKey: resolution.auth.apiKey,
+      headers: resolution.auth.headers,
+      ...(resolution.auth.baseUrl ? { baseUrl: resolution.auth.baseUrl } : {}),
+      env: resolution.env,
+    };
+  }
+}
+export const ModelRegistry = realCodingAgent?.ModelRegistry ?? StubModelRegistry;
 export class DefaultResourceLoader {
   constructor(options) {
     this.options = options;
@@ -591,8 +626,29 @@ globalThis.__fmBranchStaticModels = () => {
 };
 const modelRegistry = {
   getAvailable: () => registryModels.filter((model) => model.mainAvailable !== false).slice(),
-  find: (provider, id) => registryModels.find((model) => model.provider === provider && model.id === id),
+  find: (provider, id) =>
+    registryModels.find((model) => model.provider === provider && model.id === id) ??
+    (mainModel.provider === provider && mainModel.id === id ? mainModel : undefined),
   hasConfiguredAuth: (model) => model.mainAvailable !== false,
+  getProvider: (providerId) => {
+    const model = modelRegistry.find(providerId, mainModel.provider === providerId ? mainModel.id : "") ??
+      registryModels.find((candidate) => candidate.provider === providerId);
+    if (!model) return undefined;
+    return {
+      id: providerId,
+      streamSimple: (...args) => globalThis.__fmStockProviderStreamSimple?.(...args),
+    };
+  },
+  getApiKeyAndHeaders: async (model) => {
+    const headers = { ...(model.providerHeaders ?? {}), ...(model.headers ?? {}) };
+    return {
+      ok: true,
+      apiKey: model.apiKey ?? `${model.provider}-stub-key`,
+      headers: Object.keys(headers).length > 0 ? headers : undefined,
+      ...(model.authBaseUrl ? { baseUrl: model.authBaseUrl } : {}),
+      env: model.authEnv,
+    };
+  },
   getRegisteredProviderConfig: (providerId) => globalThis.__fmExtensionProviderConfigs?.get(providerId),
   getRegisteredNativeProvider: (providerId) => globalThis.__fmExtensionNativeProviders?.get(providerId),
   getRegisteredProviderIds: () => [
@@ -734,7 +790,9 @@ const pi = {
 // that awaits a subprocess must be allowed to finish before the driver
 // asserts on what it did.
 async function fire(event, payload, ctx) {
-  const eventCtx = ctx;
+  const eventCtx = event === "session_start"
+    ? { ...makeCtx({ model: undefined, sessionManager: mainSessionManager }), ...(ctx ?? {}) }
+    : ctx;
   if (eventCtx?.sessionManager) activeMainSession = eventCtx.sessionManager;
   for (const handler of piHandlers.get(event) ?? []) await handler(payload, eventCtx);
 }
@@ -833,6 +891,9 @@ const bashTool = session.options.customTools.find((tool) => tool.name === "bash"
 const hooked = bashTool.__options.spawnHook({ command: "true", cwd: "/x", env: { PATH: "/bin" } });
 if (hooked.env.FM_SUPERVISION_ACTOR !== "branch") throw new Error("branch bash does not inject the branch actor");
 if (hooked.env.FM_LEASE_HOLDER_PID !== String(process.ppid)) throw new Error("branch bash does not pin the verified session-lock holder pid");
+if (!/^[A-Za-z0-9._-]+$/.test(hooked.env.FM_LEASE_GENERATION ?? "")) {
+  throw new Error(`branch bash does not inject a valid lease generation: ${hooked.env.FM_LEASE_GENERATION}`);
+}
 
 // 3. Shared per-home prompt_cache_key: overrides only payloads that already
 // carry one, stable within the home.
@@ -1075,8 +1136,8 @@ test_requested_healthy_outcome_and_unsolicited_routine_outcome_delivery() {
   PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
-await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, sentToMain, mainEntries, outcomeScript, mainTools, home, realRoot }; })()`);
-const { fire, dispatch, settle, sentToMain, mainEntries, outcomeScript, mainTools, home, realRoot } = globalThis.__t;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, sentToMain, mainEntries, outcomeScript, mainTools, modelRegistry, home, realRoot }; })()`);
+const { fire, dispatch, settle, sentToMain, mainEntries, outcomeScript, mainTools, modelRegistry, home, realRoot } = globalThis.__t;
 import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
@@ -1162,6 +1223,7 @@ const requestedPrompts = [...longRequests, "FIRSTMATE give me a fresh system-res
 const entries = [];
 const mainCtx = {
   model: { provider: "anthropic", id: "main-model" },
+  modelRegistry,
   sessionManager: {
     getSessionFile: () => `${home}/main.jsonl`,
     getEntries: () => entries,
@@ -1571,8 +1633,9 @@ test_branch_cache_key_is_per_home_stable() {
     PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$1" FM_ROOT_OVERRIDE="$ROOT" \
       DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
-await eval(`(async () => { ${prelude}; globalThis.__t = { dispatch, settle }; })()`);
-const { dispatch, settle } = globalThis.__t;
+await eval(`(async () => { ${prelude}; globalThis.__t = { dispatch, fire, settle, defaultSessionCtx }; })()`);
+const { dispatch, fire, settle, defaultSessionCtx } = globalThis.__t;
+await fire("session_start", {}, defaultSessionCtx);
 dispatch("signal: cache probe");
 await settle(() => (globalThis.__fmPrompts ?? []).length === 1, "branch wake prompt");
 const loader = globalThis.__fmLoaders[0];
@@ -2069,6 +2132,114 @@ EOF
   pass "a settled branch turn without a durable outcome falls back and releases its grant for main replay"
 }
 
+test_failed_turn_lease_cleanup_is_provider_and_generation_exact() {
+  local repo home out status
+  repo="$TMP_ROOT/provider-lease-cleanup-root"
+  home="$TMP_ROOT/provider-lease-cleanup-home"
+  mkdir -p "$home/state" "$home/config"
+  install_pi_branch_extension_fixture "$repo"
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+const prelude = process.env.DRIVER_PRELUDE;
+await eval(`(async () => { ${prelude}; globalThis.__t = { bus, makeOffer, dispatch, fire, home, realRoot }; })()`);
+const { bus, makeOffer, dispatch, fire, home, realRoot } = globalThis.__t;
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+
+await fire("session_start", {});
+globalThis.__fmExecuteBranchBash = async (context) => {
+  const result = spawnSync("bash", ["-c", context.command], {
+    encoding: "utf8",
+    cwd: context.cwd,
+    env: context.env,
+  });
+  return {
+    content: [{ type: "text", text: `${result.stdout}${result.stderr}` }],
+    details: { stdout: result.stdout, stderr: result.stderr, exitCode: result.status },
+    isError: result.status !== 0,
+  };
+};
+function externalClaim(task, actor, generation) {
+  const result = spawnSync("bash", [`${realRoot}/bin/fm-lease.sh`, "claim", task, "--actor", actor], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      FM_HOME: home,
+      FM_STATE_OVERRIDE: `${home}/state`,
+      FM_ROOT_OVERRIDE: realRoot,
+      FM_SUPERVISION_ACTOR: actor,
+      FM_LEASE_HOLDER_PID: String(process.pid),
+      ...(generation ? { FM_LEASE_GENERATION: generation } : {}),
+    },
+  });
+  if (result.status !== 0) throw new Error(`could not claim ${task}: ${result.stderr}`);
+}
+let attempt = 0;
+globalThis.__fmOnBranchPrompt = async ({ session }) => {
+  attempt += 1;
+  const bash = session.options.customTools.find((tool) => tool.name === "bash");
+  const task = attempt === 1 ? "task-control" : "task-provider";
+  const claimed = await bash.execute(
+    `claim-${task}`,
+    { command: `bin/fm-lease.sh claim ${task} --actor branch` },
+    undefined,
+    undefined,
+    {},
+  );
+  if (claimed.isError) throw new Error(`branch claim failed for ${task}: ${JSON.stringify(claimed)}`);
+  if (attempt === 2) {
+    session.messages.push({
+      role: "assistant",
+      content: [],
+      stopReason: "error",
+      errorMessage: "synthetic provider failure",
+    });
+  }
+};
+
+const controlOffer = dispatch("signal: non-provider turn failure");
+const controlFailure = await controlOffer.settlement.then(() => null, (error) => error);
+if (!(controlFailure instanceof Error) || !controlFailure.message.includes("produced no durable outcome")) {
+  throw new Error(`the non-provider control did not fail as expected: ${String(controlFailure)}`);
+}
+const controlLease = `${home}/state/.lease-task-control`;
+if (!existsSync(controlLease)) throw new Error("a non-provider turn failure released its task lease");
+const currentGeneration = readFileSync(controlLease, "utf8").trim().split("\t")[3];
+if (!currentGeneration) throw new Error("the branch claim recorded no lease generation");
+
+writeFileSync(`${home}/state/.wake-queue`, "not-a-valid-wake-row\n");
+const corruptOffer = makeOffer("signal: corrupted queue control");
+bus.emit("fm-branch-supervision:dispatch", corruptOffer);
+const corruptFailure = await corruptOffer.settlement.then(() => null, (error) => error);
+if (!(corruptFailure instanceof Error) || !corruptFailure.message.includes("could not be read safely")) {
+  throw new Error(`the corrupted-queue control did not fail as expected: ${String(corruptFailure)}`);
+}
+if (!existsSync(controlLease)) throw new Error("a corrupted queue released an existing branch task lease");
+
+externalClaim("task-replacement", "branch", "replacement-generation");
+externalClaim("task-main", "main");
+const providerOffer = dispatch("signal: provider failure cleanup");
+const providerFailure = await providerOffer.settlement.then(() => null, (error) => error);
+if (!(providerFailure instanceof Error) || !providerFailure.message.includes("provider failed after construction")) {
+  throw new Error(`the provider failure did not reach exact cleanup: ${String(providerFailure)}`);
+}
+if (existsSync(controlLease) || existsSync(`${home}/state/.lease-task-provider`)) {
+  throw new Error("provider fallback retained a current-generation branch lease");
+}
+if (!existsSync(`${home}/state/.lease-task-replacement`)) {
+  throw new Error("provider fallback deleted a different-generation lease from the same holder");
+}
+if (!existsSync(`${home}/state/.lease-task-main`)) {
+  throw new Error("provider fallback deleted main's lease");
+}
+process.exit(0);
+EOF
+  status=$?
+  out=$(cat "$TMP_ROOT/node-output")
+  expect_code 0 "$status" "failed-turn cleanup must be provider-only and generation-exact: $out"
+  pass "provider fallback alone releases exact current-generation branch leases"
+}
+
 test_post_construction_provider_error_falls_back_latches_and_recovers_on_cooldown() {
   local repo home out status
   repo="$TMP_ROOT/provider-error-root"
@@ -2498,8 +2669,8 @@ test_branch_mirror_filters_order_and_cursor() {
   PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
-await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, home }; })()`);
-const { fire, dispatch, settle, home } = globalThis.__t;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, home }; })()`);
+const { fire, dispatch, settle, makeCtx, home } = globalThis.__t;
 import { existsSync, readFileSync } from "node:fs";
 
 const entries = [
@@ -2511,12 +2682,12 @@ const entries = [
   { type: "compaction", summary: "compacted" },
   { type: "message", message: { role: "user", content: `pad ${"x".repeat(5000)}\ntail: retain this request` } },
 ];
-const ctx = {
+const ctx = makeCtx({
   sessionManager: {
     getSessionFile: () => `${home}/main-1.jsonl`,
     getEntries: () => entries,
   },
-};
+});
 
 // Dialog collected at main's turn_end, delivered into the branch BEFORE the
 // next wake, tagged and filtered: no tool traffic, no operational injections,
@@ -2560,12 +2731,12 @@ if (cursor.file !== `${home}/main-1.jsonl` || cursor.index !== entries.length) {
 }
 
 // A replacement main session re-anchors: dialog mirrors from its start.
-const ctx2 = {
+const ctx2 = makeCtx({
   sessionManager: {
     getSessionFile: () => `${home}/main-2.jsonl`,
     getEntries: () => [{ type: "message", message: { role: "user", content: "fresh session standing order" } }],
   },
-};
+});
 await fire("turn_end", {}, ctx2);
 await settle(() => session.ops.filter((op) => op.kind === "custom").length === 5, "replacement-session mirror");
 const fresh = session.ops[session.ops.length - 1];
@@ -2887,7 +3058,7 @@ const replacementProvider = {
   streamSimple() {},
 };
 let replaceBeforeInvocation = true;
-globalThis.__fmOnBranchPrompt = ({ session }) => {
+globalThis.__fmOnBranchPrompt = async ({ session }) => {
   if (replaceBeforeInvocation) {
     replaceBeforeInvocation = false;
     globalThis.__fmExtensionProviderConfigs.set("anthropic", replacementProvider);
@@ -2897,7 +3068,7 @@ globalThis.__fmOnBranchPrompt = ({ session }) => {
   const factory = typeof factoryEntry === "function" ? factoryEntry : factoryEntry.factory;
   factory({ on: (event, handler) => { if (event === "before_provider_headers") beforeHeaders = handler; } });
   if (!beforeHeaders) throw new Error("the default branch installed no provider-header guard");
-  beforeHeaders({}, { abort() {} });
+  await beforeHeaders({}, { abort() {} });
   return session.modelRuntime.streamSimple(
     session.model,
     { messages: session.ops },
@@ -3047,7 +3218,7 @@ if (firstSession.options.model?.id !== "main-model") {
   throw new Error(`the branch started on something other than main's model before any pick: ${JSON.stringify(firstSession.options.model)}`);
 }
 
-// The picker offers Pi's branch-runnable catalog plus following main, and the
+// The picker offers Pi's full available catalog plus following main, and the
 // captain's pick is persisted as the one-line config value.
 uiSelections.push("openai-codex/cheap-oauth");
 await command.handler("", makeCtx());
@@ -3055,11 +3226,12 @@ const offered = uiPrompts[0];
 if (offered.options[0] !== "Follow main (anthropic/main-model)") {
   throw new Error(`the picker must offer following main first: ${JSON.stringify(offered.options)}`);
 }
-if (!offered.options.includes("openai-codex/cheap-oauth") || !offered.options.includes("anthropic/main-model")) {
-  throw new Error(`the picker omitted a model available to the isolated branch: ${JSON.stringify(offered.options)}`);
-}
-if (offered.options.includes("dynamic/extension-only")) {
-  throw new Error(`the picker offered a main-session-only provider: ${JSON.stringify(offered.options)}`);
+if (
+  !offered.options.includes("openai-codex/cheap-oauth") ||
+  !offered.options.includes("anthropic/main-model") ||
+  !offered.options.includes("dynamic/extension-only")
+) {
+  throw new Error(`the picker omitted a model from Pi's available catalog: ${JSON.stringify(offered.options)}`);
 }
 const pinFile = `${home}/config/supervision-branch-model`;
 if (readFileSync(pinFile, "utf8") !== "openai-codex/cheap-oauth\n") {
@@ -3135,6 +3307,7 @@ if (readFileSync(pinFile, "utf8") !== "openai-codex/cheap-oauth\n") throw new Er
 // If the isolated runtime cannot load, the old pin remains and no success
 // notification is emitted.
 const noticeCount = notices.length;
+uiSelections.push("openai-codex/cheap-oauth");
 globalThis.__fmModelRuntimeError = "synthetic stored-credential load failure";
 await command.handler("", makeCtx());
 delete globalThis.__fmModelRuntimeError;
@@ -3376,8 +3549,8 @@ const { fire, makeCtx, makeTuiCtx, commands, registryModels, uiSelections, uiKey
 import { readFileSync } from "node:fs";
 
 // A catalog long enough that rendering it whole would run off a terminal,
-// plus one distinctively named model to search for and one model the
-// isolated branch runtime cannot run.
+// plus one distinctively named model to search for and one model selected
+// preparation would safely reject.
 registryModels.push({ provider: "anthropic", id: "main-model" });
 for (let i = 1; i <= 30; i += 1) registryModels.push({ provider: "anthropic", id: `bulk-model-${i}` });
 registryModels.push({ provider: "openai-codex", id: "cheap-oauth", authKind: "oauth" });
@@ -3402,11 +3575,11 @@ if (opened.maxVisible !== 10) {
 if (opened.items[0].label !== "Follow main (anthropic/main-model)") {
   throw new Error(`following main must be the first row: ${JSON.stringify(opened.items.slice(0, 2))}`);
 }
-if (opened.items.length !== 33) {
-  throw new Error(`the opened list must offer following main plus every branch-runnable model: ${opened.items.length}`);
+if (opened.items.length !== 34) {
+  throw new Error(`the opened list must offer following main plus Pi's full catalog: ${opened.items.length}`);
 }
-if (opened.items.some((item) => item.label.includes("extension-only"))) {
-  throw new Error("the picker widened past the branch runtime's eligibility filter");
+if (!opened.items.some((item) => item.label.includes("extension-only"))) {
+  throw new Error("the picker hid a model whose selected preparation may fail safely");
 }
 const filtered = lists[lists.length - 1];
 if (filtered.items.length !== 1 || filtered.items[0].value !== "openai-codex/cheap-oauth") {
@@ -3806,10 +3979,14 @@ test_queued_actions_recheck_lock_ownership() {
   PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
-await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, home, mainUserMessages }; })()`);
-const { fire, dispatch, settle, home, mainUserMessages } = globalThis.__t;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, home, mainUserMessages, defaultSessionCtx }; })()`);
+const { fire, dispatch, settle, home, mainUserMessages, defaultSessionCtx } = globalThis.__t;
 import { existsSync, unlinkSync } from "node:fs";
 
+await fire("before_agent_start", { prompt: "" }, {
+  model: defaultSessionCtx.model,
+  modelRegistry: defaultSessionCtx.modelRegistry,
+});
 let releasePrompt;
 globalThis.__fmPromptGate = new Promise((resolve) => { releasePrompt = resolve; });
 if (!dispatch("signal: active wake").accepted) throw new Error("first wake was not accepted");
@@ -3852,10 +4029,14 @@ test_stale_generation_boundaries_are_side_effect_free() {
   PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
-await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, home, sentToMain }; })()`);
-const { fire, dispatch, settle, home, sentToMain } = globalThis.__t;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, home, sentToMain, defaultSessionCtx }; })()`);
+const { fire, dispatch, settle, home, sentToMain, defaultSessionCtx } = globalThis.__t;
 import { existsSync, readFileSync } from "node:fs";
 
+await fire("before_agent_start", { prompt: "" }, {
+  model: defaultSessionCtx.model,
+  modelRegistry: defaultSessionCtx.modelRegistry,
+});
 if (!dispatch("signal: establish old branch").accepted) throw new Error("old branch wake was not accepted");
 await settle(() => (globalThis.__fmPrompts ?? []).length === 1, "old branch prompt");
 const oldSession = globalThis.__fmSessions[0];
@@ -3963,8 +4144,8 @@ test_rebind_remirrors_undelivered_dialog_from_durable_cursor() {
   PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
-await eval(`(async () => { ${prelude}; globalThis.__t = { fire, home }; })()`);
-const { fire, home } = globalThis.__t;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, home, makeCtx }; })()`);
+const { fire, home, makeCtx } = globalThis.__t;
 import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -3975,9 +4156,9 @@ import { pathToFileURL } from "node:url";
 const entries = [
   { type: "message", message: { role: "user", content: "standing order: never merge task-7" } },
 ];
-const ctx = {
+const ctx = makeCtx({
   sessionManager: { getSessionFile: () => `${home}/main-1.jsonl`, getEntries: () => entries },
-};
+});
 await fire("turn_end", {}, ctx);
 await fire("session_shutdown", {});
 
@@ -4006,8 +4187,8 @@ const replacementPi = {
 };
 const replacement = await import(`${pathToFileURL(process.env.PLUGIN).href}?rebind=1`);
 replacement.default(replacementPi);
-for (const handler of replacementPiHandlers.get("session_start") ?? []) handler({}, ctx);
-for (const handler of replacementPiHandlers.get("turn_end") ?? []) handler({}, ctx);
+for (const handler of replacementPiHandlers.get("session_start") ?? []) await handler({}, ctx);
+for (const handler of replacementPiHandlers.get("turn_end") ?? []) await handler({}, ctx);
 writeFileSync(`${home}/state/.wake-queue`, "1\t1\tsignal\tbranch-driver.status\tsignal: after rebind\n");
 const offer = {
   message: "signal: after rebind",
@@ -5213,6 +5394,145 @@ EOF
   pass "cached branches invalidate before changed registrations receive mirrored context"
 }
 
+test_static_same_id_provider_hot_reload_fails_closed_at_headers() {
+  local repo home out status
+  repo="$TMP_ROOT/static-hot-reload-root"
+  home="$TMP_ROOT/static-hot-reload-home"
+  mkdir -p "$home/state" "$home/config"
+  install_pi_branch_extension_fixture "$repo"
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+const prelude = process.env.DRIVER_PRELUDE;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, registryModels, home }; })()`);
+const { fire, dispatch, settle, makeCtx, registryModels, home } = globalThis.__t;
+
+const providerId = "static-proxy";
+const modelId = "same-model";
+const modelA = {
+  provider: providerId,
+  id: modelId,
+  api: "openai-completions",
+  baseUrl: "https://static-a.invalid/v1",
+  apiKey: "static-a-key",
+  providerHeaders: { "X-Provider-Route": "a" },
+  headers: { "X-Model-Route": "a" },
+  compat: { supportsStore: false },
+};
+const variants = [
+  { label: "baseUrl-only", model: { ...modelA, baseUrl: "https://static-b.invalid/v1" } },
+  { label: "API-only", model: { ...modelA, baseUrl: "https://static-b.invalid/v1", api: "openai-responses" } },
+  {
+    label: "model-header-only",
+    model: {
+      ...modelA,
+      baseUrl: "https://static-b.invalid/v1",
+      api: "openai-responses",
+      headers: { "X-Model-Route": "b" },
+    },
+  },
+  {
+    label: "provider-header-only",
+    model: {
+      ...modelA,
+      baseUrl: "https://static-b.invalid/v1",
+      api: "openai-responses",
+      headers: { "X-Model-Route": "b" },
+      providerHeaders: { "X-Provider-Route": "b" },
+    },
+  },
+  {
+    label: "compat-only",
+    model: {
+      ...modelA,
+      baseUrl: "https://static-b.invalid/v1",
+      api: "openai-responses",
+      headers: { "X-Model-Route": "b" },
+      providerHeaders: { "X-Provider-Route": "b" },
+      compat: { supportsStore: true },
+    },
+  },
+  {
+    label: "request-route-only",
+    model: {
+      ...modelA,
+      baseUrl: "https://static-b.invalid/v1",
+      api: "openai-responses",
+      headers: { "X-Model-Route": "b" },
+      providerHeaders: { "X-Provider-Route": "b" },
+      compat: { supportsStore: true },
+      authBaseUrl: "https://request-route.invalid/v1",
+    },
+  },
+];
+registryModels.push(modelA);
+globalThis.__fmExtensionProviderConfigs = new Map();
+globalThis.__fmExtensionNativeProviders = new Map();
+const ctx = makeCtx({
+  model: { provider: providerId, id: modelId },
+  sessionManager: {
+    getSessionFile: () => `${home}/main.jsonl`,
+    getEntries: () => [],
+  },
+});
+const providerCalls = [];
+globalThis.__fmStockProviderStreamSimple = (model, context) => {
+  providerCalls.push({ model: structuredClone(model), context: structuredClone(context) });
+};
+async function invokeProvider(session, context) {
+  let beforeHeaders;
+  const factoryEntry = session.options.resourceLoader.options.extensionFactories[0];
+  const factory = typeof factoryEntry === "function" ? factoryEntry : factoryEntry.factory;
+  factory({ on: (event, handler) => { if (event === "before_provider_headers") beforeHeaders = handler; } });
+  if (!beforeHeaders) throw new Error("the branch installed no provider-header guard");
+  let aborted = false;
+  await beforeHeaders({}, { abort() { aborted = true; } });
+  if (aborted) throw new Error("the provider-header guard aborted without rejecting");
+  return session.modelRuntime.streamSimple(session.model, context, {});
+}
+
+const privatePrompt = "captain context withheld from the obsolete static route";
+await fire("session_start", {}, ctx);
+await fire("before_agent_start", { prompt: privatePrompt }, ctx);
+for (const [index, variant] of variants.entries()) {
+  const stale = index === 0 ? undefined : globalThis.__fmSessions.at(-1);
+  const callsBefore = providerCalls.length;
+  globalThis.__fmOnBranchPrompt = async ({ session }) => {
+    registryModels[0] = variant.model;
+    await invokeProvider(session, { messages: session.ops });
+  };
+  const staleOffer = dispatch(`signal: ${variant.label} static configuration hot reload`);
+  const staleFailure = await staleOffer.settlement.then(() => null, (error) => error);
+  if (!(staleFailure instanceof Error) || !staleFailure.message.includes("provider registration changed before request")) {
+    throw new Error(`${variant.label} same-ID reload did not fall back before headers: ${String(staleFailure)}`);
+  }
+  const obsolete = stale ?? globalThis.__fmSessions?.[0];
+  if (!obsolete?.disposed) throw new Error(`${variant.label} obsolete static-composition branch remained live`);
+  if (index === 0 && !obsolete.ops.some((op) => op.kind === "custom" && op.message.content.includes(privatePrompt))) {
+    throw new Error("the static reload test did not exercise mirrored captain context");
+  }
+  if (providerCalls.length !== callsBefore) {
+    throw new Error(`${variant.label} obsolete static route received mirrored context`);
+  }
+
+  globalThis.__fmOnBranchPrompt = async ({ session }) => {
+    await invokeProvider(session, { messages: session.ops });
+  };
+  const reboundOffer = dispatch(`signal: rebuild ${variant.label} static configuration`);
+  await settle(() => providerCalls.length === callsBefore + 1, `${variant.label} current static provider invocation`);
+  await reboundOffer.settlement.then(() => null, () => null);
+  const rebound = globalThis.__fmSessions.at(-1);
+  if (rebound.model?.baseUrl !== variant.model.baseUrl || rebound.model?.api !== variant.model.api) {
+    throw new Error(`${variant.label} rebuild did not use the current static route: ${JSON.stringify(rebound.model)}`);
+  }
+}
+process.exit(0);
+EOF
+  status=$?
+  out=$(cat "$TMP_ROOT/node-output")
+  expect_code 0 "$status" "same-ID static provider changes must fail closed at the header boundary: $out"
+  pass "same-ID static provider hot reloads cannot reach an obsolete route"
+}
+
 test_provider_change_at_header_boundary_blocks_all_effective_streams() {
   if ! command -v node >/dev/null 2>&1; then
     echo "skip: node not found for the Pi provider dispatch test"
@@ -5259,6 +5579,7 @@ if (!supportsScopedRuntimeCreation) {
 }
 const {
   DefaultResourceLoader: RealDefaultResourceLoader,
+  ModelRegistry: RealModelRegistry,
   ModelRuntime: RealModelRuntime,
   SessionManager: RealSessionManager,
   SettingsManager: RealSettingsManager,
@@ -5404,13 +5725,6 @@ globalThis.fetch = async (input, init) => {
 
 async function runProviderCase(options) {
   const entries = [];
-  const ctx = makeCtx({
-    ...(options.unknownMain ? { model: undefined } : {}),
-    sessionManager: {
-      getSessionFile: () => `${home}/main-${options.label}.jsonl`,
-      getEntries: () => entries,
-    },
-  });
   globalThis.__fmExtensionProviderConfigs = new Map(
     options.initialConfig ? [[options.providerId, options.initialConfig]] : [],
   );
@@ -5424,6 +5738,33 @@ async function runProviderCase(options) {
   }
   if (options.unknownMain) rmSync(`${home}/config/supervision-branch-model`, { force: true });
   else writeFileSync(`${home}/config/supervision-branch-model`, `${options.providerId}/${options.modelId}\n`);
+
+  const mainRuntime = await RealModelRuntime.create({
+    authPath: `${process.env.PI_CODING_AGENT_DIR}/auth.json`,
+    modelsPath: `${process.env.PI_CODING_AGENT_DIR}/models.json`,
+    refreshOnCreate: false,
+  });
+  const effectiveMainRegistry = new RealModelRegistry(mainRuntime);
+  if (options.initialNativeProvider) {
+    effectiveMainRegistry.registerProvider(options.initialNativeProvider);
+  } else if (options.initialConfig) {
+    effectiveMainRegistry.registerProvider(options.providerId, options.initialConfig);
+  }
+  const refresh = await effectiveMainRegistry.refresh({ providers: [options.providerId], allowNetwork: false });
+  const refreshError = refresh.errors.get(options.providerId);
+  if (refreshError) throw refreshError;
+  const effectiveMainModel = effectiveMainRegistry.find(options.providerId, options.modelId);
+  if (!effectiveMainModel) {
+    throw new Error(`${options.label} main runtime did not expose ${options.providerId}/${options.modelId}`);
+  }
+  const ctx = makeCtx({
+    modelRegistry: effectiveMainRegistry,
+    ...(options.unknownMain ? { model: undefined } : { model: effectiveMainModel }),
+    sessionManager: {
+      getSessionFile: () => `${home}/main-${options.label}.jsonl`,
+      getEntries: () => entries,
+    },
+  });
 
   await fire("session_start", {}, ctx);
   blockUnscopedRefresh = Boolean(options.unrelatedRefreshStall && supportsScopedRuntimeCreation);
@@ -5482,6 +5823,11 @@ async function runProviderCase(options) {
       globalThis.__fmExtensionNativeProviders = new Map(
         options.replacementNativeProvider ? [[options.providerId, options.replacementNativeProvider]] : [],
       );
+      if (options.replacementNativeProvider) {
+        effectiveMainRegistry.registerProvider(options.replacementNativeProvider);
+      } else if (options.replacementConfig) {
+        effectiveMainRegistry.registerProvider(options.providerId, options.replacementConfig);
+      }
     });
     let raceFailure = null;
     let raceResult = null;
@@ -5534,13 +5880,27 @@ async function runProviderCase(options) {
   await fire("before_agent_start", { prompt: privatePrompt }, ctx);
   const staleCallsBefore = options.staleCallCount();
   let stalePrompt;
-  globalThis.__fmOnBranchPrompt = () => {
+  globalThis.__fmOnBranchPrompt = async () => {
     globalThis.__fmExtensionProviderConfigs = new Map(
       options.replacementConfig ? [[options.providerId, options.replacementConfig]] : [],
     );
     globalThis.__fmExtensionNativeProviders = new Map(
       options.replacementNativeProvider ? [[options.providerId, options.replacementNativeProvider]] : [],
     );
+    if (options.replacementNativeProvider) {
+      effectiveMainRegistry.registerProvider(options.replacementNativeProvider);
+    } else if (options.replacementConfig) {
+      effectiveMainRegistry.registerProvider(options.providerId, options.replacementConfig);
+    }
+    if (options.replacementStaticConfig) {
+      writeFileSync(
+        `${process.env.PI_CODING_AGENT_DIR}/models.json`,
+        `${JSON.stringify(options.replacementStaticConfig)}\n`,
+      );
+      const refresh = await mainRuntime.refresh({ providers: [options.providerId], allowNetwork: false });
+      const refreshError = refresh.errors.get(options.providerId);
+      if (refreshError) throw refreshError;
+    }
     stalePrompt = stale.session.prompt(privatePrompt).then(
       () => null,
       (error) => error,
@@ -5564,7 +5924,8 @@ async function runProviderCase(options) {
   }
   const staleEntries = JSON.stringify(stale.sessionManager.getEntries());
   const staleError = staleResult instanceof Error ? `${staleResult.message}\n${staleEntries}` : staleEntries;
-  if (!staleError.includes("provider registration changed before request")) {
+  const nativeAbort = staleEntries.includes('"stopReason":"aborted"') && staleEntries.includes('"errorMessage":"Request aborted"');
+  if (!staleError.includes("provider registration changed before request") && !nativeAbort) {
     throw new Error(`${options.label} real runtime did not surface the guarded mismatch: ${staleError}`);
   }
   if (!first.disposed) throw new Error(`${options.label} provider-mismatched branch remained live`);
@@ -5577,11 +5938,40 @@ async function runProviderCase(options) {
   const replacementIndex = (globalThis.__fmSessions ?? []).length;
   const reboundOffer = dispatch(`signal: rebuild ${options.label} after provider mismatch`);
   const reboundFailure = await reboundOffer.settlement.then(() => null, (error) => error);
-  if (!(reboundFailure instanceof Error) || !reboundFailure.message.includes("no provider-scoped registration boundary")) {
-    throw new Error(`${options.label} did not fall safely back after its registration changed: ${String(reboundFailure)}`);
-  }
-  if ((globalThis.__fmSessions ?? []).length !== replacementIndex) {
-    throw new Error(`${options.label} rebuilt through an unscoped provider registration`);
+  if (options.replacementStaticConfig) {
+    if (!(reboundFailure instanceof Error) || !reboundFailure.message.includes("produced no durable outcome")) {
+      throw new Error(`${options.label} did not rebuild the current static composition: ${String(reboundFailure)}`);
+    }
+    if ((globalThis.__fmSessions ?? []).length !== replacementIndex + 1) {
+      throw new Error(`${options.label} did not create one replacement branch`);
+    }
+    const replacement = globalThis.__fmSessions[replacementIndex];
+    if (replacement.options.model?.baseUrl !== options.replacementBaseUrl) {
+      throw new Error(`${options.label} replacement kept the obsolete endpoint: ${JSON.stringify(replacement.options.model)}`);
+    }
+    const current = await createRealProviderSession(replacement, `${options.label}-replacement`);
+    const transportBefore = transportRequests.length;
+    await current.session.prompt(`${options.label} replacement-route control`).then(() => null, () => null);
+    const currentRequests = transportRequests.slice(transportBefore);
+    if (!currentRequests.some((request) => request.url.includes(options.replacementTransportHost))) {
+      throw new Error(`${options.label} replacement never reached its current transport: ${JSON.stringify(currentRequests)}`);
+    }
+    if (
+      options.replacementModelHeader &&
+      !currentRequests.some(
+        (request) => request.headers[options.replacementModelHeader.name.toLowerCase()] === options.replacementModelHeader.value,
+      )
+    ) {
+      throw new Error(`${options.label} replacement lost its current model header: ${JSON.stringify(currentRequests)}`);
+    }
+    current.session.dispose();
+  } else {
+    if (!(reboundFailure instanceof Error) || !reboundFailure.message.includes("no provider-scoped registration boundary")) {
+      throw new Error(`${options.label} did not fall safely back after its registration changed: ${String(reboundFailure)}`);
+    }
+    if ((globalThis.__fmSessions ?? []).length !== replacementIndex) {
+      throw new Error(`${options.label} rebuilt through an unscoped provider registration`);
+    }
   }
   await fire("session_shutdown", {});
   rmSync(`${process.env.PI_CODING_AGENT_DIR}/models.json`, { force: true });
@@ -5715,12 +6105,47 @@ await runProviderCase({
   replacementCallCount: () => transportRequests.length,
 });
 
+await runProviderCase({
+  label: "baseUrl-only registration",
+  providerId: "anthropic",
+  modelId: anthropicModel.id,
+  initialConfig: null,
+  replacementConfig: { baseUrl: "https://baseurl-only.proxy.invalid" },
+  initialBaseUrl: anthropicModel.baseUrl,
+  initialTransportHost: "anthropic.com",
+  staleCallCount: () => transportRequests.length,
+  replacementCallCount: () => transportRequests.length,
+});
+
+await runProviderCase({
+  label: "model-config-only registration",
+  providerId: "anthropic",
+  modelId: anthropicModel.id,
+  initialConfig: null,
+  replacementConfig: {
+    models: [{ ...configOnlyModel, headers: { [modelHeaderName]: "late-config-only" } }],
+  },
+  initialBaseUrl: anthropicModel.baseUrl,
+  initialTransportHost: "anthropic.com",
+  staleCallCount: () => transportRequests.length,
+  replacementCallCount: () => transportRequests.length,
+});
+
 const staticHeaderName = "X-Firstmate-Static-Route";
 const staticReplacement = {
-  api: "openai-completions",
-  baseUrl: "https://static-replacement.invalid/v1",
-  streamSimple(model) {
-    return completedStream(model, "static replacement");
+  providers: {
+    "fm-static-config": {
+      baseUrl: "https://static-replacement.invalid/v1",
+      api: "openai-completions",
+      apiKey: "static-replacement-placeholder",
+      models: [{
+        id: "static-model",
+        name: "Static model",
+        contextWindow: 4096,
+        maxTokens: 128,
+        headers: { [staticHeaderName]: "static-replacement-route" },
+      }],
+    },
   },
 };
 await runProviderCase({
@@ -5744,10 +6169,13 @@ await runProviderCase({
     },
   },
   initialConfig: null,
-  replacementConfig: staticReplacement,
+  replacementStaticConfig: staticReplacement,
   initialBaseUrl: "https://static-config.invalid/v1",
+  replacementBaseUrl: "https://static-replacement.invalid/v1",
   initialTransportHost: "static-config.invalid",
+  replacementTransportHost: "static-replacement.invalid",
   initialModelHeader: { name: staticHeaderName, value: "static-route" },
+  replacementModelHeader: { name: staticHeaderName, value: "static-replacement-route" },
   staleCallCount: () => transportRequests.length,
   replacementCallCount: () => transportRequests.length,
 });
@@ -5904,8 +6332,8 @@ test_unsupported_pi_version_rejects_before_runtime_creation() {
     FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" DRIVER_PRELUDE="$DRIVER_PRELUDE" \
     node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
-await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, makeCtx, registryModels, commands, notices }; })()`);
-const { fire, dispatch, makeCtx, registryModels, commands, notices } = globalThis.__t;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, makeCtx, registryModels, commands, notices, uiSelections }; })()`);
+const { fire, dispatch, makeCtx, registryModels, commands, notices, uiSelections } = globalThis.__t;
 
 registryModels.push({ provider: "anthropic", id: "main-model" });
 await fire("session_start", {}, makeCtx());
@@ -5919,6 +6347,7 @@ if ((globalThis.__fmModelRuntimeCreateCalls ?? []).length !== 0 || (globalThis._
 }
 const command = commands.get("supervision-model");
 if (!command) throw new Error("the supervision-model command was not registered");
+uiSelections.push("anthropic/main-model");
 await command.handler("", makeCtx());
 if (!notices.some((notice) => notice.type === "error" && notice.message.includes("Pi 0.82.0"))) {
   throw new Error(`the unsupported picker did not report its safe fallback: ${JSON.stringify(notices)}`);
@@ -6140,12 +6569,16 @@ if ((globalThis.__fmSessions ?? []).length !== 0) {
 
 const command = commands.get("supervision-model");
 if (!command) throw new Error("the supervision-model command was not registered");
+const pickerRefreshStart = (globalThis.__fmModelRuntimeRefreshCalls ?? []).length;
 await command.handler("", ctx);
 if (notices.some((notice) => notice.type === "error")) {
-  throw new Error(`picker-wide refresh isolation failed: ${JSON.stringify(notices)}`);
+  throw new Error(`catalog-only picker discovery failed: ${JSON.stringify(notices)}`);
 }
-if (!uiPrompts.at(-1)?.options.includes("anthropic/main-model")) {
-  throw new Error(`picker-wide refresh did not remain usable: ${JSON.stringify(uiPrompts.at(-1)?.options)}`);
+if (!uiPrompts.at(-1)?.options.includes("anthropic/main-model") || !uiPrompts.at(-1)?.options.includes(privateModel.provider + "/" + privateModel.id)) {
+  throw new Error(`catalog-only picker discovery omitted models: ${JSON.stringify(uiPrompts.at(-1)?.options)}`);
+}
+if ((globalThis.__fmModelRuntimeRefreshCalls ?? []).length !== pickerRefreshStart) {
+  throw new Error("opening the picker retried a failed provider refresh");
 }
 process.exit(0);
 EOF
@@ -6164,8 +6597,8 @@ test_selected_provider_resolution_avoids_unrelated_refresh() {
   PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
-await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, registryModels, commands, uiPrompts, notices }; })()`);
-const { fire, dispatch, settle, makeCtx, registryModels, commands, uiPrompts, notices } = globalThis.__t;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, registryModels, commands, uiSelections, uiPrompts, notices }; })()`);
+const { fire, dispatch, settle, makeCtx, registryModels, commands, uiSelections, uiPrompts, notices } = globalThis.__t;
 
 registryModels.push(
   { provider: "anthropic", id: "main-model", baseUrl: "https://api.anthropic.com" },
@@ -6198,31 +6631,53 @@ await offer.settlement.then(() => null, () => null);
 const command = commands.get("supervision-model");
 if (!command) throw new Error("the supervision-model command was not registered");
 const pickerRefreshStart = (globalThis.__fmModelRuntimeRefreshCalls ?? []).length;
-const realSetTimeout = globalThis.setTimeout;
-globalThis.setTimeout = (callback, delay, ...args) =>
-  Number(delay) === 5000 ? realSetTimeout(callback, 0, ...args) : realSetTimeout(callback, delay, ...args);
-try {
-  await command.handler("", makeCtx());
-} finally {
-  globalThis.setTimeout = realSetTimeout;
-}
+const pickerCreateStart = (globalThis.__fmModelRuntimeCreateCalls ?? []).length;
+await command.handler("", makeCtx());
 if (notices.some((notice) => notice.type === "error")) {
   throw new Error(`a stalled picker provider hid healthy choices: ${JSON.stringify(notices)}`);
 }
 const pickerRefreshes = (globalThis.__fmModelRuntimeRefreshCalls ?? []).slice(pickerRefreshStart);
-const pickerProviders = pickerRefreshes.map((call) => call.options?.providers ?? []);
+if (pickerRefreshes.length !== 0 || (globalThis.__fmModelRuntimeCreateCalls ?? []).length !== pickerCreateStart) {
+  throw new Error("opening the picker constructed or refreshed a provider runtime");
+}
+const offered = uiPrompts.at(-1)?.options;
+if (!offered?.[0]?.startsWith("Follow main")) {
+  throw new Error(`the picker did not keep Follow main reachable: ${JSON.stringify(offered)}`);
+}
+if (!offered.includes("anthropic/main-model") || !offered.includes("unrelated/other-model")) {
+  throw new Error(`the picker did not enumerate the full catalog: ${JSON.stringify(offered)}`);
+}
+
+const unavailableCatalogCtx = makeCtx();
+unavailableCatalogCtx.modelRegistry = {
+  ...unavailableCatalogCtx.modelRegistry,
+  getAvailable() {
+    throw new Error("synthetic catalog failure");
+  },
+};
+await command.handler("", unavailableCatalogCtx);
+const fallbackOnly = uiPrompts.at(-1)?.options;
+if (!fallbackOnly?.[0]?.startsWith("Follow main")) {
+  throw new Error(`a catalog failure hid Follow main: ${JSON.stringify(fallbackOnly)}`);
+}
+if (!notices.some((notice) => notice.type === "warning" && notice.message.includes("synthetic catalog failure"))) {
+  throw new Error(`a catalog failure was not surfaced as a warning: ${JSON.stringify(notices)}`);
+}
 if (
-  !pickerProviders.some((providers) => JSON.stringify(providers) === JSON.stringify(["anthropic"])) ||
-  !pickerProviders.some((providers) => JSON.stringify(providers) === JSON.stringify(["unrelated"])) ||
-  pickerProviders.some((providers) => providers.length !== 1)
+  (globalThis.__fmModelRuntimeRefreshCalls ?? []).length !== pickerRefreshStart ||
+  (globalThis.__fmModelRuntimeCreateCalls ?? []).length !== pickerCreateStart
 ) {
-  throw new Error(`the picker did not isolate the full provider registry: ${JSON.stringify(pickerProviders)}`);
+  throw new Error("a failed catalog read constructed or refreshed a provider runtime");
 }
-if (!uiPrompts.at(-1)?.options.includes("anthropic/main-model")) {
-  throw new Error(`the stalled provider hid a healthy picker model: ${JSON.stringify(uiPrompts.at(-1)?.options)}`);
-}
-if (uiPrompts.at(-1)?.options.includes("unrelated/other-model")) {
-  throw new Error(`the picker offered a provider whose isolated refresh never settled: ${JSON.stringify(uiPrompts.at(-1)?.options)}`);
+
+uiSelections.push("anthropic/main-model", undefined);
+await command.handler("", makeCtx());
+const selectedPickerRefreshes = (globalThis.__fmModelRuntimeRefreshCalls ?? []).slice(pickerRefreshStart);
+if (
+  selectedPickerRefreshes.length !== 1 ||
+  JSON.stringify(selectedPickerRefreshes[0].options?.providers) !== JSON.stringify(["anthropic"])
+) {
+  throw new Error(`selected preparation refreshed the wrong providers: ${JSON.stringify(selectedPickerRefreshes)}`);
 }
 if ((globalThis.__fmModelRuntimeCreateCalls ?? []).some((options) => options.refreshOnCreate !== false)) {
   throw new Error(`provider resolution allowed an all-provider create refresh: ${JSON.stringify(globalThis.__fmModelRuntimeCreateCalls)}`);
@@ -6245,7 +6700,7 @@ test_extension_registered_provider_isolated_fallback() {
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, registryModels, uiSelections, uiPrompts, notices, commands, home }; })()`);
-const { fire, dispatch, makeCtx, registryModels, uiPrompts, notices, commands, home } = globalThis.__t;
+const { fire, dispatch, makeCtx, registryModels, uiSelections, uiPrompts, notices, commands, home } = globalThis.__t;
 import { writeFileSync } from "node:fs";
 
 registryModels.push(
@@ -6272,11 +6727,19 @@ const command = commands.get("supervision-model");
 if (!command) throw new Error("the supervision-model command was not registered");
 await command.handler("", makeCtx());
 const offered = uiPrompts[0];
-if (offered.options.includes("devin/swe-1-7")) {
-  throw new Error(`the picker offered a provider Pi cannot isolate: ${JSON.stringify(offered.options)}`);
+if (!offered.options.includes("devin/swe-1-7")) {
+  throw new Error(`the picker omitted a registered catalog model: ${JSON.stringify(offered.options)}`);
 }
 if (!offered.options.includes("anthropic/main-model") || notices.some((notice) => notice.type === "error")) {
   throw new Error(`an unsupported registration hid healthy picker choices: ${JSON.stringify({ offered, notices })}`);
+}
+uiSelections.push("devin/swe-1-7");
+await command.handler("", makeCtx());
+if (!notices.some((notice) => notice.type === "error" && notice.message.includes("no provider-scoped registration boundary"))) {
+  throw new Error(`the registered selection did not fail at selected-value preparation: ${JSON.stringify(notices)}`);
+}
+if ((globalThis.__fmModelRuntimeCreateCalls ?? []).length !== 0) {
+  throw new Error("the registered selection reached runtime construction");
 }
 writeFileSync(`${home}/config/supervision-branch-model`, "devin/swe-1-7\n");
 const registeredOffer = dispatch("signal: extension provider pin");
@@ -6318,6 +6781,7 @@ test_branch_report_refuses_a_task_the_wake_did_not_name
 test_branch_predrain_recheck_excludes_new_main_owned_row_without_deferring_eligible_work
 test_branch_predrain_needs_decision_keeps_routine_row_branch_eligible
 test_settled_branch_prompt_releases_unacknowledged_grant
+test_failed_turn_lease_cleanup_is_provider_and_generation_exact
 test_post_construction_provider_error_falls_back_latches_and_recovers_on_cooldown
 test_selection_change_does_not_corrupt_inflight_provider_state
 test_main_owned_grant_result_falls_back_to_main
@@ -6335,6 +6799,7 @@ test_branch_effort_pin_applies_and_absent_pin_follows_main
 test_unpinned_branch_follows_main_effort_changes_live
 test_extension_provider_registration_falls_back_without_scoped_api
 test_cached_branch_rebinds_after_effective_provider_change
+test_static_same_id_provider_hot_reload_fails_closed_at_headers
 test_provider_change_at_header_boundary_blocks_all_effective_streams
 test_runtime_only_main_credential_rejects_branch_construction
 test_unsupported_pi_version_rejects_before_runtime_creation
