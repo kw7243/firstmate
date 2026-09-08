@@ -170,6 +170,7 @@ const PROVIDER_REPROBE_BASE_MS = 5 * 60 * 1000;
 const PROVIDER_REPROBE_MAX_MS = 60 * 60 * 1000;
 const EXTENSION_PROVIDER_OPERATION_TIMEOUT_MS = 5_000;
 class ExtensionProviderTimeoutError extends Error {}
+class ExtensionProviderResolutionError extends Error {}
 async function withExtensionProviderDeadline<T>(
   operation: Promise<T>,
   phase: string,
@@ -263,7 +264,8 @@ type BranchEffort = ReturnType<NonNullable<ExtensionAPI["getThinkingLevel"]>>;
 type ExtensionProviderRegistration =
   | { providerId: string; kind: "none" }
   | { providerId: string; kind: "native" | "config"; registration: unknown };
-type ExtensionProviderStreamSimple = ModelRuntime["streamSimple"];
+type ExtensionProvider = NonNullable<ReturnType<ModelRuntime["getProvider"]>>;
+type ExtensionProviderStreamSimple = ExtensionProvider["streamSimple"];
 type PinnedBranchModel = {
   model: BranchModel;
   modelRuntime: ModelRuntime;
@@ -822,7 +824,12 @@ export default function (pi: ExtensionAPI) {
         } else {
           registrations.set(providerId, { providerId, kind: "none" });
         }
-      } catch {
+      } catch (error) {
+        if (selectedProviderIds !== undefined) {
+          throw new ExtensionProviderResolutionError(
+            `extension-provider registration failed for ${providerId}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
         // A registration that fails to compose in the isolated runtime leaves
         // that provider unavailable, exactly as if it were never copied.
       }
@@ -830,13 +837,28 @@ export default function (pi: ExtensionAPI) {
     if (copied.length === 0) return registrations;
     const controller = new AbortController();
     try {
-      await withExtensionProviderDeadline(
+      const result = await withExtensionProviderDeadline(
         modelRuntime.refresh({ providers: copied, allowNetwork: false, signal: controller.signal }),
         "availability refresh",
         () => controller.abort(),
       );
+      if (selectedProviderIds !== undefined) {
+        for (const providerId of copied) {
+          const error = result.errors.get(providerId);
+          if (error) {
+            throw new ExtensionProviderResolutionError(
+              `extension-provider availability refresh failed for ${providerId}: ${error.message}`,
+            );
+          }
+        }
+      }
     } catch (error) {
-      if (error instanceof ExtensionProviderTimeoutError) throw error;
+      if (error instanceof ExtensionProviderTimeoutError || error instanceof ExtensionProviderResolutionError) throw error;
+      if (selectedProviderIds !== undefined) {
+        throw new ExtensionProviderResolutionError(
+          `extension-provider availability refresh failed for ${copied.join(", ")}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     }
     return registrations;
   }
@@ -863,31 +885,50 @@ export default function (pi: ExtensionAPI) {
     modelRuntime: ModelRuntime,
     snapshot: ExtensionProviderRegistration,
   ): void {
-    const streamSimple: ExtensionProviderStreamSimple = modelRuntime.streamSimple.bind(modelRuntime);
-    modelRuntime.streamSimple = (model, context, options) =>
-      streamSimple(model, context, {
-        ...options,
-        transformHeaders: async (headers) => {
-          const transformedHeaders = options?.transformHeaders
-            ? await options.transformHeaders(headers)
-            : headers;
-          const mismatch = extensionProviderRegistrationMismatch(snapshot);
-          if (mismatch) throw mismatch;
-          return transformedHeaders;
-        },
-      });
+    const provider = modelRuntime.getProvider(snapshot.providerId);
+    if (!provider) {
+      throw new ExtensionProviderResolutionError(
+        `extension-provider ${snapshot.providerId} has no effective provider in the isolated branch runtime`,
+      );
+    }
+    const streamSimple: ExtensionProviderStreamSimple = provider.streamSimple.bind(provider);
+    const guardedStreamSimple: ExtensionProviderStreamSimple = (model, context, options) => {
+      const mismatch = extensionProviderRegistrationMismatch(snapshot);
+      if (mismatch) throw mismatch;
+      return streamSimple(model, context, options);
+    };
+    const boundMethods = new WeakMap<Function, Function>();
+    const guardedProvider = new Proxy(provider, {
+      get(target, property) {
+        if (property === "streamSimple") return guardedStreamSimple;
+        const value = Reflect.get(target, property, target);
+        if (typeof value !== "function") return value;
+        const cached = boundMethods.get(value);
+        if (cached) return cached;
+        const bound = value.bind(target);
+        boundMethods.set(value, bound);
+        return bound;
+      },
+    });
+    modelRuntime.registerNativeProvider(guardedProvider);
   }
 
   async function resolveBranchModel(provider: string, modelId: string): Promise<BranchModelResolution> {
     const label = `${provider}/${modelId}`;
     const modelRuntime = await createExtensionProviderRuntime();
     const registrations = await copyExtensionProviders(modelRuntime, [provider]);
-    const model = modelRuntime.getModel(provider, modelId) as BranchModel | undefined;
-    if (!model) return { ok: false, reason: `${label} is unavailable to the isolated branch runtime` };
-    if (!modelRuntime.hasConfiguredAuth(provider)) {
-      return { ok: false, reason: `${label} has no configured credentials in the isolated branch runtime` };
-    }
     const providerRegistration = registrations.get(provider) ?? { providerId: provider, kind: "none" as const };
+    const model = modelRuntime.getModel(provider, modelId) as BranchModel | undefined;
+    if (!model) {
+      const reason = `${label} is unavailable to the isolated branch runtime`;
+      if (providerRegistration.kind !== "none") throw new ExtensionProviderResolutionError(reason);
+      return { ok: false, reason };
+    }
+    if (!modelRuntime.hasConfiguredAuth(provider)) {
+      const reason = `${label} has no configured credentials in the isolated branch runtime`;
+      if (providerRegistration.kind !== "none") throw new ExtensionProviderResolutionError(reason);
+      return { ok: false, reason };
+    }
     guardExtensionProviderStreamSimple(modelRuntime, providerRegistration);
     return {
       ok: true,
@@ -924,7 +965,7 @@ export default function (pi: ExtensionAPI) {
       const resolved = await resolveBranchModel(mainModel.provider, mainModel.id);
       return resolved.ok ? resolved.selection : undefined;
     } catch (error) {
-      if (error instanceof ExtensionProviderTimeoutError) throw error;
+      if (error instanceof ExtensionProviderTimeoutError || error instanceof ExtensionProviderResolutionError) throw error;
       return undefined;
     }
   }

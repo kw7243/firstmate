@@ -156,11 +156,13 @@ class StubModelRuntime {
   }
   registerNativeProvider(provider) {
     const providerId = provider.id;
+    const inherited = this.models.filter((model) => model.provider === providerId);
     this.registeredProviderConfigs.delete(providerId);
     this.registeredNativeProviders.set(providerId, provider);
     this.providers.set(providerId, provider);
     this.models = this.models.filter((model) => model.provider !== providerId);
-    for (const model of provider.models ?? []) {
+    const models = typeof provider.getModels === "function" ? provider.getModels() : (provider.models ?? inherited);
+    for (const model of models) {
       this.models.push({
         ...model,
         provider: providerId,
@@ -5168,6 +5170,40 @@ async function runProviderCase(options) {
     releaseLateRefresh = null;
   }
 
+  if (options.microtaskInvocationRace) {
+    const capturedProvider = first.options.modelRuntime.getProvider(options.providerId);
+    if (!capturedProvider) throw new Error(`${options.label} had no effective provider to capture`);
+    const callsBefore = options.staleCallCount();
+    await Promise.resolve().then(() => {
+      globalThis.__fmExtensionProviderConfigs = new Map(
+        options.replacementConfig ? [[options.providerId, options.replacementConfig]] : [],
+      );
+      globalThis.__fmExtensionNativeProviders = new Map(
+        options.replacementNativeProvider ? [[options.providerId, options.replacementNativeProvider]] : [],
+      );
+    });
+    let raceFailure = null;
+    try {
+      await capturedProvider
+        .streamSimple(first.options.model, { systemPrompt: "provider invocation race", messages: [], tools: [] })
+        .result();
+    } catch (error) {
+      raceFailure = error;
+    }
+    if (options.staleCallCount() !== callsBefore) {
+      throw new Error(`${options.label} invoked a provider captured before the registration microtask`);
+    }
+    if (!(raceFailure instanceof Error) || !raceFailure.message.includes("provider registration changed before request")) {
+      throw new Error(`${options.label} invocation-adjacent guard missed the registration microtask: ${String(raceFailure)}`);
+    }
+    globalThis.__fmExtensionProviderConfigs = new Map(
+      options.initialConfig ? [[options.providerId, options.initialConfig]] : [],
+    );
+    globalThis.__fmExtensionNativeProviders = new Map(
+      options.initialNativeProvider ? [[options.providerId, options.initialNativeProvider]] : [],
+    );
+  }
+
   if (options.initialTransportHost) {
     const control = await createRealProviderSession(first, `${options.label}-control`);
     const transportBefore = transportUrls.length;
@@ -5282,6 +5318,7 @@ await runProviderCase({
   initialConfig: customProviderA,
   replacementConfig: customProviderB,
   lateRefreshRace: true,
+  microtaskInvocationRace: true,
   initialBaseUrl: customProviderA.baseUrl,
   replacementBaseUrl: customProviderB.baseUrl,
   staleCallCount: () => providerACalls,
@@ -5393,7 +5430,7 @@ EOF
   status=$?
   out=$(cat "$TMP_ROOT/node-output")
   expect_code 0 "$status" "provider changes must block every stale selected stream before disclosure: $out"
-  pass "header-boundary guard survives late refreshes and prototype-native providers"
+  pass "invocation guard survives registration microtasks, late refreshes, and prototype-native providers"
 }
 
 test_model_runtime_create_deadline_rejects_to_watcher_fallback() {
@@ -5551,6 +5588,90 @@ EOF
   out=$(cat "$TMP_ROOT/node-output")
   expect_code 0 "$status" "a blocked provider refresh must reject promptly to watcher-owned fallback: $out"
   pass "blocked extension-provider refreshes reject on a bounded deadline to watcher fallback"
+}
+
+test_selected_provider_refresh_error_rejects_to_watcher_fallback() {
+  local repo home out status
+  repo="$TMP_ROOT/extprov-refresh-error-root"
+  home="$TMP_ROOT/extprov-refresh-error-home"
+  mkdir -p "$home/state" "$home/config"
+  install_pi_branch_extension_fixture "$repo"
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+const prelude = process.env.DRIVER_PRELUDE;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, makeCtx, registryModels, commands, uiPrompts, notices }; })()`);
+const { fire, dispatch, makeCtx, registryModels, commands, uiPrompts, notices } = globalThis.__t;
+
+const privateModel = {
+  provider: "private-proxy",
+  id: "private-model",
+  name: "Private model",
+  api: "private-api",
+  baseUrl: "https://private.proxy.invalid",
+  reasoning: false,
+  input: ["text"],
+  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  contextWindow: 4096,
+  maxTokens: 128,
+};
+registryModels.push(
+  { ...privateModel, branchAvailable: false },
+  { provider: "anthropic", id: "main-model", baseUrl: "https://api.anthropic.com" },
+);
+globalThis.__fmExtensionProviderConfigs = new Map();
+globalThis.__fmExtensionNativeProviders = new Map([
+  [
+    privateModel.provider,
+    {
+      id: privateModel.provider,
+      name: "Private proxy",
+      apiKey: "stored-private-credential",
+      models: [privateModel],
+      streamSimple: () => undefined,
+    },
+  ],
+]);
+globalThis.__fmModelRuntimeRefresh = (_runtime, options) => ({
+  aborted: false,
+  errors: options?.providers?.includes(privateModel.provider)
+    ? new Map([[privateModel.provider, new Error("private provider availability failed")]])
+    : new Map(),
+});
+
+const ctx = makeCtx({ model: { provider: privateModel.provider, id: privateModel.id } });
+await fire("session_start", {}, ctx);
+const offer = dispatch("signal: selected private provider refresh failure");
+const failure = await offer.settlement.then(
+  () => null,
+  (error) => error,
+);
+if (!offer.accepted) throw new Error("the selected-provider failure wake was not accepted for settlement");
+if (
+  !(failure instanceof Error) ||
+  !failure.message.includes("extension-provider availability refresh failed for private-proxy") ||
+  !failure.message.includes("private provider availability failed")
+) {
+  throw new Error(`the selected-provider refresh error did not reject to watcher fallback: ${String(failure)}`);
+}
+if ((globalThis.__fmSessions ?? []).length !== 0) {
+  throw new Error("a selected provider with a failed refresh built a branch session");
+}
+
+const command = commands.get("supervision-model");
+if (!command) throw new Error("the supervision-model command was not registered");
+await command.handler("", ctx);
+if (notices.some((notice) => notice.type === "error")) {
+  throw new Error(`picker-wide refresh isolation failed: ${JSON.stringify(notices)}`);
+}
+if (!uiPrompts.at(-1)?.options.includes("anthropic/main-model")) {
+  throw new Error(`picker-wide refresh did not remain usable: ${JSON.stringify(uiPrompts.at(-1)?.options)}`);
+}
+process.exit(0);
+EOF
+  status=$?
+  out=$(cat "$TMP_ROOT/node-output")
+  expect_code 0 "$status" "a selected provider refresh error must reject while picker discovery stays isolated: $out"
+  pass "selected provider refresh errors reject to watcher fallback without breaking discovery"
 }
 
 test_selected_provider_resolution_avoids_unrelated_refresh() {
@@ -5756,6 +5877,7 @@ test_cached_branch_rebinds_after_effective_provider_change
 test_provider_change_at_header_boundary_blocks_all_effective_streams
 test_model_runtime_create_deadline_rejects_to_watcher_fallback
 test_extension_provider_refresh_deadline_rejects_to_watcher_fallback
+test_selected_provider_refresh_error_rejects_to_watcher_fallback
 test_selected_provider_resolution_avoids_unrelated_refresh
 test_extension_registered_provider_resolves_in_the_branch
 test_supervision_model_command_picks_effort_after_the_model
