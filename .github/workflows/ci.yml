@@ -74,6 +74,13 @@ jobs:
           set -eu
           npm install -g @earendil-works/pi-coding-agent
           npm ls -g --depth 0 @earendil-works/pi-coding-agent
+      - name: Verify the minimum Pi provider boundary
+        run: |
+          set -eu
+          npm install --prefix "$RUNNER_TEMP/pi-0.84.1" --no-save --no-package-lock \
+            @earendil-works/pi-coding-agent@0.84.1
+          FM_PI_PACKAGE_DIR="$RUNNER_TEMP/pi-0.84.1/node_modules/@earendil-works/pi-coding-agent" \
+            FM_PI_MINIMUM_BOUNDARY_ONLY=1 bash tests/fm-pi-branch-extension.test.sh
       - name: Run portable parallel shard 1
         run: |
           set -eu

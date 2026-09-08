@@ -104,8 +104,10 @@ export class DynamicBorder {
 }
 
 class StubModelRuntime {
-  constructor() {
-    this.models = (globalThis.__fmBranchStaticModels?.() ?? []).map((model) => ({ ...model }));
+  constructor(providerId) {
+    this.models = (globalThis.__fmBranchStaticModels?.() ?? [])
+      .filter((model) => providerId === undefined || model.provider === providerId)
+      .map((model) => ({ ...model }));
     this.authenticated = new Set(this.models.filter((model) => model.storedAuth !== false).map((model) => model.provider));
     this.registeredProviderConfigs = new Map();
     this.registeredNativeProviders = new Map();
@@ -129,6 +131,17 @@ class StubModelRuntime {
     if (queuedError) throw new Error(queuedError);
     if (globalThis.__fmModelRuntimeError) throw new Error(globalThis.__fmModelRuntimeError);
     const runtime = new StubModelRuntime();
+    (globalThis.__fmModelRuntimes ??= []).push(runtime);
+    return runtime;
+  }
+  static async createForProvider(providerId, options = {}) {
+    const scopedOptions = { ...options, providerId };
+    (globalThis.__fmModelRuntimeCreateCalls ??= []).push(scopedOptions);
+    await globalThis.__fmModelRuntimeCreate?.(scopedOptions);
+    const queuedError = globalThis.__fmModelRuntimeErrors?.shift();
+    if (queuedError) throw new Error(queuedError);
+    if (globalThis.__fmModelRuntimeError) throw new Error(globalThis.__fmModelRuntimeError);
+    const runtime = new StubModelRuntime(providerId);
     (globalThis.__fmModelRuntimes ??= []).push(runtime);
     return runtime;
   }
@@ -198,6 +211,9 @@ class StubModelRuntime {
   getProvider(provider) {
     return this.providers.get(provider);
   }
+  getProviders() {
+    return [...this.providers.values()];
+  }
   async getAuth(model) {
     const headers = { ...(model.providerHeaders ?? {}), ...(model.headers ?? {}) };
     return {
@@ -216,6 +232,9 @@ class StubModelRuntime {
   getAvailableSnapshot() {
     return this.models.filter((model) => this.hasConfiguredAuth(model.provider));
   }
+}
+if (process.env.FM_TEST_DISABLE_SCOPED_PROVIDER_RUNTIME === "1") {
+  delete StubModelRuntime.createForProvider;
 }
 const realCodingAgent = process.env.FM_TEST_REAL_MODEL_RUNTIME === "1"
   ? await import(pathToFileURL(`${process.env.PI_PACKAGE_DIR}/dist/index.js`).href)
@@ -1880,7 +1899,7 @@ test_branch_report_refuses_a_task_the_wake_did_not_name() {
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { dispatch, fire, home, settle, approvedProject, defaultSessionCtx }; })()`);
 const { dispatch, fire, home, settle, approvedProject, defaultSessionCtx } = globalThis.__t;
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -5673,22 +5692,6 @@ import { pathToFileURL } from "node:url";
 
 const packageRoot = resolve(process.env.PI_PACKAGE_DIR);
 const piVersion = JSON.parse(readFileSync(`${packageRoot}/package.json`, "utf8")).version;
-const piVersionParts = String(piVersion).split(".").map((part) => Number.parseInt(part, 10));
-const supportsScopedRuntimeCreation =
-  piVersionParts[0] > 0 ||
-  piVersionParts[1] > 84 ||
-  (piVersionParts[1] === 84 && piVersionParts[2] >= 1);
-if (!supportsScopedRuntimeCreation) {
-  registryModels.push({ provider: "anthropic", id: "main-model" });
-  await fire("session_start", {}, makeCtx());
-  const unsupported = dispatch("signal: unsupported Pi provider boundary");
-  const failure = await unsupported.settlement.then(() => null, (error) => error);
-  if (!(failure instanceof Error) || !failure.message.includes("does not support provider-scoped supervision runtime")) {
-    throw new Error(`Pi ${piVersion} did not fall safely back before runtime creation: ${String(failure)}`);
-  }
-  if ((globalThis.__fmSessions ?? []).length !== 0) throw new Error(`Pi ${piVersion} built an unscoped branch`);
-  process.exit(0);
-}
 const {
   DefaultResourceLoader: RealDefaultResourceLoader,
   ModelRegistry: RealModelRegistry,
@@ -5697,6 +5700,18 @@ const {
   SettingsManager: RealSettingsManager,
   createAgentSession: createRealAgentSession,
 } = await import(pathToFileURL(`${packageRoot}/dist/index.js`).href);
+const supportsScopedRuntimeCreation = typeof RealModelRuntime.createForProvider === "function";
+if (!supportsScopedRuntimeCreation) {
+  registryModels.push({ provider: "anthropic", id: "main-model" });
+  await fire("session_start", {}, makeCtx());
+  const unsupported = dispatch("signal: missing Pi provider boundary");
+  const failure = await unsupported.settlement.then(() => null, (error) => error);
+  if (!(failure instanceof Error) || !failure.message.includes("no supported provider-scoped ModelRuntime")) {
+    throw new Error(`Pi ${piVersion} did not fall safely back before runtime creation: ${String(failure)}`);
+  }
+  if ((globalThis.__fmSessions ?? []).length !== 0) throw new Error(`Pi ${piVersion} built an unscoped branch`);
+  process.exit(0);
+}
 const { createAssistantMessageEventStream } = await import(
   pathToFileURL(`${packageRoot}/node_modules/@earendil-works/pi-ai/dist/index.js`).href
 );
@@ -6344,7 +6359,162 @@ EOF
   status=$?
   out=$(cat "$TMP_ROOT/node-output")
   expect_code 0 "$status" "provider changes must block every stale selected stream before disclosure: $out"
-  pass "real Pi scopes defaults, preserves static headers, and rejects unsafe registrations"
+  pass "real Pi scopes selected providers or rejects before unscoped runtime construction"
+}
+
+test_minimum_pi_unrelated_config_cannot_hide_or_block_selection() {
+  local package_dir package_version repo home out status only
+  only=${FM_PI_MINIMUM_BOUNDARY_ONLY:-0}
+  if ! command -v node >/dev/null 2>&1; then
+    if [ "$only" = 1 ]; then
+      fail "node not found for the minimum Pi provider-boundary test"
+    fi
+    echo "skip: node not found for the minimum Pi provider-boundary test"
+    return
+  fi
+  package_dir=${FM_PI_PACKAGE_DIR:-"$(npm root -g 2>/dev/null)/@earendil-works/pi-coding-agent"}
+  if [ ! -f "$package_dir/package.json" ]; then
+    if [ "$only" = 1 ]; then
+      fail "Pi 0.84.1 package not found for the minimum provider-boundary test"
+    fi
+    echo "skip: Pi 0.84.1 package not found for the minimum provider-boundary test"
+    return
+  fi
+  package_version=$(node -p "require(process.argv[1]).version" "$package_dir/package.json")
+  if [ "$package_version" != 0.84.1 ]; then
+    if [ "$only" = 1 ]; then
+      fail "minimum provider-boundary test requires Pi 0.84.1, found $package_version"
+    fi
+    echo "skip: installed Pi $package_version is not the minimum provider-boundary release 0.84.1"
+    return
+  fi
+  repo="$TMP_ROOT/minimum-provider-boundary-root"
+  home="$TMP_ROOT/minimum-provider-boundary-home"
+  mkdir -p "$home/state" "$home/config" "$home/pi-agent"
+  install_pi_branch_extension_fixture "$repo"
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    PI_PACKAGE_DIR="$package_dir" PI_CODING_AGENT_DIR="$home/pi-agent" PI_OFFLINE=1 \
+    FM_TEST_REAL_MODEL_RUNTIME=1 DRIVER_PRELUDE="$DRIVER_PRELUDE" \
+    node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+const prelude = process.env.DRIVER_PRELUDE;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, makeCtx, commands, uiSelections, uiPrompts, notices, home }; })()`);
+const { fire, dispatch, makeCtx, commands, uiSelections, uiPrompts, notices, home } = globalThis.__t;
+import { existsSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+
+const packageRoot = resolve(process.env.PI_PACKAGE_DIR);
+const { ModelRegistry: RealModelRegistry, ModelRuntime: RealModelRuntime, VERSION } = await import(
+  pathToFileURL(`${packageRoot}/dist/index.js`).href
+);
+if (VERSION !== "0.84.1") throw new Error(`expected Pi 0.84.1, found ${VERSION}`);
+if (typeof RealModelRuntime.createForProvider === "function") {
+  throw new Error("Pi 0.84.1 unexpectedly exposes a provider-scoped ModelRuntime constructor");
+}
+
+const modelsPath = `${home}/pi-agent/models.json`;
+const healthyProvider = {
+  baseUrl: "https://healthy-provider.invalid/v1",
+  api: "openai-completions",
+  apiKey: "healthy-placeholder",
+  models: [{ id: "healthy-model", name: "Healthy model", contextWindow: 4096, maxTokens: 128 }],
+};
+const unrelatedProvider = {
+  baseUrl: "https://unrelated-provider.invalid/v1",
+  api: "openai-completions",
+  apiKey: "unrelated-placeholder",
+  models: [{ id: "unrelated-model", name: "Unrelated model", contextWindow: 4096, maxTokens: 128 }],
+};
+writeFileSync(
+  modelsPath,
+  `${JSON.stringify({ providers: { "fm-healthy": healthyProvider, "fm-unrelated": unrelatedProvider } })}\n`,
+);
+const mainRuntime = await RealModelRuntime.create({
+  authPath: `${home}/pi-agent/auth.json`,
+  modelsPath,
+  refreshOnCreate: false,
+});
+const refresh = await mainRuntime.refresh({ providers: ["fm-healthy"], allowNetwork: false });
+const refreshError = refresh.errors.get("fm-healthy");
+if (refreshError) throw refreshError;
+const selected = mainRuntime.getModel("fm-healthy", "healthy-model");
+if (!selected || !mainRuntime.hasConfiguredAuth("fm-healthy")) {
+  throw new Error("the real minimum-version runtime did not cache the healthy selected model");
+}
+const mainRegistry = new RealModelRegistry(mainRuntime);
+if (!mainRegistry.getAvailable().some((model) => model.provider === selected.provider && model.id === selected.id)) {
+  throw new Error("the real minimum-version registry did not expose the cached healthy model");
+}
+writeFileSync(
+  modelsPath,
+  `${JSON.stringify({
+    providers: {
+      "fm-healthy": healthyProvider,
+      "fm-unrelated": { ...unrelatedProvider, models: "malformed" },
+    },
+  })}\n`,
+);
+
+let globalCreateCalls = 0;
+let selectedRuntimeRefreshCalls = 0;
+RealModelRuntime.create = () => {
+  globalCreateCalls += 1;
+  return new Promise(() => {});
+};
+mainRuntime.refresh = () => {
+  selectedRuntimeRefreshCalls += 1;
+  return new Promise(() => {});
+};
+async function within(promise, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`timed out waiting for ${label}`)), 750);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+const ctx = makeCtx({ model: selected, modelRegistry: mainRegistry });
+await fire("session_start", {}, ctx);
+const command = commands.get("supervision-model");
+if (!command) throw new Error("the supervision-model command was not registered");
+const label = "fm-healthy/healthy-model";
+uiSelections.push(label);
+await within(command.handler("", ctx), "minimum-version selected-model preparation");
+if (!uiPrompts[0]?.options.includes(label)) {
+  throw new Error(`the malformed unrelated provider hid the healthy picker choice: ${JSON.stringify(uiPrompts[0])}`);
+}
+if (!notices.some((notice) => notice.type === "error" && notice.message.includes("no supported provider-scoped ModelRuntime"))) {
+  throw new Error(`the selection did not report the missing scoped boundary: ${JSON.stringify(notices)}`);
+}
+if (existsSync(`${home}/config/supervision-branch-model`)) {
+  throw new Error("the unsupported selected model was persisted");
+}
+
+writeFileSync(`${home}/config/supervision-branch-model`, `${label}\n`);
+const offer = dispatch("signal: minimum Pi provider boundary");
+if (!offer.accepted) throw new Error("the minimum-version branch offer was not accepted for settlement");
+const failure = await within(
+  offer.settlement.then(() => null, (error) => error),
+  "minimum-version branch fallback",
+);
+if (!(failure instanceof Error) || !failure.message.includes("no supported provider-scoped ModelRuntime")) {
+  throw new Error(`the branch did not reject before global construction: ${String(failure)}`);
+}
+if (globalCreateCalls !== 0) throw new Error(`the extension entered all-provider ModelRuntime.create ${globalCreateCalls} time(s)`);
+if (selectedRuntimeRefreshCalls !== 0) {
+  throw new Error(`the extension refreshed the cached selected runtime ${selectedRuntimeRefreshCalls} time(s)`);
+}
+if ((globalThis.__fmSessions ?? []).length !== 0) throw new Error("the minimum-version fallback built a branch session");
+process.exit(0);
+EOF
+  status=$?
+  out=$(cat "$TMP_ROOT/node-output")
+  expect_code 0 "$status" "Pi 0.84.1 must isolate picker availability from unrelated malformed configuration: $out"
+  pass "Pi 0.84.1 keeps healthy choices visible and rejects before global runtime construction"
 }
 
 test_runtime_only_main_credential_rejects_branch_construction() {
@@ -6352,15 +6522,10 @@ test_runtime_only_main_credential_rejects_branch_construction() {
     echo "skip: node not found for the Pi runtime-only credential test"
     return
   fi
-  local package_dir package_version repo home out status
+  local package_dir repo home out status
   package_dir=${FM_PI_PACKAGE_DIR:-"$(npm root -g 2>/dev/null)/@earendil-works/pi-coding-agent"}
   if [ ! -f "$package_dir/package.json" ]; then
     echo "skip: installed @earendil-works/pi-coding-agent package not found"
-    return
-  fi
-  package_version=$(node -p "require(process.argv[1]).version" "$package_dir/package.json")
-  if ! pi_version_at_least "$package_version" 0.84.1; then
-    echo "skip: installed Pi $package_version predates provider-scoped runtime construction"
     return
   fi
   repo="$TMP_ROOT/runtime-only-main-root"
@@ -6375,13 +6540,24 @@ for (const name of ["ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_OAUTH_TOKEN", "ANTHROPIC_
   delete process.env[name];
 }
 const prelude = process.env.DRIVER_PRELUDE;
-await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, makeCtx, home }; })()`);
-const { fire, dispatch, makeCtx, home } = globalThis.__t;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, makeCtx, registryModels, home }; })()`);
+const { fire, dispatch, makeCtx, registryModels, home } = globalThis.__t;
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const packageRoot = resolve(process.env.PI_PACKAGE_DIR);
 const { ModelRuntime: RealModelRuntime } = await import(pathToFileURL(`${packageRoot}/dist/index.js`).href);
+if (typeof RealModelRuntime.createForProvider !== "function") {
+  registryModels.push({ provider: "anthropic", id: "main-model" });
+  await fire("session_start", {}, makeCtx());
+  const offer = dispatch("signal: Pi lacks a provider-scoped runtime");
+  const failure = await offer.settlement.then(() => null, (error) => error);
+  if (!(failure instanceof Error) || !failure.message.includes("no supported provider-scoped ModelRuntime")) {
+    throw new Error(`the missing provider-scoped boundary did not reject safely: ${String(failure)}`);
+  }
+  if ((globalThis.__fmSessions ?? []).length !== 0) throw new Error("an unscoped Pi runtime built a branch session");
+  process.exit(0);
+}
 const isolatedRuntime = await RealModelRuntime.create({
   authPath: `${home}/pi-agent/auth.json`,
   modelsPath: null,
@@ -6431,16 +6607,17 @@ EOF
   status=$?
   out=$(cat "$TMP_ROOT/node-output")
   expect_code 0 "$status" "a main-runtime-only credential must reject branch construction: $out"
-  pass "runtime-only main credentials reject unsafe unpinned branch construction"
+  pass "real Pi rejects unisolated runtimes and runtime-only credentials"
 }
 
-test_unsupported_pi_version_rejects_before_runtime_creation() {
+test_missing_scoped_runtime_boundary_rejects_before_runtime_creation() {
   local repo home out status
   repo="$TMP_ROOT/unsupported-pi-runtime-root"
   home="$TMP_ROOT/unsupported-pi-runtime-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
-  FM_TEST_PI_VERSION=0.82.0 PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" \
+  FM_TEST_PI_VERSION=0.82.0 FM_TEST_DISABLE_SCOPED_PROVIDER_RUNTIME=1 \
+    PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" \
     FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" DRIVER_PRELUDE="$DRIVER_PRELUDE" \
     node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
@@ -6451,7 +6628,7 @@ registryModels.push({ provider: "anthropic", id: "main-model" });
 await fire("session_start", {}, makeCtx());
 const offer = dispatch("signal: Pi 0.82 provider boundary");
 const failure = await offer.settlement.then(() => null, (error) => error);
-if (!(failure instanceof Error) || !failure.message.includes("Pi 0.82.0 does not support provider-scoped supervision runtime")) {
+if (!(failure instanceof Error) || !failure.message.includes("Pi 0.82.0 exposes no supported provider-scoped ModelRuntime")) {
   throw new Error(`Pi 0.82 did not reject to watcher fallback: ${String(failure)}`);
 }
 if ((globalThis.__fmModelRuntimeCreateCalls ?? []).length !== 0 || (globalThis.__fmSessions ?? []).length !== 0) {
@@ -6472,10 +6649,10 @@ EOF
   status=$?
   out=$(cat "$TMP_ROOT/node-output")
   expect_code 0 "$status" "Pi versions without scoped construction must reject before runtime creation: $out"
-  pass "unsupported Pi versions fall back before all-provider runtime creation"
+  pass "Pi without a scoped runtime boundary falls back before all-provider construction"
 }
 
-test_model_runtime_create_deadline_rejects_to_watcher_fallback() {
+test_scoped_model_runtime_create_deadline_rejects_to_watcher_fallback() {
   local repo home out status
   repo="$TMP_ROOT/extprov-create-deadline-root"
   home="$TMP_ROOT/extprov-create-deadline-home"
@@ -6507,7 +6684,7 @@ globalThis.setTimeout = (callback, delay, ...args) => {
 let offer;
 let failure;
 try {
-  offer = dispatch("signal: blocked model runtime creation");
+  offer = dispatch("signal: blocked scoped model runtime creation");
   failure = await offer.settlement.then(
     () => null,
     (error) => error,
@@ -6517,33 +6694,33 @@ try {
 }
 if (!offer?.accepted) throw new Error("the runtime-creation wake was not accepted for settlement");
 if (!Number.isFinite(deadlineMs) || deadlineMs <= 0) {
-  throw new Error(`model runtime creation had no positive finite deadline: ${String(deadlineMs)}`);
+  throw new Error(`scoped model runtime creation had no positive finite deadline: ${String(deadlineMs)}`);
 }
 if (!(failure instanceof Error) || !failure.message.includes("extension-provider runtime creation exceeded")) {
-  throw new Error(`the blocked model runtime creation did not reject to watcher fallback: ${String(failure)}`);
+  throw new Error(`the blocked scoped model runtime creation did not reject to watcher fallback: ${String(failure)}`);
 }
 const createCall = globalThis.__fmModelRuntimeCreateCalls?.at(-1);
-if (!createCall?.signal?.aborted) throw new Error("the timed-out model runtime creation did not receive cancellation");
-if (typeof rejectLateCreate !== "function") throw new Error("the unresolved model runtime creation was not started");
+if (!createCall?.signal?.aborted) throw new Error("the timed-out scoped model runtime creation did not receive cancellation");
+if (typeof rejectLateCreate !== "function") throw new Error("the unresolved scoped model runtime creation was not started");
 const unhandled = [];
 const recordUnhandled = (error) => unhandled.push(error);
 process.on("unhandledRejection", recordUnhandled);
-rejectLateCreate(new Error("late model runtime creation failure"));
+rejectLateCreate(new Error("late scoped model runtime creation failure"));
 await new Promise((resolve) => setImmediate(resolve));
 process.off("unhandledRejection", recordUnhandled);
 if (unhandled.length !== 0) {
-  throw new Error(`the late model runtime creation escaped as an unhandled rejection: ${String(unhandled[0])}`);
+  throw new Error(`the late scoped model runtime creation escaped as an unhandled rejection: ${String(unhandled[0])}`);
 }
-if ((globalThis.__fmSessions ?? []).length !== 0) throw new Error("a timed-out model runtime creation built a branch session");
+if ((globalThis.__fmSessions ?? []).length !== 0) throw new Error("a timed-out scoped model runtime creation built a branch session");
 if ((globalThis.__fmModelRuntimeRefreshCalls ?? []).length !== 0) {
-  throw new Error("a timed-out model runtime creation reached provider refresh");
+  throw new Error("a timed-out scoped model runtime creation reached provider refresh");
 }
 process.exit(0);
 EOF
   status=$?
   out=$(cat "$TMP_ROOT/node-output")
-  expect_code 0 "$status" "a blocked model runtime creation must reject promptly to watcher-owned fallback: $out"
-  pass "blocked model runtime creation rejects on a bounded deadline to watcher fallback"
+  expect_code 0 "$status" "a blocked scoped model runtime creation must reject promptly to watcher-owned fallback: $out"
+  pass "blocked scoped model runtime creation rejects on a bounded deadline to watcher fallback"
 }
 
 test_extension_provider_refresh_deadline_rejects_to_watcher_fallback() {
@@ -6794,6 +6971,12 @@ if (
 if ((globalThis.__fmModelRuntimeCreateCalls ?? []).some((options) => options.refreshOnCreate !== false)) {
   throw new Error(`provider resolution allowed an all-provider create refresh: ${JSON.stringify(globalThis.__fmModelRuntimeCreateCalls)}`);
 }
+if (
+  (globalThis.__fmModelRuntimeCreateCalls ?? []).length === 0 ||
+  globalThis.__fmModelRuntimeCreateCalls.some((options) => options.providerId !== "anthropic")
+) {
+  throw new Error(`provider resolution constructed outside the selected provider: ${JSON.stringify(globalThis.__fmModelRuntimeCreateCalls)}`);
+}
 process.exit(0);
 EOF
   status=$?
@@ -6879,6 +7062,11 @@ EOF
   pass "extension-registered providers fall back without hiding healthy picker choices"
 }
 
+if [ "${FM_PI_MINIMUM_BOUNDARY_ONLY:-0}" = 1 ]; then
+  test_minimum_pi_unrelated_config_cannot_hide_or_block_selection
+  exit 0
+fi
+
 test_outcomes_tool_uses_stock_execution_and_export_consumers
 test_real_pi_picker_primitives_stay_bounded_and_searchable
 test_branch_dispatch_two_stage_filter_and_prefix_contract
@@ -6914,9 +7102,10 @@ test_cached_branch_rebinds_after_effective_provider_change
 test_static_same_id_provider_hot_reload_fails_closed_at_headers
 test_header_auth_race_rechecks_registration_and_composition
 test_provider_change_at_header_boundary_blocks_all_effective_streams
+test_minimum_pi_unrelated_config_cannot_hide_or_block_selection
 test_runtime_only_main_credential_rejects_branch_construction
-test_unsupported_pi_version_rejects_before_runtime_creation
-test_model_runtime_create_deadline_rejects_to_watcher_fallback
+test_missing_scoped_runtime_boundary_rejects_before_runtime_creation
+test_scoped_model_runtime_create_deadline_rejects_to_watcher_fallback
 test_extension_provider_refresh_deadline_rejects_to_watcher_fallback
 test_selected_provider_refresh_error_rejects_to_watcher_fallback
 test_selected_provider_resolution_avoids_unrelated_refresh

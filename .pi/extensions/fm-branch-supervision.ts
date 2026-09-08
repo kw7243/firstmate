@@ -171,19 +171,14 @@ const PROVIDER_ERROR_LATCH_THRESHOLD = 2;
 const PROVIDER_REPROBE_BASE_MS = 5 * 60 * 1000;
 const PROVIDER_REPROBE_MAX_MS = 60 * 60 * 1000;
 const EXTENSION_PROVIDER_OPERATION_TIMEOUT_MS = 5_000;
-const SCOPED_PROVIDER_RUNTIME_MIN_VERSION = [0, 84, 1] as const;
 class ExtensionProviderTimeoutError extends Error {}
 class ExtensionProviderResolutionError extends Error {}
-function supportsScopedProviderRuntime(version: string): boolean {
-  const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version);
-  if (!match) return false;
-  const actual = match.slice(1).map(Number);
-  for (let index = 0; index < SCOPED_PROVIDER_RUNTIME_MIN_VERSION.length; index += 1) {
-    if (actual[index] > SCOPED_PROVIDER_RUNTIME_MIN_VERSION[index]) return true;
-    if (actual[index] < SCOPED_PROVIDER_RUNTIME_MIN_VERSION[index]) return false;
-  }
-  return true;
-}
+type ProviderScopedModelRuntimeConstructor = typeof ModelRuntime & {
+  createForProvider?: (
+    providerId: string,
+    options: NonNullable<Parameters<typeof ModelRuntime.create>[0]>,
+  ) => Promise<ModelRuntime>;
+};
 async function withExtensionProviderDeadline<T>(
   operation: Promise<T>,
   phase: string,
@@ -763,10 +758,11 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
-  async function createExtensionProviderRuntime(): Promise<ModelRuntime> {
-    if (!supportsScopedProviderRuntime(VERSION)) {
+  async function createExtensionProviderRuntime(providerId: string): Promise<ModelRuntime> {
+    const constructor = ModelRuntime as ProviderScopedModelRuntimeConstructor;
+    if (typeof constructor.createForProvider !== "function") {
       throw new ExtensionProviderResolutionError(
-        `Pi ${VERSION} does not support provider-scoped supervision runtime construction`,
+        `Pi ${VERSION} exposes no supported provider-scoped ModelRuntime construction boundary`,
       );
     }
     const controller = new AbortController();
@@ -775,11 +771,17 @@ export default function (pi: ExtensionAPI) {
       signal: controller.signal,
       refreshOnCreate: false,
     };
-    return withExtensionProviderDeadline(
-      ModelRuntime.create(options),
+    const modelRuntime = await withExtensionProviderDeadline(
+      constructor.createForProvider.call(constructor, providerId, options),
       "runtime creation",
       () => controller.abort(),
     );
+    if (modelRuntime.getProviders().some((provider) => provider.id !== providerId)) {
+      throw new ExtensionProviderResolutionError(
+        `Pi ${VERSION} returned unrelated providers in the scoped runtime for ${providerId}`,
+      );
+    }
+    return modelRuntime;
   }
 
   function extensionProviderRegistrationKind(providerId: string): "native" | "config" | null {
@@ -805,7 +807,7 @@ export default function (pi: ExtensionAPI) {
         `Pi ${VERSION} exposes no provider-scoped registration boundary for extension provider ${providerId}`,
       );
     }
-    const modelRuntime = await createExtensionProviderRuntime();
+    const modelRuntime = await createExtensionProviderRuntime(providerId);
     const controller = new AbortController();
     try {
       const result = await withExtensionProviderDeadline(
@@ -817,6 +819,11 @@ export default function (pi: ExtensionAPI) {
       if (error) {
         throw new ExtensionProviderResolutionError(
           `extension-provider availability refresh failed for ${providerId}: ${error.message}`,
+        );
+      }
+      if (modelRuntime.getProviders().some((provider) => provider.id !== providerId)) {
+        throw new ExtensionProviderResolutionError(
+          `Pi ${VERSION} added unrelated providers while refreshing the scoped runtime for ${providerId}`,
         );
       }
     } catch (error) {

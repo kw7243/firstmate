@@ -1284,7 +1284,7 @@ FM_HARNESS_LIVENESS_DRIFT=1 bin/fm-test-run.sh tests/fm-harness-liveness-drift-l
 
 ## Pi supervision branch
 
-The supervision-branch extension (`.pi/extensions/fm-branch-supervision.ts`, [docs/pi-supervision-branch.md](../pi-supervision-branch.md)) builds its second session through the Pi SDK surface: `createAgentSession` (including its `model`, `modelRuntime`, and `thinkingLevel` options), `DefaultResourceLoader` with `extensionFactories`, `SessionManager`, `createBashToolDefinition` with a `spawnHook`, `sendCustomMessage` for routine notes, `appendEntry` and `registerEntryRenderer` for captain outcomes, the `before_provider_headers` freshness boundary, the cache-key-only `before_provider_request` hook, the command context's model registry for picker candidates and effective request composition, a fresh provider-scoped `ModelRuntime` for selected-value resolution, and Pi's own `getSupportedThinkingLevels`/`clampThinkingLevel` plus its `getThinkingLevel` and `thinking_level_select` extension surface for effort.
+The supervision-branch extension (`.pi/extensions/fm-branch-supervision.ts`, [docs/pi-supervision-branch.md](../pi-supervision-branch.md)) builds its second session through the Pi SDK surface: `createAgentSession` (including its `model`, `modelRuntime`, and `thinkingLevel` options), `DefaultResourceLoader` with `extensionFactories`, `SessionManager`, `createBashToolDefinition` with a `spawnHook`, `sendCustomMessage` for routine notes, `appendEntry` and `registerEntryRenderer` for captain outcomes, the `before_provider_headers` freshness boundary, the cache-key-only `before_provider_request` hook, the command context's model registry for picker candidates and effective request composition, an explicitly provider-scoped `ModelRuntime` constructor when Pi supplies one, rejection before all-provider construction when it does not, and Pi's own `getSupportedThinkingLevels`/`clampThinkingLevel` plus its `getThinkingLevel` and `thinking_level_select` extension surface for effort.
 In TUI mode, its `/supervision-model` model list is drawn with Pi's own `SelectList`, `Input`, `fuzzyFilter`, and `DynamicBorder` through the extension context's `ui.custom` surface, which is what bounds and searches a long catalog.
 
 Evidence produced 2026-08-25 on macOS 26.5.2 arm64, Node v24.13.1:
@@ -1454,6 +1454,23 @@ It names the installed version and the floor rather than degrading quietly, and 
 The same guard against the pre-change extension in the same lab measured a 676.9 ms worst keystroke echo while delivering two outcomes and a 295.3 ms worst echo with nothing to deliver, against a 49.2 ms extension-free floor, and failed as designed.
 Measured through the same real `fm_branch_report` tool and real `bin/` scripts with a 1 ms interval timer, the largest single block of the JavaScript thread fell from 273 ms to 2.0 ms for a routine outcome, from 286 ms to 2.0 ms for a captain outcome, and from 134 ms to 1.9 ms for main's acknowledgement, against a 1.3-2.2 ms idle-loop floor.
 Those absolute figures are specific to this host and Pi version; the guards assert the relationship (delivery must stay in the class of the same machine's own floor) rather than a remembered millisecond number.
+
+### 2026-09-08 Pi 0.84.1 provider construction boundary
+
+The exact minimum-version regression ran on Linux 6.8.0-137-generic x86_64 with Node v24.18.0 and the npm `@earendil-works/pi-coding-agent` 0.84.1 package.
+It built a real Pi `ModelRuntime` and `ModelRegistry` over valid selected and unrelated static providers, cached the healthy selection, then made the unrelated provider schema-invalid and replaced both the all-provider constructor and the cached runtime's refresh with non-settling sentinels.
+The real picker retained the cached healthy choice, selected-value preparation and a pinned branch offer both returned before the sentinel, no branch session was built, and no provider request was made.
+
+```sh
+pi_min_root=$(mktemp -d "$PWD/.pi-min.XXXXXX")
+trap 'rm -rf -- "$pi_min_root"' EXIT
+npm install --prefix "$pi_min_root" --no-save --no-package-lock @earendil-works/pi-coding-agent@0.84.1
+FM_PI_PACKAGE_DIR="$pi_min_root/node_modules/@earendil-works/pi-coding-agent" FM_PI_MINIMUM_BOUNDARY_ONLY=1 bash tests/fm-pi-branch-extension.test.sh
+```
+
+```text
+ok - Pi 0.84.1 keeps healthy choices visible and rejects before global runtime construction
+```
 
 ## Oh My Pi (omp)
 

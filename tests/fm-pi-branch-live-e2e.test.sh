@@ -1,18 +1,16 @@
 #!/usr/bin/env bash
 # Opt-in live guard for the Pi supervision-branch extension against the REAL
-# installed @earendil-works/pi-coding-agent SDK (no stubs): the branch session
-# is created through the real DefaultResourceLoader/SessionManager/
-# createAgentSession surface, the custom bash and fm_branch_report tool
-# definitions must be accepted by the real tool registry, the session file and
-# pointer must persist on disk, and - because the isolated agent dir carries no
-# credentials and no models - the branch's first prompt must reject its offer
-# settlement so the watcher retains ownership and delivers the wake to main
-# against the real SDK. It also resolves the supervision-branch model pin
-# through the branch's REAL ModelRuntime, so a pin the vendor cannot resolve is
-# proven to refuse the build rather than silently running the branch on main's
-# model. A second branch probe intercepts the incident's post-construction 429
-# in-process and proves that Pi's normally settled error turn returns ownership
-# to the watcher. The model-precedence probe pins the vendor contract that the
+# installed @earendil-works/pi-coding-agent SDK (no stubs): a Pi release with
+# provider-scoped runtime construction must build the branch through the real
+# DefaultResourceLoader/SessionManager/createAgentSession surface, while a
+# release without that boundary must return the offer to main before an
+# all-provider runtime or branch session is created. On a compatible release,
+# the custom bash and fm_branch_report tool definitions must be accepted by the
+# real tool registry, and an unresolvable model pin must refuse the build rather
+# than silently running the branch on main's model. A second compatible-release
+# probe intercepts the incident's post-construction 429 in-process and proves
+# that Pi's normally settled error turn returns ownership to the watcher. The
+# model-precedence probe pins the vendor contract that the
 # model pin rests on:
 # an explicit model must beat the model a reopened session recorded, proven
 # against a local, never-contacted fake provider. The effort-precedence probe
@@ -153,6 +151,7 @@ watchMod.default(pi);
 const { ModelRegistry, ModelRuntime } = await import(
   pathToFileURL(`${process.env.PI_PACKAGE_DIR}/dist/index.js`).href
 );
+const scopedRuntimeAvailable = typeof ModelRuntime.createForProvider === "function";
 const modelRegistry = new ModelRegistry(
   await ModelRuntime.create({
     authPath: `${process.env.PI_CODING_AGENT_DIR}/auth.json`,
@@ -203,18 +202,24 @@ const fallback = mainUserMessages[0].content;
 if (!fallback.includes("FIRSTMATE WATCHER WAKE: signal: live-sdk probe")) {
   throw new Error(`watcher-owned fallback lost the wake reason: ${fallback}`);
 }
-if (!existsSync(`${home}/state/.branch-session`)) {
-  throw new Error("real SessionManager did not persist the branch session pointer");
-}
-// The real SessionManager writes the session file lazily (on its first
-// persisted entry), so assert the pointer's placement rather than the file:
-// the recorded path must live under this home branch-session store.
-const pointer = readFileSync(`${home}/state/.branch-session`, "utf8").trim();
-if (!pointer.startsWith(`${home}/state/branch-session/`) || !pointer.endsWith(".jsonl")) {
-  throw new Error(`recorded branch session pointer is misplaced: ${pointer}`);
-}
-if (!existsSync(`${home}/state/branch-session`)) {
-  throw new Error("branch session store directory was not created");
+if (scopedRuntimeAvailable) {
+  if (!existsSync(`${home}/state/.branch-session`)) {
+    throw new Error("real SessionManager did not persist the branch session pointer");
+  }
+  const pointer = readFileSync(`${home}/state/.branch-session`, "utf8").trim();
+  if (!pointer.startsWith(`${home}/state/branch-session/`) || !pointer.endsWith(".jsonl")) {
+    throw new Error(`recorded branch session pointer is misplaced: ${pointer}`);
+  }
+  if (!existsSync(`${home}/state/branch-session`)) {
+    throw new Error("branch session store directory was not created");
+  }
+} else {
+  if (!offerFailure.message.includes("no supported provider-scoped ModelRuntime")) {
+    throw new Error(`the missing scoped runtime boundary reported the wrong failure: ${offerFailure.message}`);
+  }
+  if (existsSync(`${home}/state/.branch-session`)) {
+    throw new Error("Pi without a scoped runtime constructor persisted a branch session pointer");
+  }
 }
 
 // A model pin the branch's REAL runtime cannot resolve must refuse the build
@@ -236,8 +241,10 @@ if (offers.length !== 2 || !offers[1].accepted) {
 }
 const pinFailure = await offers[1].settlement.then(() => null, (error) => error);
 if (!(pinFailure instanceof Error) ||
-    !pinFailure.message.includes("openai/no-such-live-model") ||
-    !pinFailure.message.includes("supervision model pin")) {
+    (scopedRuntimeAvailable &&
+      (!pinFailure.message.includes("openai/no-such-live-model") ||
+        !pinFailure.message.includes("supervision model pin"))) ||
+    (!scopedRuntimeAvailable && !pinFailure.message.includes("no supported provider-scoped ModelRuntime"))) {
   throw new Error(`the rejected real-SDK settlement did not name the unusable pin: ${String(pinFailure)}`);
 }
 const pinFallback = mainUserMessages[1].content;
@@ -250,20 +257,27 @@ const confirmations = readFileSync(process.env.FM_LIVE_WATCH_LOG, "utf8")
 if (confirmations.length !== 2) {
   throw new Error(`watcher did not confirm both successor deliveries: ${confirmations.join(" | ")}`);
 }
-console.log("LIVE_OK");
+console.log(scopedRuntimeAvailable ? "LIVE_OK_SCOPED" : "LIVE_OK_FALLBACK");
 process.exit(0);
 EOF
 status=$?
 out=$(cat "$TMP_ROOT/node-output")
-if [ "$status" -ne 0 ] || [ "$out" != "LIVE_OK" ]; then
+if [ "$status" -ne 0 ] || { [ "$out" != "LIVE_OK_SCOPED" ] && [ "$out" != "LIVE_OK_FALLBACK" ]; }; then
   fail "real-SDK Pi branch guard failed against pi-coding-agent $PI_VERSION: $out"
 fi
-pass "real Pi SDK $PI_VERSION accepts the branch session construction and preserves an unpromptable wake"
+if [ "$out" = LIVE_OK_SCOPED ]; then
+  PI_SCOPED_RUNTIME=1
+  pass "real Pi SDK $PI_VERSION accepts scoped branch construction and preserves an unpromptable wake"
+else
+  PI_SCOPED_RUNTIME=0
+  pass "real Pi SDK $PI_VERSION rejects branch construction before an all-provider runtime and preserves the wake"
+fi
 
 # Real-SDK Mode 2 guard: a constructed AgentSession receives the c1 429 shape
 # from Pi's real OpenAI-compatible adapter. Fetch is intercepted in-process,
 # so no provider request leaves the machine, but Pi still persists the error
 # assistant message and resolves session.prompt() through its production loop.
+if [ "$PI_SCOPED_RUNTIME" = 1 ]; then
 errorhome="$TMP_ROOT/error-home"
 erroragentdir="$TMP_ROOT/error-agent-dir"
 mkdir -p "$errorhome/state" "$errorhome/config" "$erroragentdir"
@@ -429,6 +443,7 @@ if [ "$status" -ne 0 ] || [ "$out" != "ERROR_FALLBACK_OK" ]; then
   fail "real-SDK Pi settled-provider-error guard failed against pi-coding-agent $PI_VERSION: $out"
 fi
 pass "real Pi SDK $PI_VERSION rejects a post-construction 429 to watcher-owned main delivery without losing its durable row"
+fi
 
 # Third probe: the vendor contract the supervision-branch model pin rests on.
 # An explicit model must beat the model a reopened session recorded, or a pin
