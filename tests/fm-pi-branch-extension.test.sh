@@ -69,7 +69,7 @@ import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 export function getAgentDir() {
-  return "/stub-agent-dir";
+  return process.env.PI_CODING_AGENT_DIR ?? "/stub-agent-dir";
 }
 
 export function getMarkdownTheme() {
@@ -133,6 +133,7 @@ class StubModelRuntime {
     return runtime;
   }
   registerProvider(providerId, config) {
+    (globalThis.__fmProviderRegistrationCalls ??= []).push({ kind: "config", providerId });
     this.registeredNativeProviders.delete(providerId);
     this.registeredProviderConfigs.set(providerId, config);
     const inheritedProvider = this.providers.get(providerId);
@@ -153,9 +154,11 @@ class StubModelRuntime {
       });
     }
     if (config.oauth || config.apiKey) this.pendingAuth.add(providerId);
+    if (globalThis.__fmRegistrationStartsRefresh) void this.refresh({ allowNetwork: false });
   }
   registerNativeProvider(provider) {
     const providerId = provider.id;
+    (globalThis.__fmProviderRegistrationCalls ??= []).push({ kind: "native", providerId });
     const inherited = this.models.filter((model) => model.provider === providerId);
     this.registeredProviderConfigs.delete(providerId);
     this.registeredNativeProviders.set(providerId, provider);
@@ -171,6 +174,7 @@ class StubModelRuntime {
       });
     }
     if (provider.oauth || provider.apiKey || provider.getApiKey) this.pendingAuth.add(providerId);
+    if (globalThis.__fmRegistrationStartsRefresh) void this.refresh({ allowNetwork: false });
   }
   async refresh(options) {
     (globalThis.__fmModelRuntimeRefreshCalls ??= []).push({ runtime: this, options });
@@ -201,9 +205,11 @@ class StubModelRuntime {
     return this.models.filter((model) => this.hasConfiguredAuth(model.provider));
   }
 }
-export const ModelRuntime = process.env.FM_TEST_REAL_MODEL_RUNTIME === "1"
-  ? (await import(pathToFileURL(`${process.env.PI_PACKAGE_DIR}/dist/index.js`).href)).ModelRuntime
-  : StubModelRuntime;
+const realCodingAgent = process.env.FM_TEST_REAL_MODEL_RUNTIME === "1"
+  ? await import(pathToFileURL(`${process.env.PI_PACKAGE_DIR}/dist/index.js`).href)
+  : null;
+export const VERSION = realCodingAgent?.VERSION ?? process.env.FM_TEST_PI_VERSION ?? "0.85.1";
+export const ModelRuntime = realCodingAgent?.ModelRuntime ?? StubModelRuntime;
 export class DefaultResourceLoader {
   constructor(options) {
     this.options = options;
@@ -245,6 +251,20 @@ export class SessionManager {
   }
 }
 
+class StubSettingsManager {
+  static create(cwd, agentDir) {
+    (globalThis.__fmSettingsManagerCreateCalls ??= []).push({ cwd, agentDir });
+    return new StubSettingsManager();
+  }
+  getDefaultProvider() {
+    return globalThis.__fmDefaultProvider;
+  }
+  getDefaultModel() {
+    return globalThis.__fmDefaultModel;
+  }
+}
+export const SettingsManager = realCodingAgent?.SettingsManager ?? StubSettingsManager;
+
 export function createBashToolDefinition(cwd, options) {
   return {
     name: "bash",
@@ -272,6 +292,11 @@ export async function createAgentSession(options) {
   let selectedModel = options.model;
   if (!selectedModel && recordedModel) {
     selectedModel = modelRuntime.getModel(recordedModel.provider, recordedModel.modelId);
+  }
+  if (!selectedModel && options.settingsManager) {
+    const provider = options.settingsManager.getDefaultProvider?.();
+    const modelId = options.settingsManager.getDefaultModel?.();
+    if (provider && modelId) selectedModel = modelRuntime.getModel(provider, modelId);
   }
   if (!selectedModel && globalThis.__fmSelectDefaultModel) {
     selectedModel = await globalThis.__fmSelectDefaultModel({ modelRuntime, options });
@@ -546,6 +571,8 @@ const uiPrompts = [];
 const notices = [];
 const commands = new Map();
 let mainModel = { provider: "anthropic", id: "main-model" };
+globalThis.__fmDefaultProvider = "anthropic";
+globalThis.__fmDefaultModel = "main-model";
 // Main's own effort, which Pi answers through pi.getThinkingLevel(). Drivers
 // change it through setMainThinkingLevel and then fire Pi's own
 // thinking_level_select event, exactly as Pi does for a real /settings pick.
@@ -2051,9 +2078,10 @@ test_post_construction_provider_error_falls_back_latches_and_recovers_on_cooldow
   PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
-await eval(`(async () => { ${prelude}; globalThis.__t = { pi, makeOffer, dispatch, fire, settle, home, mainUserMessages, sentToMain }; })()`);
-const { pi, makeOffer, dispatch, fire, settle, home, mainUserMessages, sentToMain } = globalThis.__t;
+await eval(`(async () => { ${prelude}; globalThis.__t = { pi, makeOffer, dispatch, fire, settle, home, realRoot, mainUserMessages, sentToMain }; })()`);
+const { pi, makeOffer, dispatch, fire, settle, home, realRoot, mainUserMessages, sentToMain } = globalThis.__t;
 import { existsSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 
 let now = 1_000_000;
 Date.now = () => now;
@@ -2069,11 +2097,54 @@ globalThis.__fmInitialBranchMessages = Array.from({ length: 100 }, (_, index) =>
   content: `old context ${index}`,
   ...(index % 2 === 0 ? {} : { stopReason: "stop" }),
 }));
+globalThis.__fmExecuteBranchBash = async (context) => {
+  const result = spawnSync("bash", ["-c", context.command], {
+    encoding: "utf8",
+    cwd: context.cwd,
+    env: context.env,
+  });
+  return {
+    content: [{ type: "text", text: `${result.stdout}${result.stderr}` }],
+    details: { stdout: result.stdout, stderr: result.stderr, exitCode: result.status },
+    isError: result.status !== 0,
+  };
+};
+function claimLease(task, actor, holderPid) {
+  const result = spawnSync("bash", [
+    `${realRoot}/bin/fm-lease.sh`,
+    "claim",
+    task,
+    "--actor",
+    actor,
+  ], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      FM_HOME: home,
+      FM_STATE_OVERRIDE: `${home}/state`,
+      FM_ROOT_OVERRIDE: realRoot,
+      FM_SUPERVISION_ACTOR: actor,
+      FM_LEASE_HOLDER_PID: String(holderPid),
+    },
+  });
+  if (result.status !== 0) throw new Error(`could not claim ${task}: ${result.stderr}`);
+}
 let attempt = 0;
 let releaseFailedProbe;
 globalThis.__fmOnBranchPrompt = async ({ session }) => {
   attempt += 1;
   if (attempt === 1) {
+    const bash = session.options.customTools.find((tool) => tool.name === "bash");
+    const claimed = await bash.execute(
+      "claim-before-provider-failure",
+      { command: "bin/fm-lease.sh claim task-owned --actor branch" },
+      undefined,
+      undefined,
+      {},
+    );
+    if (claimed.isError) throw new Error(`the branch could not claim its task lease: ${JSON.stringify(claimed)}`);
+    claimLease("task-foreign-holder", "branch", process.ppid);
+    claimLease("task-main-holder", "main", process.pid);
     session.messages = [
       { role: "assistant", content: "compaction summary", stopReason: "stop" },
       ...Array.from({ length: 10 }, (_, index) => ({ role: "user", content: `retained ${index}` })),
@@ -2128,6 +2199,19 @@ if (!(firstFailure instanceof Error) ||
 if (mainUserMessages.length !== 0) throw new Error("branch bypassed watcher-owned fallback delivery");
 if (existsSync(`${home}/state/.branch-eligible-rows`)) {
   throw new Error("provider-error fallback left the claimed row grant active");
+}
+if (existsSync(`${home}/state/.lease-task-owned`)) {
+  throw new Error("provider-error fallback left its branch-owned task lease active");
+}
+claimLease("task-owned", "main", process.pid);
+if (!existsSync(`${home}/state/.lease-task-owned`)) {
+  throw new Error("main could not claim the task after provider fallback");
+}
+if (!existsSync(`${home}/state/.lease-task-foreign-holder`)) {
+  throw new Error("provider-error fallback released another branch holder's lease");
+}
+if (!existsSync(`${home}/state/.lease-task-main-holder`)) {
+  throw new Error("provider-error fallback released main's lease");
 }
 
 const healthy = dispatch("signal: healthy branch turn");
@@ -2226,8 +2310,8 @@ process.exit(0);
 EOF
   status=$?
   out=$(cat "$TMP_ROOT/node-output")
-  expect_code 0 "$status" "provider errors must latch, cool down, re-probe once, back off, and recover through a durable report: $out"
-  pass "provider-error latches cool down, re-probe once with backoff, and recover through a durable report"
+  expect_code 0 "$status" "provider errors must release owned leases, latch, cool down, and recover: $out"
+  pass "provider errors release owned leases, cool down, and recover"
 }
 
 test_selection_change_does_not_corrupt_inflight_provider_state() {
@@ -2678,15 +2762,14 @@ import { rmSync, writeFileSync } from "node:fs";
 
 registryModels.push({ provider: "anthropic", id: "main-model" }, { provider: "openai", id: "cheap-1" });
 
-// 1. No pin and main's model not known yet: the build passes no override so Pi
-// selects its own default, then the branch captures and guards that effective
-// model before any mirrored context or prompt can reach it.
+// 1. No pin and main's model not known yet: Pi still receives no model
+// override, but it selects through the already-bounded provider runtime.
 await fire("session_start", {});
 dispatch("signal: main model unknown");
 await settle(() => (globalThis.__fmSessions ?? []).length === 1, "unknown-main-model branch build");
 const unknownSelectionCall = globalThis.__fmCreateAgentSessionCalls[0];
-if ("model" in unknownSelectionCall || "modelRuntime" in unknownSelectionCall) {
-  throw new Error("an unknown main model did not preserve Pi's no-override selection path");
+if ("model" in unknownSelectionCall || !unknownSelectionCall.modelRuntime || !unknownSelectionCall.settingsManager) {
+  throw new Error("an unknown main model did not use Pi's bounded no-override selection path");
 }
 const unknownEffective = globalThis.__fmSessions[0];
 if (
@@ -2695,6 +2778,13 @@ if (
   !unknownEffective.options.modelRuntime
 ) {
   throw new Error(`the branch did not capture Pi's effective default: ${JSON.stringify(unknownEffective.options.model)}`);
+}
+const unknownRefresh = globalThis.__fmModelRuntimeRefreshCalls?.[0];
+if (JSON.stringify(unknownRefresh?.options?.providers) !== JSON.stringify(["anthropic"])) {
+  throw new Error(`the unknown default did not stay provider-scoped: ${JSON.stringify(unknownRefresh?.options)}`);
+}
+if (globalThis.__fmModelRuntimeCreateCalls?.[0]?.refreshOnCreate !== false) {
+  throw new Error("the unknown default allowed create-time all-provider refresh");
 }
 
 // 2. No pin, main's model known: the branch follows MAIN's own model,
@@ -2787,7 +2877,6 @@ const replacementCtx = makeCtx({
   },
 });
 const providerCalls = [];
-const replacementCalls = [];
 globalThis.__fmStockProviderStreamSimple = (model, context) => {
   providerCalls.push({ model, context: structuredClone(context) });
 };
@@ -2795,9 +2884,7 @@ const replacementProvider = {
   api: "anthropic-messages",
   baseUrl: "https://replacement-anthropic.invalid",
   apiKey: "replacement-credential",
-  streamSimple(model, context) {
-    replacementCalls.push({ model, context: structuredClone(context) });
-  },
+  streamSimple() {},
 };
 let replaceBeforeInvocation = true;
 globalThis.__fmOnBranchPrompt = ({ session }) => {
@@ -2805,6 +2892,12 @@ globalThis.__fmOnBranchPrompt = ({ session }) => {
     replaceBeforeInvocation = false;
     globalThis.__fmExtensionProviderConfigs.set("anthropic", replacementProvider);
   }
+  let beforeHeaders;
+  const factoryEntry = session.options.resourceLoader.options.extensionFactories[0];
+  const factory = typeof factoryEntry === "function" ? factoryEntry : factoryEntry.factory;
+  factory({ on: (event, handler) => { if (event === "before_provider_headers") beforeHeaders = handler; } });
+  if (!beforeHeaders) throw new Error("the default branch installed no provider-header guard");
+  beforeHeaders({}, { abort() {} });
   return session.modelRuntime.streamSimple(
     session.model,
     { messages: session.ops },
@@ -2835,28 +2928,21 @@ if (!(failure instanceof Error) || !failure.message.includes("provider registrat
 }
 
 const reboundOffer = dispatch("signal: rebuild against the current default provider");
-await settle(
-  () => (globalThis.__fmSessions ?? []).length === 2 && globalThis.__fmSessions[1].ops.some((op) => op.kind === "prompt"),
-  "current default-provider branch prompt",
-);
-await reboundOffer.settlement.then(() => null, () => null);
-const rebound = globalThis.__fmSessions[1];
+const reboundFailure = await reboundOffer.settlement.then(() => null, (error) => error);
 if (!session.disposed) throw new Error("the obsolete default-provider branch remained live");
-if (rebound.model?.baseUrl !== replacementProvider.baseUrl) {
-  throw new Error(`the rebuilt branch did not use the current provider: ${JSON.stringify(rebound.model)}`);
+if (!(reboundFailure instanceof Error) || !reboundFailure.message.includes("no provider-scoped registration boundary")) {
+  throw new Error(`the rebuilt branch did not fall safely back from the runtime registration: ${String(reboundFailure)}`);
 }
 if (providerCalls.length !== 0) {
   throw new Error(`the obsolete stock provider received mirrored context: ${JSON.stringify(providerCalls)}`);
 }
-if (replacementCalls.length !== 1) {
-  throw new Error(`the rebuilt branch did not invoke the current provider: ${JSON.stringify(replacementCalls)}`);
-}
+if ((globalThis.__fmSessions ?? []).length !== 1) throw new Error("the unsupported registration built a replacement branch");
 process.exit(0);
 EOF
   status=$?
   out=$(cat "$TMP_ROOT/node-output")
   expect_code 0 "$status" "a no-model replacement session must clear the prior unpinned provider selection: $out"
-  pass "a no-model replacement guards Pi's default and rebuilds onto its current provider"
+  pass "a no-model replacement guards Pi's bounded default and falls back from runtime registration"
 }
 
 test_unpinned_branch_follows_main_model_changes_live() {
@@ -4993,7 +5079,7 @@ EOF
   pass "a failed cursor write re-delivers a routine note exactly once more while a captain outcome stays deduplicated"
 }
 
-test_effective_extension_provider_registration_precedes_model_lookup() {
+test_extension_provider_registration_falls_back_without_scoped_api() {
   local repo home out status
   repo="$TMP_ROOT/extprov-effective-root"
   home="$TMP_ROOT/extprov-effective-home"
@@ -5003,7 +5089,7 @@ test_effective_extension_provider_registration_precedes_model_lookup() {
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, registryModels, home }; })()`);
-const { fire, dispatch, settle, makeCtx, registryModels, home } = globalThis.__t;
+const { fire, dispatch, makeCtx, registryModels, home } = globalThis.__t;
 import { writeFileSync } from "node:fs";
 
 registryModels.push(
@@ -5038,34 +5124,32 @@ globalThis.__fmExtensionNativeProviders = new Map([
 
 await fire("session_start", {}, makeCtx());
 const overrideOffer = dispatch("signal: effective config override");
-await settle(() => (globalThis.__fmSessions ?? []).length === 1, "config-override branch build");
-const overridden = globalThis.__fmSessions[0].options.model;
-if (overridden?.baseUrl !== "https://anthropic.proxy.invalid") {
-  throw new Error(`the branch bypassed the effective provider override: ${JSON.stringify(overridden)}`);
+const overrideFailure = await overrideOffer.settlement.then(() => null, (error) => error);
+if (!(overrideFailure instanceof Error) || !overrideFailure.message.includes("no provider-scoped registration boundary")) {
+  throw new Error(`the config registration did not fall safely back: ${String(overrideFailure)}`);
 }
-await overrideOffer.settlement.then(() => null, () => null);
+if ((globalThis.__fmSessions ?? []).length !== 0) throw new Error("the config registration built an unsafe branch");
 
 writeFileSync(`${home}/config/supervision-branch-model`, "native-proxy/native-model\n");
 await fire("session_shutdown", {});
 await fire("session_start", {}, makeCtx());
 const nativeOffer = dispatch("signal: native provider registration");
-await settle(() => (globalThis.__fmSessions ?? []).length === 2, "native-provider branch build");
-const native = globalThis.__fmSessions[1].options.model;
-if (
-  native?.provider !== "native-proxy" ||
-  native?.id !== "native-model" ||
-  native?.baseUrl !== "https://native.proxy.invalid" ||
-  native?.api !== "native-private-api"
-) {
-  throw new Error(`the branch did not preserve the native provider registration: ${JSON.stringify(native)}`);
+const nativeFailure = await nativeOffer.settlement.then(() => null, (error) => error);
+if (!(nativeFailure instanceof Error) || !nativeFailure.message.includes("no provider-scoped registration boundary")) {
+  throw new Error(`the native registration did not fall safely back: ${String(nativeFailure)}`);
 }
-await nativeOffer.settlement.then(() => null, () => null);
+if ((globalThis.__fmModelRuntimeCreateCalls ?? []).length !== 0) {
+  throw new Error("an unsupported runtime registration reached model runtime creation");
+}
+if ((globalThis.__fmProviderRegistrationCalls ?? []).length !== 0) {
+  throw new Error("the branch invoked Pi's unscoped provider registration API");
+}
 process.exit(0);
 EOF
   status=$?
   out=$(cat "$TMP_ROOT/node-output")
-  expect_code 0 "$status" "effective provider overrides and native registrations must bind branch models: $out"
-  pass "effective provider overrides and native registrations bind before branch model lookup"
+  expect_code 0 "$status" "runtime provider registrations must fall safely back without a scoped Pi API: $out"
+  pass "runtime provider registrations fall back before unscoped Pi registration"
 }
 
 test_cached_branch_rebinds_after_effective_provider_change() {
@@ -5112,27 +5196,21 @@ globalThis.__fmExtensionProviderConfigs.set("anthropic", {
 const privatePrompt = "captain context added after private proxy registration";
 await fire("before_agent_start", { prompt: privatePrompt }, ctx);
 const reboundOffer = dispatch("signal: provider registration changed");
-await settle(
-  () => (globalThis.__fmSessions ?? []).length === 2 && globalThis.__fmSessions[1].ops.some((op) => op.kind === "prompt"),
-  "provider-rebound branch prompt",
-);
-const rebound = globalThis.__fmSessions[1];
+const reboundFailure = await reboundOffer.settlement.then(() => null, (error) => error);
 if (!first.disposed) throw new Error("the obsolete provider-bound branch remained live");
-if (rebound.options.model?.baseUrl !== "https://anthropic.proxy.invalid") {
-  throw new Error(`the replacement branch bypassed the new private proxy: ${JSON.stringify(rebound.options.model)}`);
+if (!(reboundFailure instanceof Error) || !reboundFailure.message.includes("no provider-scoped registration boundary")) {
+  throw new Error(`the replacement did not fall safely back from the new registration: ${String(reboundFailure)}`);
 }
 if (first.ops.some((op) => JSON.stringify(op).includes(privatePrompt))) {
   throw new Error("new private context reached the obsolete provider-bound branch");
 }
-const reboundMirror = rebound.ops.find((op) => op.kind === "custom" && op.message.content.includes(privatePrompt));
-if (!reboundMirror) throw new Error("the replacement branch did not receive the newly mirrored private context");
-await reboundOffer.settlement.then(() => null, () => null);
+if ((globalThis.__fmSessions ?? []).length !== 1) throw new Error("the unsupported replacement built a branch session");
 process.exit(0);
 EOF
   status=$?
   out=$(cat "$TMP_ROOT/node-output")
   expect_code 0 "$status" "a cached branch must rebind when its effective provider registration changes: $out"
-  pass "cached branches rebind before new mirrored context reaches a changed provider"
+  pass "cached branches invalidate before changed registrations receive mirrored context"
 }
 
 test_provider_change_at_header_boundary_blocks_all_effective_streams() {
@@ -5167,7 +5245,18 @@ const piVersionParts = String(piVersion).split(".").map((part) => Number.parseIn
 const supportsScopedRuntimeCreation =
   piVersionParts[0] > 0 ||
   piVersionParts[1] > 84 ||
-  (piVersionParts[1] === 84 && piVersionParts[2] >= 4);
+  (piVersionParts[1] === 84 && piVersionParts[2] >= 1);
+if (!supportsScopedRuntimeCreation) {
+  registryModels.push({ provider: "anthropic", id: "main-model" });
+  await fire("session_start", {}, makeCtx());
+  const unsupported = dispatch("signal: unsupported Pi provider boundary");
+  const failure = await unsupported.settlement.then(() => null, (error) => error);
+  if (!(failure instanceof Error) || !failure.message.includes("does not support provider-scoped supervision runtime")) {
+    throw new Error(`Pi ${piVersion} did not fall safely back before runtime creation: ${String(failure)}`);
+  }
+  if ((globalThis.__fmSessions ?? []).length !== 0) throw new Error(`Pi ${piVersion} built an unscoped branch`);
+  process.exit(0);
+}
 const {
   DefaultResourceLoader: RealDefaultResourceLoader,
   ModelRuntime: RealModelRuntime,
@@ -5191,6 +5280,7 @@ const modelDefinition = {
 registryModels.push(
   { provider: "private-proxy", id: "private-model", branchAvailable: false },
   { provider: "prototype-native", id: "private-model", branchAvailable: false },
+  { provider: "fm-static-config", id: "static-model", branchAvailable: false },
 );
 let providerACalls = 0;
 let providerBCalls = 0;
@@ -5273,43 +5363,9 @@ const discoveryRuntime = await RealModelRuntime.create({
 });
 const anthropicModel = discoveryRuntime.getModels("anthropic").find((model) => model.input.includes("text"));
 if (!anthropicModel) throw new Error("the real runtime exposed no Anthropic text model for stock-route coverage");
-
-let defaultSelectionCount = 0;
-globalThis.__fmSelectDefaultModel = async ({ modelRuntime }) => {
-  defaultSelectionCount += 1;
-  const label = `default-${defaultSelectionCount}`;
-  const agentDir = `${home}/real-agent-${label}`;
-  const sessionsDir = `${home}/real-sessions-${label}`;
-  mkdirSync(agentDir, { recursive: true });
-  mkdirSync(sessionsDir, { recursive: true });
-  const settingsManager = RealSettingsManager.create(home, agentDir);
-  settingsManager.setDefaultModelAndProvider("anthropic", anthropicModel.id);
-  const resourceLoader = new RealDefaultResourceLoader({
-    cwd: home,
-    agentDir,
-    settingsManager,
-    noExtensions: true,
-    noSkills: true,
-    noPromptTemplates: true,
-    noThemes: true,
-    noContextFiles: true,
-    systemPrompt: "default provider selection regression",
-  });
-  await resourceLoader.reload();
-  const sessionManager = RealSessionManager.create(home, sessionsDir);
-  const { session } = await createRealAgentSession({
-    cwd: home,
-    sessionManager,
-    settingsManager,
-    resourceLoader,
-    modelRuntime,
-    noTools: "builtin",
-  });
-  const selected = session.model;
-  session.dispose();
-  if (!selected) throw new Error("Pi selected no default Anthropic model");
-  return selected;
-};
+const defaultSettings = RealSettingsManager.create(home, process.env.PI_CODING_AGENT_DIR);
+defaultSettings.setDefaultModelAndProvider("anthropic", anthropicModel.id);
+await defaultSettings.flush();
 
 const runtimeRefresh = RealModelRuntime.prototype.refresh;
 let lateRefreshArmed = false;
@@ -5361,17 +5417,35 @@ async function runProviderCase(options) {
   globalThis.__fmExtensionNativeProviders = new Map(
     options.initialNativeProvider ? [[options.providerId, options.initialNativeProvider]] : [],
   );
+  if (options.staticConfig) {
+    writeFileSync(`${process.env.PI_CODING_AGENT_DIR}/models.json`, `${JSON.stringify(options.staticConfig)}\n`);
+  } else {
+    rmSync(`${process.env.PI_CODING_AGENT_DIR}/models.json`, { force: true });
+  }
   if (options.unknownMain) rmSync(`${home}/config/supervision-branch-model`, { force: true });
   else writeFileSync(`${home}/config/supervision-branch-model`, `${options.providerId}/${options.modelId}\n`);
 
   await fire("session_start", {}, ctx);
   blockUnscopedRefresh = Boolean(options.unrelatedRefreshStall && supportsScopedRuntimeCreation);
-  if (options.lateRefreshRace) {
+  if (options.lateRefreshRace && !options.initialConfig && !options.initialNativeProvider) {
     lateRefreshArmed = true;
     releaseLateRefresh = null;
   }
   const firstIndex = (globalThis.__fmSessions ?? []).length;
   const firstOffer = dispatch(`signal: establish ${options.label} provider branch`);
+  if (options.initialConfig || options.initialNativeProvider) {
+    const initialFailure = await firstOffer.settlement.then(() => null, (error) => error);
+    if (!(initialFailure instanceof Error) || !initialFailure.message.includes("no provider-scoped registration boundary")) {
+      throw new Error(`${options.label} did not fall safely back before unscoped registration: ${String(initialFailure)}`);
+    }
+    if ((globalThis.__fmSessions ?? []).length !== firstIndex) {
+      throw new Error(`${options.label} built a branch from an unscoped runtime registration`);
+    }
+    await fire("session_shutdown", {});
+    rmSync(`${process.env.PI_CODING_AGENT_DIR}/models.json`, { force: true });
+    blockUnscopedRefresh = false;
+    return;
+  }
   await settle(
     () =>
       (globalThis.__fmSessions ?? []).length === firstIndex + 1 &&
@@ -5380,6 +5454,12 @@ async function runProviderCase(options) {
   );
   await firstOffer.settlement.then(() => null, () => null);
   const first = globalThis.__fmSessions[firstIndex];
+  if (options.unknownMain) {
+    const createCall = globalThis.__fmCreateAgentSessionCalls?.at(-1);
+    if (!createCall || "model" in createCall || !createCall.modelRuntime) {
+      throw new Error(`${options.label} did not give Pi a bounded no-override runtime`);
+    }
+  }
   if (options.initialBaseUrl && first.options.model?.baseUrl !== options.initialBaseUrl) {
     throw new Error(`${options.label} initial route bypassed its endpoint: ${JSON.stringify(first.options.model)}`);
   }
@@ -5496,39 +5576,15 @@ async function runProviderCase(options) {
   globalThis.__fmOnBranchPrompt = undefined;
   const replacementIndex = (globalThis.__fmSessions ?? []).length;
   const reboundOffer = dispatch(`signal: rebuild ${options.label} after provider mismatch`);
-  await settle(
-    () =>
-      (globalThis.__fmSessions ?? []).length === replacementIndex + 1 &&
-      globalThis.__fmSessions[replacementIndex].ops.some((op) => op.kind === "prompt"),
-    `${options.label} replacement branch prompt`,
-  );
-  await reboundOffer.settlement.then(() => null, () => null);
-  const replacement = globalThis.__fmSessions[replacementIndex];
-  if (options.replacementBaseUrl && replacement.options.model?.baseUrl !== options.replacementBaseUrl) {
-    throw new Error(`${options.label} replacement bypassed its endpoint: ${JSON.stringify(replacement.options.model)}`);
+  const reboundFailure = await reboundOffer.settlement.then(() => null, (error) => error);
+  if (!(reboundFailure instanceof Error) || !reboundFailure.message.includes("no provider-scoped registration boundary")) {
+    throw new Error(`${options.label} did not fall safely back after its registration changed: ${String(reboundFailure)}`);
   }
-  const realReplacement = await createRealProviderSession(replacement, `${options.label}-replacement`);
-  const replacementCallsBefore = options.replacementCallCount();
-  await realReplacement.session.prompt(`${options.label} replacement provider dispatch`).then(() => null, () => null);
-  if (options.replacementCallCount() <= replacementCallsBefore) {
-    throw new Error(`${options.label} replacement did not reach the current provider`);
+  if ((globalThis.__fmSessions ?? []).length !== replacementIndex) {
+    throw new Error(`${options.label} rebuilt through an unscoped provider registration`);
   }
-  if (options.replacementTransportHost) {
-    const replacementRequests = transportRequests.slice(replacementCallsBefore);
-    if (!replacementRequests.some((request) => request.url.includes(options.replacementTransportHost))) {
-      throw new Error(`${options.label} replacement missed its endpoint: ${JSON.stringify(replacementRequests)}`);
-    }
-    if (
-      options.replacementModelHeader &&
-      !replacementRequests.some(
-        (request) => request.headers[options.replacementModelHeader.name.toLowerCase()] === options.replacementModelHeader.value,
-      )
-    ) {
-      throw new Error(`${options.label} replacement lost its model-specific header: ${JSON.stringify(replacementRequests)}`);
-    }
-  }
-  realReplacement.session.dispose();
   await fire("session_shutdown", {});
+  rmSync(`${process.env.PI_CODING_AGENT_DIR}/models.json`, { force: true });
   blockUnscopedRefresh = false;
 }
 
@@ -5659,6 +5715,43 @@ await runProviderCase({
   replacementCallCount: () => transportRequests.length,
 });
 
+const staticHeaderName = "X-Firstmate-Static-Route";
+const staticReplacement = {
+  api: "openai-completions",
+  baseUrl: "https://static-replacement.invalid/v1",
+  streamSimple(model) {
+    return completedStream(model, "static replacement");
+  },
+};
+await runProviderCase({
+  label: "static-config",
+  providerId: "fm-static-config",
+  modelId: "static-model",
+  staticConfig: {
+    providers: {
+      "fm-static-config": {
+        baseUrl: "https://static-config.invalid/v1",
+        api: "openai-completions",
+        apiKey: "static-config-placeholder",
+        models: [{
+          id: "static-model",
+          name: "Static model",
+          contextWindow: 4096,
+          maxTokens: 128,
+          headers: { [staticHeaderName]: "static-route" },
+        }],
+      },
+    },
+  },
+  initialConfig: null,
+  replacementConfig: staticReplacement,
+  initialBaseUrl: "https://static-config.invalid/v1",
+  initialTransportHost: "static-config.invalid",
+  initialModelHeader: { name: staticHeaderName, value: "static-route" },
+  staleCallCount: () => transportRequests.length,
+  replacementCallCount: () => transportRequests.length,
+});
+
 let stockReplacementCalls = 0;
 const stockReplacement = {
   api: anthropicModel.api,
@@ -5697,6 +5790,7 @@ await runProviderCase({
   unknownMain: true,
   initialConfig: null,
   replacementConfig: defaultStockReplacement,
+  unrelatedRefreshStall: true,
   initialBaseUrl: anthropicModel.baseUrl,
   replacementBaseUrl: defaultStockReplacement.baseUrl,
   initialTransportHost: "anthropic.com",
@@ -5710,7 +5804,7 @@ EOF
   status=$?
   out=$(cat "$TMP_ROOT/node-output")
   expect_code 0 "$status" "provider changes must block every stale selected stream before disclosure: $out"
-  pass "invocation guard covers Pi defaults, scoped creation, late refreshes, and prototype-native providers"
+  pass "real Pi scopes defaults, preserves static headers, and rejects unsafe registrations"
 }
 
 test_runtime_only_main_credential_rejects_branch_construction() {
@@ -5718,10 +5812,15 @@ test_runtime_only_main_credential_rejects_branch_construction() {
     echo "skip: node not found for the Pi runtime-only credential test"
     return
   fi
-  local package_dir repo home out status
+  local package_dir package_version repo home out status
   package_dir=${FM_PI_PACKAGE_DIR:-"$(npm root -g 2>/dev/null)/@earendil-works/pi-coding-agent"}
   if [ ! -f "$package_dir/package.json" ]; then
     echo "skip: installed @earendil-works/pi-coding-agent package not found"
+    return
+  fi
+  package_version=$(node -p "require(process.argv[1]).version" "$package_dir/package.json")
+  if ! pi_version_at_least "$package_version" 0.84.1; then
+    echo "skip: installed Pi $package_version predates provider-scoped runtime construction"
     return
   fi
   repo="$TMP_ROOT/runtime-only-main-root"
@@ -5793,6 +5892,46 @@ EOF
   out=$(cat "$TMP_ROOT/node-output")
   expect_code 0 "$status" "a main-runtime-only credential must reject branch construction: $out"
   pass "runtime-only main credentials reject unsafe unpinned branch construction"
+}
+
+test_unsupported_pi_version_rejects_before_runtime_creation() {
+  local repo home out status
+  repo="$TMP_ROOT/unsupported-pi-runtime-root"
+  home="$TMP_ROOT/unsupported-pi-runtime-home"
+  mkdir -p "$home/state" "$home/config"
+  install_pi_branch_extension_fixture "$repo"
+  FM_TEST_PI_VERSION=0.82.0 PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" \
+    FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" DRIVER_PRELUDE="$DRIVER_PRELUDE" \
+    node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+const prelude = process.env.DRIVER_PRELUDE;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, makeCtx, registryModels, commands, notices }; })()`);
+const { fire, dispatch, makeCtx, registryModels, commands, notices } = globalThis.__t;
+
+registryModels.push({ provider: "anthropic", id: "main-model" });
+await fire("session_start", {}, makeCtx());
+const offer = dispatch("signal: Pi 0.82 provider boundary");
+const failure = await offer.settlement.then(() => null, (error) => error);
+if (!(failure instanceof Error) || !failure.message.includes("Pi 0.82.0 does not support provider-scoped supervision runtime")) {
+  throw new Error(`Pi 0.82 did not reject to watcher fallback: ${String(failure)}`);
+}
+if ((globalThis.__fmModelRuntimeCreateCalls ?? []).length !== 0 || (globalThis.__fmSessions ?? []).length !== 0) {
+  throw new Error("Pi 0.82 reached unscoped runtime or session construction");
+}
+const command = commands.get("supervision-model");
+if (!command) throw new Error("the supervision-model command was not registered");
+await command.handler("", makeCtx());
+if (!notices.some((notice) => notice.type === "error" && notice.message.includes("Pi 0.82.0"))) {
+  throw new Error(`the unsupported picker did not report its safe fallback: ${JSON.stringify(notices)}`);
+}
+if ((globalThis.__fmModelRuntimeCreateCalls ?? []).length !== 0) {
+  throw new Error("the unsupported picker created an all-provider runtime");
+}
+process.exit(0);
+EOF
+  status=$?
+  out=$(cat "$TMP_ROOT/node-output")
+  expect_code 0 "$status" "Pi versions without scoped construction must reject before runtime creation: $out"
+  pass "unsupported Pi versions fall back before all-provider runtime creation"
 }
 
 test_model_runtime_create_deadline_rejects_to_watcher_fallback() {
@@ -5879,17 +6018,8 @@ await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, makeCt
 const { fire, dispatch, makeCtx, registryModels, mainUserMessages } = globalThis.__t;
 
 registryModels.push({ provider: "anthropic", id: "main-model", baseUrl: "https://api.anthropic.com" });
-globalThis.__fmExtensionProviderConfigs = new Map([
-  [
-    "anthropic",
-    {
-      name: "Private Anthropic proxy",
-      api: "anthropic-messages",
-      baseUrl: "https://anthropic.proxy.invalid",
-      apiKey: "stored-proxy-credential",
-    },
-  ],
-]);
+globalThis.__fmExtensionProviderConfigs = new Map();
+globalThis.__fmExtensionNativeProviders = new Map();
 let rejectLateRefresh;
 globalThis.__fmModelRuntimeRefresh = (_runtime, options) =>
   new Promise((_resolve, reject) => {
@@ -5977,22 +6107,11 @@ const privateModel = {
   maxTokens: 128,
 };
 registryModels.push(
-  { ...privateModel, branchAvailable: false },
+  privateModel,
   { provider: "anthropic", id: "main-model", baseUrl: "https://api.anthropic.com" },
 );
 globalThis.__fmExtensionProviderConfigs = new Map();
-globalThis.__fmExtensionNativeProviders = new Map([
-  [
-    privateModel.provider,
-    {
-      id: privateModel.provider,
-      name: "Private proxy",
-      apiKey: "stored-private-credential",
-      models: [privateModel],
-      streamSimple: () => undefined,
-    },
-  ],
-]);
+globalThis.__fmExtensionNativeProviders = new Map();
 globalThis.__fmModelRuntimeRefresh = (_runtime, options) => ({
   aborted: false,
   errors: options?.providers?.includes(privateModel.provider)
@@ -6052,32 +6171,12 @@ registryModels.push(
   { provider: "anthropic", id: "main-model", baseUrl: "https://api.anthropic.com" },
   { provider: "unrelated", id: "other-model", branchAvailable: false },
 );
-globalThis.__fmExtensionProviderConfigs = new Map([
-  [
-    "anthropic",
-    {
-      name: "Private Anthropic proxy",
-      api: "anthropic-messages",
-      baseUrl: "https://anthropic.proxy.invalid",
-      apiKey: "stored-proxy-credential",
-    },
-  ],
-  [
-    "unrelated",
-    {
-      name: "Unrelated dynamic provider",
-      api: "unrelated-api",
-      baseUrl: "https://unrelated.invalid",
-      apiKey: "stored-unrelated-credential",
-      models: [{ id: "other-model", name: "Other model" }],
-    },
-  ],
-]);
+globalThis.__fmExtensionProviderConfigs = new Map();
 globalThis.__fmExtensionNativeProviders = new Map();
 globalThis.__fmModelRuntimeCreate = (options) =>
   options.refreshOnCreate === false ? undefined : new Promise(() => {});
-globalThis.__fmModelRuntimeRefresh = (runtime, _options) => {
-  if (runtime.registeredProviderConfigs.has("unrelated")) return new Promise(() => {});
+globalThis.__fmModelRuntimeRefresh = (_runtime, options) => {
+  if (options?.providers?.includes("unrelated")) return new Promise(() => {});
   return undefined;
 };
 
@@ -6091,8 +6190,8 @@ const selectedRefresh = globalThis.__fmModelRuntimeRefreshCalls?.at(-1);
 if (JSON.stringify(selectedRefresh?.options?.providers) !== JSON.stringify(["anthropic"])) {
   throw new Error(`selected resolution refreshed unrelated providers: ${JSON.stringify(selectedRefresh?.options?.providers)}`);
 }
-if (globalThis.__fmSessions[0].options.model?.baseUrl !== "https://anthropic.proxy.invalid") {
-  throw new Error(`the selected private provider did not bind: ${JSON.stringify(globalThis.__fmSessions[0].options.model)}`);
+if (globalThis.__fmSessions[0].options.model?.baseUrl !== "https://api.anthropic.com") {
+  throw new Error(`the selected stock provider did not bind: ${JSON.stringify(globalThis.__fmSessions[0].options.model)}`);
 }
 await offer.settlement.then(() => null, () => null);
 
@@ -6136,7 +6235,7 @@ EOF
   pass "selected model resolution stays narrow while picker refresh failures stay isolated"
 }
 
-test_extension_registered_provider_resolves_in_the_branch() {
+test_extension_registered_provider_isolated_fallback() {
   local repo home out status
   repo="$TMP_ROOT/extprov-root"
   home="$TMP_ROOT/extprov-home"
@@ -6146,16 +6245,11 @@ test_extension_registered_provider_resolves_in_the_branch() {
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, registryModels, uiSelections, uiPrompts, notices, commands, home }; })()`);
-const { fire, dispatch, settle, makeCtx, registryModels, uiSelections, uiPrompts, notices, commands, home } = globalThis.__t;
-import { readFileSync, writeFileSync } from "node:fs";
+const { fire, dispatch, makeCtx, registryModels, uiPrompts, notices, commands, home } = globalThis.__t;
+import { writeFileSync } from "node:fs";
 
-// An extension-registered provider exists only in main's registry, never in
-// the isolated branch runtime's static catalog. Registering its config on
-// main's registry is what makes it resolvable for the branch.
 registryModels.push(
   { provider: "anthropic", id: "main-model" },
-  // Available in main's registry but absent from the branch runtime's static
-  // catalog, exactly like a provider an extension registered at runtime.
   { provider: "devin", id: "swe-1-7", branchAvailable: false },
 );
 globalThis.__fmExtensionProviderConfigs = new Map([
@@ -6174,58 +6268,40 @@ globalThis.__fmExtensionProviderConfigs = new Map([
 
 await fire("session_start", {}, makeCtx());
 
-// The picker must offer the extension-registered model: it is available in
-// main's registry and resolvable in the branch runtime once its registration
-// is copied across.
 const command = commands.get("supervision-model");
 if (!command) throw new Error("the supervision-model command was not registered");
-uiSelections.push("devin/swe-1-7");
 await command.handler("", makeCtx());
 const offered = uiPrompts[0];
-if (!offered.options.includes("devin/swe-1-7")) {
-  throw new Error(`the picker must offer an extension-registered provider the branch can run: ${JSON.stringify(offered.options)}`);
+if (offered.options.includes("devin/swe-1-7")) {
+  throw new Error(`the picker offered a provider Pi cannot isolate: ${JSON.stringify(offered.options)}`);
 }
-if (readFileSync(`${home}/config/supervision-branch-model`, "utf8") !== "devin/swe-1-7\n") {
-  throw new Error("the extension-registered pick was not persisted");
+if (!offered.options.includes("anthropic/main-model") || notices.some((notice) => notice.type === "error")) {
+  throw new Error(`an unsupported registration hid healthy picker choices: ${JSON.stringify({ offered, notices })}`);
 }
-dispatch("signal: extension provider pin");
-await settle(() => (globalThis.__fmSessions ?? []).length === 1, "pinned extension-provider branch build");
-const pinned = globalThis.__fmSessions[0].options.model;
-if (!pinned || pinned.provider !== "devin" || pinned.id !== "swe-1-7") {
-  throw new Error(`the extension-registered pin did not bind the branch: ${JSON.stringify(pinned)}`);
-}
-// Copying the provider registration must not loosen the branch's isolation:
-// the devin-pinned session still loads no extensions, skills, or context files.
-const pinnedLoader = globalThis.__fmLoaders.at(-1);
-for (const key of ["noExtensions", "noSkills", "noContextFiles"]) {
-  if (pinnedLoader.options[key] !== true) throw new Error(`devin-pinned branch loader must keep ${key}`);
-}
-
-// Without the registration, the same pin is unavailable and the branch
-// refuses to build rather than silently downgrading.
-globalThis.__fmExtensionProviderConfigs = new Map();
-await fire("session_shutdown", {});
-await fire("session_start", {}, makeCtx());
-const unregisteredOffer = dispatch("signal: unregistered provider pin");
-if (!unregisteredOffer.accepted) throw new Error("unregistered-pin wake was not initially accepted");
-const unregisteredFailure = await unregisteredOffer.settlement.then(
+writeFileSync(`${home}/config/supervision-branch-model`, "devin/swe-1-7\n");
+const registeredOffer = dispatch("signal: extension provider pin");
+if (!registeredOffer.accepted) throw new Error("registered-provider wake was not initially accepted");
+const registeredFailure = await registeredOffer.settlement.then(
   () => null,
   (error) => error,
 );
 if (
-  !(unregisteredFailure instanceof Error) ||
-  !unregisteredFailure.message.includes("devin/swe-1-7") ||
-  !unregisteredFailure.message.includes("supervision model pin")
+  !(registeredFailure instanceof Error) ||
+  !registeredFailure.message.includes("no provider-scoped registration boundary") ||
+  !registeredFailure.message.includes("devin")
 ) {
-  throw new Error(`the unregistered pin did not reject with its own name: ${String(unregisteredFailure)}`);
+  throw new Error(`the runtime registration did not reject safely: ${String(registeredFailure)}`);
 }
-if ((globalThis.__fmSessions ?? []).length !== 1) throw new Error("an unregistered pin must not build a second branch session");
+if ((globalThis.__fmSessions ?? []).length !== 0) throw new Error("a runtime-registered provider built a branch session");
+if ((globalThis.__fmProviderRegistrationCalls ?? []).length !== 0) {
+  throw new Error("the fallback invoked Pi's unscoped registration API");
+}
 process.exit(0);
 EOF
   status=$?
   out=$(cat "$TMP_ROOT/node-output")
-  expect_code 0 "$status" "an extension-registered provider must resolve in the isolated branch runtime: $out"
-  pass "an extension-registered provider resolves in the isolated branch runtime"
+  expect_code 0 "$status" "an extension-registered provider must fall back when Pi cannot isolate registration: $out"
+  pass "extension-registered providers fall back without hiding healthy picker choices"
 }
 
 test_outcomes_tool_uses_stock_execution_and_export_consumers
@@ -6257,15 +6333,16 @@ test_supervision_model_picker_is_bounded_searchable_and_branch_only
 test_branch_model_picker_keeps_follow_main_first_under_ranking
 test_branch_effort_pin_applies_and_absent_pin_follows_main
 test_unpinned_branch_follows_main_effort_changes_live
-test_effective_extension_provider_registration_precedes_model_lookup
+test_extension_provider_registration_falls_back_without_scoped_api
 test_cached_branch_rebinds_after_effective_provider_change
 test_provider_change_at_header_boundary_blocks_all_effective_streams
 test_runtime_only_main_credential_rejects_branch_construction
+test_unsupported_pi_version_rejects_before_runtime_creation
 test_model_runtime_create_deadline_rejects_to_watcher_fallback
 test_extension_provider_refresh_deadline_rejects_to_watcher_fallback
 test_selected_provider_refresh_error_rejects_to_watcher_fallback
 test_selected_provider_resolution_avoids_unrelated_refresh
-test_extension_registered_provider_resolves_in_the_branch
+test_extension_registered_provider_isolated_fallback
 test_supervision_model_command_picks_effort_after_the_model
 test_unusable_model_pin_falls_back_to_main
 test_replacement_activation_cleans_leases_and_retries_failure

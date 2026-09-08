@@ -80,7 +80,9 @@ import {
   ModelRuntime,
   type ModelRegistry,
   SessionManager,
+  SettingsManager,
   ToolExecutionComponent,
+  VERSION,
   type AgentSession,
   type ExtensionAPI,
   type ExtensionCommandContext,
@@ -169,8 +171,19 @@ const PROVIDER_ERROR_LATCH_THRESHOLD = 2;
 const PROVIDER_REPROBE_BASE_MS = 5 * 60 * 1000;
 const PROVIDER_REPROBE_MAX_MS = 60 * 60 * 1000;
 const EXTENSION_PROVIDER_OPERATION_TIMEOUT_MS = 5_000;
+const SCOPED_PROVIDER_RUNTIME_MIN_VERSION = [0, 84, 1] as const;
 class ExtensionProviderTimeoutError extends Error {}
 class ExtensionProviderResolutionError extends Error {}
+function supportsScopedProviderRuntime(version: string): boolean {
+  const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version);
+  if (!match) return false;
+  const actual = match.slice(1).map(Number);
+  for (let index = 0; index < SCOPED_PROVIDER_RUNTIME_MIN_VERSION.length; index += 1) {
+    if (actual[index] > SCOPED_PROVIDER_RUNTIME_MIN_VERSION[index]) return true;
+    if (actual[index] < SCOPED_PROVIDER_RUNTIME_MIN_VERSION[index]) return false;
+  }
+  return true;
+}
 async function withExtensionProviderDeadline<T>(
   operation: Promise<T>,
   phase: string,
@@ -261,16 +274,13 @@ function settledPromptProviderError(sessionManager: SessionManager, entryOffset:
 // surface Pi already hands this extension.
 type BranchModel = NonNullable<ReturnType<ModelRuntime["getModel"]>>;
 type BranchEffort = ReturnType<NonNullable<ExtensionAPI["getThinkingLevel"]>>;
-type ExtensionProviderRegistration =
-  | { providerId: string; kind: "none" }
-  | { providerId: string; kind: "native" | "config"; registration: unknown };
-type ExtensionProvider = NonNullable<ReturnType<ModelRuntime["getProvider"]>>;
-type ExtensionProviderStreamSimple = ExtensionProvider["streamSimple"];
+type ExtensionProviderRegistration = { providerId: string };
 type PinnedBranchModel = {
   model: BranchModel;
   modelRuntime: ModelRuntime;
   providerRegistration: ExtensionProviderRegistration;
 };
+type PreparedDefaultBranchModel = PinnedBranchModel & { settingsManager: SettingsManager };
 type BranchModelResolution = { ok: true; selection: PinnedBranchModel } | { ok: false; reason: string };
 
 // Pi owns the effort vocabulary. The picker's options and every clamp still
@@ -594,7 +604,8 @@ export default function (pi: ExtensionAPI) {
     sessionManager: SessionManager;
     generation: number;
     selectionRevision: number;
-    providerRegistration?: ExtensionProviderRegistration;
+    leaseHolderPid: string;
+    providerRegistration: ExtensionProviderRegistration;
     watchProviderRegistrationMismatch: (listener: (error: Error) => void) => () => void;
   };
   let branch: BranchSession | null = null;
@@ -751,11 +762,17 @@ export default function (pi: ExtensionAPI) {
   }
 
   async function createExtensionProviderRuntime(): Promise<ModelRuntime> {
+    if (!supportsScopedProviderRuntime(VERSION)) {
+      throw new ExtensionProviderResolutionError(
+        `Pi ${VERSION} does not support provider-scoped supervision runtime construction`,
+      );
+    }
     const controller = new AbortController();
     const options = {
+      allowModelNetwork: false,
       signal: controller.signal,
       refreshOnCreate: false,
-    } as Parameters<typeof ModelRuntime.create>[0];
+    };
     return withExtensionProviderDeadline(
       ModelRuntime.create(options),
       "runtime creation",
@@ -763,55 +780,31 @@ export default function (pi: ExtensionAPI) {
     );
   }
 
-  // Resolves one model against the isolated branch runtime using only the
-  // credentials that runtime already holds - the branch runs in the same home
-  // and same user as main, so stored credentials keep their own semantics
-  // (OAuth stays OAuth, an API key stays an API key) and nothing is ever
-  // installed, converted, derived, or overwritten here.
-  // A provider that exists only because an extension registered it into
-  // main's runtime (pi-devin-auth's "devin", whose streamSimple is the custom
-  // gRPC path no static catalog can express) is invisible to an isolated
-  // branch runtime until its registration is copied across. The effective
-  // registration carries that streamSimple and oauth wiring by reference, so
-  // copying it reuses the provider's own registration rather than reimplementing its
-  // wire protocol; the copy is never persisted and stays scoped to this one
-  // runtime. The picker gives each provider its own runtime, so one that fails
-  // to compose cannot blind the rest. The selected provider's auth check has
-  // not run yet, so that provider is refreshed here and every caller's
-  // hasConfiguredAuth verdict is real rather than the provisional entry
-  // registration leaves behind.
-  async function copyExtensionProvider(
-    modelRuntime: ModelRuntime,
-    providerId: string,
-  ): Promise<ExtensionProviderRegistration> {
-    let registration: ExtensionProviderRegistration = { providerId, kind: "none" };
+  function extensionProviderRegistrationKind(providerId: string): "native" | "config" | null {
     if (mainModelRegistry) {
       try {
         const nativeProvider = mainModelRegistry.getRegisteredNativeProvider(providerId);
-        if (nativeProvider) {
-          registration = {
-            providerId,
-            kind: "native",
-            registration: nativeProvider,
-          };
-          modelRuntime.registerNativeProvider(nativeProvider);
-        } else {
-          const config = mainModelRegistry.getRegisteredProviderConfig(providerId);
-          if (config) {
-            registration = {
-              providerId,
-              kind: "config",
-              registration: config,
-            };
-            modelRuntime.registerProvider(providerId, config);
-          }
-        }
+        if (nativeProvider) return "native";
+        if (mainModelRegistry.getRegisteredProviderConfig(providerId)) return "config";
       } catch (error) {
         throw new ExtensionProviderResolutionError(
           `extension-provider registration failed for ${providerId}: ${error instanceof Error ? error.message : String(error)}`,
         );
       }
     }
+    return null;
+  }
+
+  async function prepareExtensionProviderRuntime(
+    providerId: string,
+  ): Promise<{ modelRuntime: ModelRuntime; providerRegistration: ExtensionProviderRegistration }> {
+    if (extensionProviderRegistrationKind(providerId)) {
+      throw new ExtensionProviderResolutionError(
+        `Pi ${VERSION} exposes no provider-scoped registration boundary for extension provider ${providerId}`,
+      );
+    }
+    const modelRuntime = await createExtensionProviderRuntime();
+    const providerRegistration = { providerId };
     const controller = new AbortController();
     try {
       const result = await withExtensionProviderDeadline(
@@ -831,7 +824,7 @@ export default function (pi: ExtensionAPI) {
         `extension-provider availability refresh failed for ${providerId}: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
-    return registration;
+    return { modelRuntime, providerRegistration };
   }
 
   async function availableBranchModelLabels(
@@ -844,8 +837,7 @@ export default function (pi: ExtensionAPI) {
         providerId,
         (async () => {
           try {
-            const modelRuntime = await createExtensionProviderRuntime();
-            await copyExtensionProvider(modelRuntime, providerId);
+            const { modelRuntime } = await prepareExtensionProviderRuntime(providerId);
             return modelRuntime;
           } catch (error) {
             firstFailure ??= error;
@@ -872,13 +864,10 @@ export default function (pi: ExtensionAPI) {
   }
 
   function extensionProviderRegistrationIsCurrent(snapshot: ExtensionProviderRegistration): boolean {
-    if (!mainModelRegistry) return snapshot.kind === "none";
+    if (!mainModelRegistry) return true;
     try {
-      const nativeProvider = mainModelRegistry.getRegisteredNativeProvider(snapshot.providerId);
-      if (nativeProvider) return snapshot.kind === "native" && snapshot.registration === nativeProvider;
-      const providerConfig = mainModelRegistry.getRegisteredProviderConfig(snapshot.providerId);
-      if (providerConfig) return snapshot.kind === "config" && snapshot.registration === providerConfig;
-      return snapshot.kind === "none";
+      return !mainModelRegistry.getRegisteredNativeProvider(snapshot.providerId)
+        && !mainModelRegistry.getRegisteredProviderConfig(snapshot.providerId);
     } catch {
       return false;
     }
@@ -889,64 +878,18 @@ export default function (pi: ExtensionAPI) {
     return new Error(`supervision branch provider registration changed before request for ${snapshot.providerId}`);
   }
 
-  function guardExtensionProviderStreamSimple(
-    modelRuntime: ModelRuntime,
-    snapshot: ExtensionProviderRegistration,
-    model: BranchModel,
-  ): void {
-    const provider = modelRuntime.getProvider(snapshot.providerId);
-    if (!provider) {
-      throw new ExtensionProviderResolutionError(
-        `extension-provider ${snapshot.providerId} has no effective provider in the isolated branch runtime`,
-      );
-    }
-    const streamSimple: ExtensionProviderStreamSimple = provider.streamSimple.bind(provider);
-    const guardedStreamSimple: ExtensionProviderStreamSimple = (model, context, options) => {
-      const mismatch = extensionProviderRegistrationMismatch(snapshot);
-      if (mismatch) throw mismatch;
-      return streamSimple(model, context, options);
-    };
-    if (snapshot.kind === "config") {
-      const config = snapshot.registration as Parameters<ModelRuntime["registerProvider"]>[1];
-      modelRuntime.registerProvider(snapshot.providerId, {
-        ...config,
-        api: model.api,
-        streamSimple: guardedStreamSimple,
-      });
-      return;
-    }
-    const boundMethods = new WeakMap<Function, Function>();
-    const guardedProvider = new Proxy(provider, {
-      get(target, property) {
-        if (property === "streamSimple") return guardedStreamSimple;
-        const value = Reflect.get(target, property, target);
-        if (typeof value !== "function") return value;
-        const cached = boundMethods.get(value);
-        if (cached) return cached;
-        const bound = value.bind(target);
-        boundMethods.set(value, bound);
-        return bound;
-      },
-    });
-    modelRuntime.registerNativeProvider(guardedProvider);
-  }
-
   async function resolveBranchModel(provider: string, modelId: string): Promise<BranchModelResolution> {
     const label = `${provider}/${modelId}`;
-    const modelRuntime = await createExtensionProviderRuntime();
-    const providerRegistration = await copyExtensionProvider(modelRuntime, provider);
+    const { modelRuntime, providerRegistration } = await prepareExtensionProviderRuntime(provider);
     const model = modelRuntime.getModel(provider, modelId) as BranchModel | undefined;
     if (!model) {
       const reason = `${label} is unavailable to the isolated branch runtime`;
-      if (providerRegistration.kind !== "none") throw new ExtensionProviderResolutionError(reason);
       return { ok: false, reason };
     }
     if (!modelRuntime.hasConfiguredAuth(provider)) {
       const reason = `${label} has no configured credentials in the isolated branch runtime`;
-      if (providerRegistration.kind !== "none") throw new ExtensionProviderResolutionError(reason);
       return { ok: false, reason };
     }
-    guardExtensionProviderStreamSimple(modelRuntime, providerRegistration, model);
     return {
       ok: true,
       selection: {
@@ -971,8 +914,8 @@ export default function (pi: ExtensionAPI) {
   // main's own model is applied EXPLICITLY - otherwise clearing the pin would
   // report that the branch follows main while the reopened session quietly
   // restored the model an earlier pin left behind. Only when main's model is
-  // genuinely unknown does the build fall back to passing no override at all,
-  // which is the pre-feature behavior.
+  // genuinely unknown does the build pass no model override, while the
+  // prepared runtime still bounds Pi's recorded or configured default.
   async function branchModelSelection(): Promise<PinnedBranchModel | undefined> {
     const pin = readModelPin();
     if (pin) return preparePinnedBranchModel(pin);
@@ -982,28 +925,54 @@ export default function (pi: ExtensionAPI) {
     return resolved.selection;
   }
 
-  async function guardEffectiveDefaultBranchModel(session: AgentSession): Promise<PinnedBranchModel> {
+  async function prepareEffectiveDefaultBranchModel(sessionManager: SessionManager): Promise<PreparedDefaultBranchModel> {
+    const context = sessionManager.buildSessionContext();
+    const recorded = context.messages.length > 0 ? context.model : null;
+    const settingsManager = SettingsManager.create(fmRoot, getAgentDir());
+    const provider = recorded?.provider ?? settingsManager.getDefaultProvider();
+    const modelId = recorded?.modelId ?? settingsManager.getDefaultModel();
+    if (!provider || !modelId) {
+      throw new ExtensionProviderResolutionError(
+        "Pi exposes no bounded effective default model for the supervision branch",
+      );
+    }
+    const resolved = await resolveBranchModel(provider, modelId);
+    if (!resolved.ok) throw new ExtensionProviderResolutionError(`Pi default ${resolved.reason}`);
+    return { ...resolved.selection, settingsManager };
+  }
+
+  function captureEffectiveDefaultBranchModel(
+    session: AgentSession,
+    prepared: PreparedDefaultBranchModel,
+  ): PinnedBranchModel {
     const selected = session.model as BranchModel | undefined;
     if (!selected) {
       throw new ExtensionProviderResolutionError("Pi selected no effective model for the supervision branch");
     }
-    const modelRuntime = session.modelRuntime;
-    const providerRegistration = await copyExtensionProvider(modelRuntime, selected.provider);
-    const model = modelRuntime.getModel(selected.provider, selected.id) as BranchModel | undefined;
+    if (selected.provider !== prepared.model.provider || selected.id !== prepared.model.id) {
+      throw new ExtensionProviderResolutionError(
+        `Pi selected ${selected.provider}/${selected.id} outside the prepared supervision runtime boundary`,
+      );
+    }
+    if (session.modelRuntime !== prepared.modelRuntime) {
+      throw new ExtensionProviderResolutionError("Pi replaced the prepared supervision model runtime");
+    }
+    const model = prepared.modelRuntime.getModel(selected.provider, selected.id) as BranchModel | undefined;
     if (!model) {
       throw new ExtensionProviderResolutionError(
         `${selected.provider}/${selected.id} is unavailable to the isolated branch runtime`,
       );
     }
-    if (!modelRuntime.hasConfiguredAuth(selected.provider)) {
+    if (!prepared.modelRuntime.hasConfiguredAuth(selected.provider)) {
       throw new ExtensionProviderResolutionError(
         `${selected.provider}/${selected.id} has no configured credentials in the isolated branch runtime`,
       );
     }
-    guardExtensionProviderStreamSimple(modelRuntime, providerRegistration, model);
-    const guardedModel = (modelRuntime.getModel(selected.provider, selected.id) as BranchModel | undefined) ?? model;
-    await session.setModel(guardedModel);
-    return { model: guardedModel, modelRuntime, providerRegistration };
+    return {
+      model,
+      modelRuntime: prepared.modelRuntime,
+      providerRegistration: prepared.providerRegistration,
+    };
   }
 
   async function effectiveBranchModel(selected: BranchModel | undefined): Promise<BranchModel | undefined> {
@@ -1061,12 +1030,12 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
-  // A replaced branch conversation must not leave its per-task leases behind
-  // (the session-lock holder pid is still alive, so the sweep alone would
-  // keep them). One bulk release per generation, at activation.
-  async function releaseBranchLeases(expectedGeneration: number): Promise<boolean> {
+  async function releaseBranchLeases(expectedGeneration: number, holderPid?: string): Promise<boolean> {
     if (!(await generationOwnsLock(expectedGeneration))) return false;
-    const result = await runCommandAsync("bash", [leaseScript, "release-actor", "--actor", "branch"], {
+    if (holderPid && ownedLockPid !== holderPid) return false;
+    const args = [leaseScript, "release-actor", "--actor", "branch"];
+    if (holderPid) args.push("--holder-pid", holderPid);
+    const result = await runCommandAsync("bash", args, {
       cwd: fmRoot,
       env: { ...scriptEnv, FM_SUPERVISION_ACTOR: "branch" },
     });
@@ -1384,7 +1353,8 @@ export default function (pi: ExtensionAPI) {
   ): Promise<{
     session: AgentSession;
     sessionManager: SessionManager;
-    providerRegistration?: ExtensionProviderRegistration;
+    leaseHolderPid: string;
+    providerRegistration: ExtensionProviderRegistration;
     watchProviderRegistrationMismatch: (listener: (error: Error) => void) => () => void;
   }> {
     // Resolved first, before any session file or prompt work: a model pin Pi
@@ -1424,6 +1394,8 @@ export default function (pi: ExtensionAPI) {
     }
     branchSessionGeneration = branchGeneration;
     branchSessionFile = sessionManager.getSessionFile() ?? "";
+    const preparedDefault = pinned ? undefined : await prepareEffectiveDefaultBranchModel(sessionManager);
+    const providerRegistration = pinned?.providerRegistration ?? preparedDefault!.providerRegistration;
     let providerRegistrationMismatchListener: ((error: Error) => void) | null = null;
     // The branch loads no project resources at all: extensions off (so it can
     // never spawn its own branch), skills/context files off (they vary per
@@ -1443,9 +1415,7 @@ export default function (pi: ExtensionAPI) {
           name: "fm-branch-cache-key",
           factory: (branchPi: ExtensionAPI) => {
             branchPi.on("before_provider_headers", (_event, ctx) => {
-              const providerRegistrationMismatch = pinned
-                ? extensionProviderRegistrationMismatch(pinned.providerRegistration)
-                : null;
+              const providerRegistrationMismatch = extensionProviderRegistrationMismatch(providerRegistration);
               if (providerRegistrationMismatch) {
                 providerRegistrationMismatchListener?.(providerRegistrationMismatch);
                 ctx.abort();
@@ -1505,12 +1475,17 @@ ${context.command}
         bashTool as unknown as ToolDefinition,
         createReportTool(branchGeneration),
       ],
-      ...(pinned ? { model: pinned.model, modelRuntime: pinned.modelRuntime } : {}),
+      ...(pinned
+        ? { model: pinned.model, modelRuntime: pinned.modelRuntime }
+        : {
+            modelRuntime: preparedDefault!.modelRuntime,
+            settingsManager: preparedDefault!.settingsManager,
+          }),
       ...(effort === undefined ? {} : { thinkingLevel: effort }),
     });
     if (!pinned) {
       try {
-        pinned = await guardEffectiveDefaultBranchModel(created.session);
+        pinned = captureEffectiveDefaultBranchModel(created.session, preparedDefault!);
       } catch (error) {
         try {
           created.session.dispose();
@@ -1535,7 +1510,8 @@ ${context.command}
     return {
       session: created.session,
       sessionManager,
-      providerRegistration: pinned.providerRegistration,
+      leaseHolderPid,
+      providerRegistration,
       watchProviderRegistrationMismatch: (listener) => {
         providerRegistrationMismatchListener = listener;
         return () => {
@@ -1548,7 +1524,7 @@ ${context.command}
   async function ensureBranch(expectedGeneration: number, recoveryProbe = false): Promise<BranchSession> {
     if (!(await actingAsOwner(expectedGeneration))) throw new Error("supervision session was replaced or lost lock ownership");
     if (branchBroken && !(recoveryProbe && providerRecovery?.probeInFlight)) throw new Error(branchBroken);
-    if (branch?.providerRegistration && !extensionProviderRegistrationIsCurrent(branch.providerRegistration)) {
+    if (branch && !extensionProviderRegistrationIsCurrent(branch.providerRegistration)) {
       const stale = branch;
       branch = null;
       try {
@@ -1566,10 +1542,7 @@ ${context.command}
           } catch {}
           continue;
         }
-        if (
-          created.providerRegistration &&
-          !extensionProviderRegistrationIsCurrent(created.providerRegistration)
-        ) {
+        if (!extensionProviderRegistrationIsCurrent(created.providerRegistration)) {
           try {
             created.session.dispose();
           } catch {}
@@ -1625,6 +1598,7 @@ ${context.command}
 
   function enqueueWake(message: string, acceptedGeneration: number, recoveryProbe = false): Promise<void> {
     const acceptedSelectionRevision = branchSelectionRevision;
+    let failedTurnLeaseHolderPid = "";
     const delivery = branchChain
       .then(async () => {
         if (shuttingDown || acceptedGeneration !== generation) {
@@ -1644,6 +1618,7 @@ ${context.command}
           throw new Error("could not reconcile unread supervision outcomes into main");
         }
         const branchForWake = await ensureBranch(acceptedGeneration, recoveryProbe);
+        failedTurnLeaseHolderPid = branchForWake.leaseHolderPid;
         const { session, sessionManager } = branchForWake;
         await flushMirror(session, acceptedGeneration);
         if (!(await actingAsOwner(acceptedGeneration))) throw new Error("supervision session no longer owns the fleet lock");
@@ -1722,6 +1697,9 @@ ${context.command}
         }
       })
       .catch(async (error: unknown) => {
+        if (failedTurnLeaseHolderPid) {
+          await releaseBranchLeases(acceptedGeneration, failedTurnLeaseHolderPid);
+        }
         await releaseEligibleRowsSnapshot(state, wakeGrantScript, String(acceptedGeneration));
         throw error;
       })

@@ -21,10 +21,11 @@
 #   fm-lease.sh check <task>
 #       Print "<actor> <pid> <epoch> <live|stale>" for a held lease, or
 #       nothing (exit 1) when the task is unleased.
-#   fm-lease.sh release-actor --actor main|branch
+#   fm-lease.sh release-actor --actor main|branch [--holder-pid <pid>]
 #       Drop every lease the named actor holds; the Pi branch extension runs
 #       this at generation activation so a replaced branch conversation's
-#       leases never outlive it.
+#       leases never outlive it. With --holder-pid, drop only leases matching
+#       that holder.
 #   fm-lease.sh sweep
 #       Remove every provably stale lease in this home. Run at session start
 #       (a lease held by a dead actor is cleared at session start); safe to
@@ -50,7 +51,7 @@ fm_lock_acquire_wait "$LEASE_COMMAND_LOCK"
 trap 'fm_lock_release "$LEASE_COMMAND_LOCK"' EXIT
 
 usage() {
-  echo "usage: fm-lease.sh claim|release <task> [--actor main|branch] | release-actor --actor main|branch | check <task> | sweep" >&2
+  echo "usage: fm-lease.sh claim|release <task> [--actor main|branch] | release-actor --actor main|branch [--holder-pid <pid>] | check <task> | sweep" >&2
   exit 2
 }
 
@@ -84,16 +85,26 @@ case "$CMD" in
     ;;
   release-actor)
     ACTOR=
+    HOLDER_PID=
+    HOLDER_PID_SET=0
     while [ "$#" -gt 0 ]; do
       case "$1" in
         --actor)
           ACTOR=${2:-}
           shift 2 || usage
           ;;
+        --holder-pid)
+          HOLDER_PID=${2:-}
+          HOLDER_PID_SET=1
+          shift 2 || usage
+          ;;
         *) usage ;;
       esac
     done
     case "$ACTOR" in main|branch) ;; *) usage ;; esac
+    if [ "$HOLDER_PID_SET" = 1 ]; then
+      case "$HOLDER_PID" in ""|0|1|*[!0-9]*) usage ;; esac
+    fi
     ;;
   sweep)
     [ "$#" -eq 0 ] || usage
@@ -172,7 +183,8 @@ case "$CMD" in
       case "$LEASE" in *.lock) continue ;; esac
       TASK=${LEASE##*/.lease-}
       fm_lease_valid_id "$TASK" || continue
-      if fm_lease_read "$TASK" && [ "$FM_LEASE_ACTOR" = "$ACTOR" ]; then
+      if fm_lease_read "$TASK" && [ "$FM_LEASE_ACTOR" = "$ACTOR" ] \
+        && { [ "$HOLDER_PID_SET" = 0 ] || [ "$FM_LEASE_PID" = "$HOLDER_PID" ]; }; then
         rm -f -- "$LEASE"
       fi
     done
