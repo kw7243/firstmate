@@ -704,7 +704,7 @@ export default function (pi: ExtensionAPI) {
   }
 
   function rememberMainModel(ctx?: { model?: { provider: string; id: string }; modelRegistry?: ModelRegistry }): void {
-    if (ctx?.model) mainModel = { provider: ctx.model.provider, id: ctx.model.id };
+    mainModel = ctx?.model ? { provider: ctx.model.provider, id: ctx.model.id } : null;
     if (ctx?.modelRegistry) mainModelRegistry = ctx.modelRegistry;
   }
 
@@ -772,95 +772,102 @@ export default function (pi: ExtensionAPI) {
   // registration carries that streamSimple and oauth wiring by reference, so
   // copying it reuses the provider's own registration rather than reimplementing its
   // wire protocol; the copy is never persisted and stays scoped to this one
-  // runtime. One registration that fails to compose must not blind the rest,
-  // so each copy is isolated. A just-registered provider's auth check has not
-  // run yet, so the copied providers are refreshed here and every caller's
+  // runtime. The picker gives each registration its own runtime, so one that
+  // fails to compose cannot blind the rest. A just-registered provider's auth
+  // check has not run yet, so the copied provider is refreshed here and every caller's
   // hasConfiguredAuth verdict is real rather than the provisional entry
   // registration leaves behind.
-  async function copyExtensionProviders(
+  async function copyExtensionProvider(
     modelRuntime: ModelRuntime,
-    selectedProviderIds?: readonly string[],
-  ): Promise<Map<string, ExtensionProviderRegistration>> {
-    const registrations = new Map<string, ExtensionProviderRegistration>();
-    if (!mainModelRegistry) {
-      for (const providerId of selectedProviderIds ?? []) {
-        registrations.set(providerId, { providerId, kind: "none" });
-      }
-      return registrations;
-    }
-    let providerIds = selectedProviderIds;
-    if (!providerIds) {
-      try {
-        providerIds = mainModelRegistry.getRegisteredProviderIds();
-      } catch {
-        return registrations;
-      }
-    }
-    const copied: string[] = [];
-    for (const providerId of providerIds) {
-      try {
-        const nativeProvider = mainModelRegistry.getRegisteredNativeProvider(providerId);
-        if (nativeProvider) {
-          const registration: ExtensionProviderRegistration = {
-            providerId,
-            kind: "native",
-            registration: nativeProvider,
-          };
-          modelRuntime.registerNativeProvider(nativeProvider);
-          registrations.set(providerId, registration);
-          copied.push(providerId);
-          continue;
-        }
+    providerId: string,
+  ): Promise<ExtensionProviderRegistration> {
+    if (!mainModelRegistry) return { providerId, kind: "none" };
+    let registration: ExtensionProviderRegistration;
+    try {
+      const nativeProvider = mainModelRegistry.getRegisteredNativeProvider(providerId);
+      if (nativeProvider) {
+        registration = {
+          providerId,
+          kind: "native",
+          registration: nativeProvider,
+        };
+        modelRuntime.registerNativeProvider(nativeProvider);
+      } else {
         const config = mainModelRegistry.getRegisteredProviderConfig(providerId);
-        if (config) {
-          const registration: ExtensionProviderRegistration = {
-            providerId,
-            kind: "config",
-            registration: config,
-          };
-          modelRuntime.registerProvider(providerId, config);
-          registrations.set(providerId, registration);
-          copied.push(providerId);
-        } else {
-          registrations.set(providerId, { providerId, kind: "none" });
-        }
-      } catch (error) {
-        if (selectedProviderIds !== undefined) {
-          throw new ExtensionProviderResolutionError(
-            `extension-provider registration failed for ${providerId}: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        }
-        // A registration that fails to compose in the isolated runtime leaves
-        // that provider unavailable, exactly as if it were never copied.
+        if (!config) return { providerId, kind: "none" };
+        registration = {
+          providerId,
+          kind: "config",
+          registration: config,
+        };
+        modelRuntime.registerProvider(providerId, config);
       }
+    } catch (error) {
+      throw new ExtensionProviderResolutionError(
+        `extension-provider registration failed for ${providerId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
-    if (copied.length === 0) return registrations;
     const controller = new AbortController();
     try {
       const result = await withExtensionProviderDeadline(
-        modelRuntime.refresh({ providers: copied, allowNetwork: false, signal: controller.signal }),
+        modelRuntime.refresh({ providers: [providerId], allowNetwork: false, signal: controller.signal }),
         "availability refresh",
         () => controller.abort(),
       );
-      if (selectedProviderIds !== undefined) {
-        for (const providerId of copied) {
-          const error = result.errors.get(providerId);
-          if (error) {
-            throw new ExtensionProviderResolutionError(
-              `extension-provider availability refresh failed for ${providerId}: ${error.message}`,
-            );
-          }
-        }
+      const error = result.errors.get(providerId);
+      if (error) {
+        throw new ExtensionProviderResolutionError(
+          `extension-provider availability refresh failed for ${providerId}: ${error.message}`,
+        );
       }
     } catch (error) {
       if (error instanceof ExtensionProviderTimeoutError || error instanceof ExtensionProviderResolutionError) throw error;
-      if (selectedProviderIds !== undefined) {
-        throw new ExtensionProviderResolutionError(
-          `extension-provider availability refresh failed for ${copied.join(", ")}: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
+      throw new ExtensionProviderResolutionError(
+        `extension-provider availability refresh failed for ${providerId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
-    return registrations;
+    return registration;
+  }
+
+  async function availableBranchModelLabels(
+    models: readonly { provider: string; id: string }[],
+  ): Promise<string[]> {
+    let registeredProviderIds: readonly string[] = [];
+    if (mainModelRegistry) {
+      try {
+        registeredProviderIds = mainModelRegistry.getRegisteredProviderIds();
+      } catch {}
+    }
+    const registered = new Set(registeredProviderIds);
+    const providerRuntimes = new Map<string, Promise<ModelRuntime | null>>();
+    for (const providerId of new Set(models.map((model) => model.provider))) {
+      if (!registered.has(providerId)) continue;
+      providerRuntimes.set(
+        providerId,
+        (async () => {
+          try {
+            const modelRuntime = await createExtensionProviderRuntime();
+            await copyExtensionProvider(modelRuntime, providerId);
+            return modelRuntime;
+          } catch {
+            return null;
+          }
+        })(),
+      );
+    }
+    const needsStockRuntime = models.some((model) => !registered.has(model.provider));
+    const stockRuntime = needsStockRuntime ? await createExtensionProviderRuntime() : null;
+    const labels = await Promise.all(
+      models.map(async (model) => {
+        const modelRuntime = registered.has(model.provider)
+          ? await providerRuntimes.get(model.provider)
+          : stockRuntime;
+        return modelRuntime?.getModel(model.provider, model.id) && modelRuntime.hasConfiguredAuth(model.provider)
+          ? modelLabel(model)
+          : null;
+      }),
+    );
+    return labels.filter((label): label is string => label !== null);
   }
 
   function extensionProviderRegistrationIsCurrent(snapshot: ExtensionProviderRegistration): boolean {
@@ -926,8 +933,7 @@ export default function (pi: ExtensionAPI) {
   async function resolveBranchModel(provider: string, modelId: string): Promise<BranchModelResolution> {
     const label = `${provider}/${modelId}`;
     const modelRuntime = await createExtensionProviderRuntime();
-    const registrations = await copyExtensionProviders(modelRuntime, [provider]);
-    const providerRegistration = registrations.get(provider) ?? { providerId: provider, kind: "none" as const };
+    const providerRegistration = await copyExtensionProvider(modelRuntime, provider);
     const model = modelRuntime.getModel(provider, modelId) as BranchModel | undefined;
     if (!model) {
       const reason = `${label} is unavailable to the isolated branch runtime`;
@@ -1952,12 +1958,7 @@ ${context.command}
       const followMain = `Follow main${ctx.model ? ` (${modelLabel(ctx.model)})` : ""}`;
       let available: string[];
       try {
-        const modelRuntime = await createExtensionProviderRuntime();
-        await copyExtensionProviders(modelRuntime);
-        available = ctx.modelRegistry
-          .getAvailable()
-          .filter((model) => modelRuntime.getModel(model.provider, model.id) && modelRuntime.hasConfiguredAuth(model.provider))
-          .map(modelLabel);
+        available = await availableBranchModelLabels(ctx.modelRegistry.getAvailable());
       } catch (error) {
         ctx.ui.notify(
           `Could not read the supervision branch models: ${error instanceof Error ? error.message : String(error)}`,

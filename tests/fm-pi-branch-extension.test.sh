@@ -2715,6 +2715,70 @@ EOF
   pass "the current pin state binds every branch build, and clearing it returns the branch to main's model"
 }
 
+test_no_model_session_clears_unpinned_provider_selection() {
+  local repo home out status
+  repo="$TMP_ROOT/no-model-selection-root"
+  home="$TMP_ROOT/no-model-selection-home"
+  mkdir -p "$home/state" "$home/config"
+  install_pi_branch_extension_fixture "$repo"
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+const prelude = process.env.DRIVER_PRELUDE;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, registryModels, home }; })()`);
+const { fire, dispatch, settle, makeCtx, registryModels, home } = globalThis.__t;
+
+registryModels.push({ provider: "anthropic", id: "main-model" });
+await fire("session_start", {}, makeCtx());
+await fire("session_shutdown", {});
+
+const privatePrompt = "captain context from the replacement session";
+const replacementEntries = [];
+const replacementCtx = makeCtx({
+  model: undefined,
+  sessionManager: {
+    getSessionFile: () => `${home}/replacement-main.jsonl`,
+    getEntries: () => replacementEntries,
+  },
+});
+const providerCalls = [];
+globalThis.__fmStockProviderStreamSimple = (model, context) => {
+  providerCalls.push({ model, context: structuredClone(context) });
+};
+globalThis.__fmOnBranchPrompt = ({ session }) => {
+  if (!session.options.model || !session.options.modelRuntime) return;
+  return session.options.modelRuntime.streamSimple(
+    session.options.model,
+    { messages: session.ops },
+    {},
+  );
+};
+
+await fire("session_start", {}, replacementCtx);
+await fire("before_agent_start", { prompt: privatePrompt }, replacementCtx);
+const offer = dispatch("signal: replacement session has no model");
+await settle(
+  () => (globalThis.__fmSessions ?? []).length === 1 && globalThis.__fmSessions[0].ops.some((op) => op.kind === "prompt"),
+  "no-model replacement branch prompt",
+);
+const session = globalThis.__fmSessions[0];
+if (!session.ops.some((op) => op.kind === "custom" && op.message.content.includes(privatePrompt))) {
+  throw new Error("the no-model replacement did not exercise mirrored captain context");
+}
+if ("model" in session.options || "modelRuntime" in session.options) {
+  throw new Error(`the no-model replacement reused the prior provider selection: ${JSON.stringify(session.options.model)}`);
+}
+if (providerCalls.length !== 0) {
+  throw new Error(`mirrored replacement context reached the prior provider: ${JSON.stringify(providerCalls)}`);
+}
+await offer.settlement.then(() => null, () => null);
+process.exit(0);
+EOF
+  status=$?
+  out=$(cat "$TMP_ROOT/node-output")
+  expect_code 0 "$status" "a no-model replacement session must clear the prior unpinned provider selection: $out"
+  pass "a no-model replacement clears the prior unpinned provider before mirroring context"
+}
+
 test_unpinned_branch_follows_main_model_changes_live() {
   local repo home out status
   repo="$TMP_ROOT/model-live-root"
@@ -5828,8 +5892,8 @@ test_selected_provider_resolution_avoids_unrelated_refresh() {
   PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
     DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
-await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, registryModels, commands, uiPrompts }; })()`);
-const { fire, dispatch, settle, makeCtx, registryModels, commands, uiPrompts } = globalThis.__t;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, registryModels, commands, uiPrompts, notices }; })()`);
+const { fire, dispatch, settle, makeCtx, registryModels, commands, uiPrompts, notices } = globalThis.__t;
 
 registryModels.push(
   { provider: "anthropic", id: "main-model", baseUrl: "https://api.anthropic.com" },
@@ -5857,8 +5921,8 @@ globalThis.__fmExtensionProviderConfigs = new Map([
   ],
 ]);
 globalThis.__fmExtensionNativeProviders = new Map();
-globalThis.__fmModelRuntimeRefresh = (_runtime, options) => {
-  if (options?.providers?.includes("unrelated")) return new Promise(() => {});
+globalThis.__fmModelRuntimeRefresh = (runtime, _options) => {
+  if (runtime.registeredProviderConfigs.has("unrelated")) return new Promise(() => {});
   return undefined;
 };
 
@@ -5877,24 +5941,41 @@ if (globalThis.__fmSessions[0].options.model?.baseUrl !== "https://anthropic.pro
 }
 await offer.settlement.then(() => null, () => null);
 
-delete globalThis.__fmModelRuntimeRefresh;
 const command = commands.get("supervision-model");
 if (!command) throw new Error("the supervision-model command was not registered");
-await command.handler("", makeCtx());
-const pickerRefresh = globalThis.__fmModelRuntimeRefreshCalls?.at(-1);
-const pickerProviders = [...(pickerRefresh?.options?.providers ?? [])].sort();
-if (JSON.stringify(pickerProviders) !== JSON.stringify(["anthropic", "unrelated"])) {
-  throw new Error(`the picker did not refresh the full provider registry: ${JSON.stringify(pickerProviders)}`);
+const pickerRefreshStart = (globalThis.__fmModelRuntimeRefreshCalls ?? []).length;
+const realSetTimeout = globalThis.setTimeout;
+globalThis.setTimeout = (callback, delay, ...args) =>
+  Number(delay) === 5000 ? realSetTimeout(callback, 0, ...args) : realSetTimeout(callback, delay, ...args);
+try {
+  await command.handler("", makeCtx());
+} finally {
+  globalThis.setTimeout = realSetTimeout;
 }
-if (!uiPrompts.at(-1)?.options.includes("unrelated/other-model")) {
-  throw new Error(`the picker omitted the unrelated registered model: ${JSON.stringify(uiPrompts.at(-1)?.options)}`);
+if (notices.some((notice) => notice.type === "error")) {
+  throw new Error(`a stalled picker provider hid healthy choices: ${JSON.stringify(notices)}`);
+}
+const pickerRefreshes = (globalThis.__fmModelRuntimeRefreshCalls ?? []).slice(pickerRefreshStart);
+const pickerProviders = pickerRefreshes.map((call) => call.options?.providers ?? []);
+if (
+  !pickerProviders.some((providers) => JSON.stringify(providers) === JSON.stringify(["anthropic"])) ||
+  !pickerProviders.some((providers) => JSON.stringify(providers) === JSON.stringify(["unrelated"])) ||
+  pickerProviders.some((providers) => providers.length !== 1)
+) {
+  throw new Error(`the picker did not isolate the full provider registry: ${JSON.stringify(pickerProviders)}`);
+}
+if (!uiPrompts.at(-1)?.options.includes("anthropic/main-model")) {
+  throw new Error(`the stalled provider hid a healthy picker model: ${JSON.stringify(uiPrompts.at(-1)?.options)}`);
+}
+if (uiPrompts.at(-1)?.options.includes("unrelated/other-model")) {
+  throw new Error(`the picker offered a provider whose isolated refresh never settled: ${JSON.stringify(uiPrompts.at(-1)?.options)}`);
 }
 process.exit(0);
 EOF
   status=$?
   out=$(cat "$TMP_ROOT/node-output")
   expect_code 0 "$status" "selected model resolution must not wait on unrelated providers while discovery still enumerates them: $out"
-  pass "selected model resolution refreshes only its provider while discovery retains all providers"
+  pass "selected model resolution stays narrow while picker refresh failures stay isolated"
 }
 
 test_extension_registered_provider_resolves_in_the_branch() {
@@ -6011,6 +6092,7 @@ test_branch_mirror_filters_order_and_cursor
 test_branch_mirror_reanchors_for_the_new_session_branch_conversation
 test_branch_session_is_new_at_every_main_session_start
 test_branch_model_pin_applies_and_absent_pin_keeps_the_default
+test_no_model_session_clears_unpinned_provider_selection
 test_unpinned_branch_follows_main_model_changes_live
 test_supervision_model_command_persists_and_rebinds_the_live_branch
 test_supervision_model_picker_is_bounded_searchable_and_branch_only
