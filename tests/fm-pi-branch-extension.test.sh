@@ -1899,7 +1899,7 @@ test_branch_report_refuses_a_task_the_wake_did_not_name() {
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { dispatch, fire, home, settle, approvedProject, defaultSessionCtx }; })()`);
 const { dispatch, fire, home, settle, approvedProject, defaultSessionCtx } = globalThis.__t;
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -3363,6 +3363,90 @@ EOF
   out=$(cat "$TMP_ROOT/node-output")
   expect_code 0 "$status" "the supervision-model command must persist the pick and rebind the live branch: $out"
   pass "supervision-model command persists the captain's pick and rebinds the live branch"
+}
+
+test_supervision_model_rejects_registration_race_during_preparation() {
+  local repo home out status
+  repo="$TMP_ROOT/modelcmd-registration-race-root"
+  home="$TMP_ROOT/modelcmd-registration-race-home"
+  mkdir -p "$home/state" "$home/config"
+  install_pi_branch_extension_fixture "$repo"
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+const prelude = process.env.DRIVER_PRELUDE;
+await eval(`(async () => { ${prelude}; globalThis.__t = { makeCtx, commands, registryModels, uiSelections, uiPrompts, notices, home }; })()`);
+const { makeCtx, commands, registryModels, uiSelections, uiPrompts, notices, home } = globalThis.__t;
+import { readFileSync, writeFileSync } from "node:fs";
+
+const providerId = "static-race";
+const modelId = "selected-model";
+const selected = {
+  provider: providerId,
+  id: modelId,
+  api: "openai-completions",
+  baseUrl: "https://static-route.invalid/v1",
+  apiKey: "static-route-key",
+};
+registryModels.push(
+  { provider: "anthropic", id: "main-model" },
+  selected,
+);
+globalThis.__fmExtensionProviderConfigs = new Map();
+globalThis.__fmExtensionNativeProviders = new Map();
+const pinFile = `${home}/config/supervision-branch-model`;
+writeFileSync(pinFile, "anthropic/main-model\n");
+const command = commands.get("supervision-model");
+if (!command) throw new Error("the supervision-model command was not registered");
+
+let markCreateStarted;
+const createStarted = new Promise((resolve) => { markCreateStarted = resolve; });
+let releaseCreate;
+const createRelease = new Promise((resolve) => { releaseCreate = resolve; });
+globalThis.__fmModelRuntimeCreate = async (options) => {
+  if (options.providerId !== providerId) {
+    throw new Error(`the picker constructed the wrong provider: ${JSON.stringify(options)}`);
+  }
+  markCreateStarted();
+  await createRelease;
+};
+uiSelections.push(`${providerId}/${modelId}`);
+const selection = command.handler("", makeCtx());
+await createStarted;
+globalThis.__fmExtensionProviderConfigs.set(providerId, {
+  api: selected.api,
+  baseUrl: "https://registered-route.invalid/v1",
+  models: [{ ...selected }],
+  streamSimple() {},
+});
+releaseCreate();
+await selection;
+delete globalThis.__fmModelRuntimeCreate;
+
+if (readFileSync(pinFile, "utf8") !== "anthropic/main-model\n") {
+  throw new Error(`the registration race replaced the working pin: ${JSON.stringify(readFileSync(pinFile, "utf8"))}`);
+}
+if ((globalThis.__fmModelRuntimeRefreshCalls ?? []).length !== 0) {
+  throw new Error("selected-provider preparation continued after the registration changed");
+}
+if (
+  notices.length !== 1 ||
+  notices[0].type !== "error" ||
+  !notices[0].message.includes("provider registration changed during selected-model preparation")
+) {
+  throw new Error(`the registration race did not emit one failure: ${JSON.stringify(notices)}`);
+}
+if (notices.some((notice) => notice.message.includes(`Supervision branch model: ${providerId}/${modelId}`))) {
+  throw new Error(`the rejected registration race emitted model success: ${JSON.stringify(notices)}`);
+}
+if (uiPrompts.length !== 1) {
+  throw new Error(`the rejected model selection continued into the effort picker: ${JSON.stringify(uiPrompts)}`);
+}
+process.exit(0);
+EOF
+  status=$?
+  out=$(cat "$TMP_ROOT/node-output")
+  expect_code 0 "$status" "a same-ID registration during scoped preparation must reject before persistence: $out"
+  pass "supervision-model rejects registration races before persistence"
 }
 
 test_branch_effort_pin_applies_and_absent_pin_follows_main() {
@@ -7093,6 +7177,7 @@ test_branch_model_pin_applies_and_absent_pin_keeps_the_default
 test_no_model_session_clears_unpinned_provider_selection
 test_unpinned_branch_follows_main_model_changes_live
 test_supervision_model_command_persists_and_rebinds_the_live_branch
+test_supervision_model_rejects_registration_race_during_preparation
 test_supervision_model_picker_is_bounded_searchable_and_branch_only
 test_branch_model_picker_keeps_follow_main_first_under_ranking
 test_branch_effort_pin_applies_and_absent_pin_follows_main

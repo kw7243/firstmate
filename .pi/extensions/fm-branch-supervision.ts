@@ -269,7 +269,15 @@ function settledPromptProviderError(sessionManager: SessionManager, entryOffset:
 // surface Pi already hands this extension.
 type BranchModel = NonNullable<ReturnType<ModelRuntime["getModel"]>>;
 type BranchEffort = ReturnType<NonNullable<ExtensionAPI["getThinkingLevel"]>>;
-type ExtensionProviderRegistration = { providerId: string; modelId: string; compositionDigest: string };
+type ProviderRegistrationKind = "native" | "config" | null;
+type ProviderCompositionSnapshot = {
+  providerId: string;
+  modelId: string;
+  registrationKind: ProviderRegistrationKind;
+  effectiveCompositionDigest: string;
+};
+type ExtensionProviderRegistration = ProviderCompositionSnapshot & { compositionDigest: string };
+type LiveProviderPreparation = { registry: ModelRegistry; snapshot: ProviderCompositionSnapshot };
 type PinnedBranchModel = {
   model: BranchModel;
   modelRuntime: ModelRuntime;
@@ -784,30 +792,26 @@ export default function (pi: ExtensionAPI) {
     return modelRuntime;
   }
 
-  function extensionProviderRegistrationKind(providerId: string): "native" | "config" | null {
-    if (mainModelRegistry) {
-      try {
-        const nativeProvider = mainModelRegistry.getRegisteredNativeProvider(providerId);
-        if (nativeProvider) return "native";
-        if (mainModelRegistry.getRegisteredProviderConfig(providerId)) return "config";
-      } catch (error) {
-        throw new ExtensionProviderResolutionError(
-          `extension-provider registration failed for ${providerId}: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
+  function providerRegistrationKind(registry: ModelRegistry, providerId: string): ProviderRegistrationKind {
+    try {
+      const nativeProvider = registry.getRegisteredNativeProvider(providerId);
+      if (nativeProvider) return "native";
+      if (registry.getRegisteredProviderConfig(providerId)) return "config";
+    } catch (error) {
+      throw new ExtensionProviderResolutionError(
+        `extension-provider registration failed for ${providerId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
     return null;
   }
 
   async function prepareExtensionProviderRuntime(
     providerId: string,
+    preparation: LiveProviderPreparation,
   ): Promise<ModelRuntime> {
-    if (extensionProviderRegistrationKind(providerId)) {
-      throw new ExtensionProviderResolutionError(
-        `Pi ${VERSION} exposes no provider-scoped registration boundary for extension provider ${providerId}`,
-      );
-    }
+    assertLiveProviderPreparationCurrent(preparation);
     const modelRuntime = await createExtensionProviderRuntime(providerId);
+    assertLiveProviderPreparationCurrent(preparation);
     const controller = new AbortController();
     try {
       const result = await withExtensionProviderDeadline(
@@ -815,6 +819,7 @@ export default function (pi: ExtensionAPI) {
         "availability refresh",
         () => controller.abort(),
       );
+      assertLiveProviderPreparationCurrent(preparation);
       const error = result.errors.get(providerId);
       if (error) {
         throw new ExtensionProviderResolutionError(
@@ -875,17 +880,91 @@ export default function (pi: ExtensionAPI) {
     };
   }
 
+  function captureEffectiveProviderComposition(
+    registry: ModelRegistry,
+    providerId: string,
+    modelId: string,
+    registrationKind: ProviderRegistrationKind,
+  ): ProviderCompositionSnapshot {
+    const model = registry.find(providerId, modelId);
+    const provider = registry.getProvider(providerId);
+    if (!model || !provider) {
+      throw new ExtensionProviderResolutionError(`${providerId}/${modelId} has no effective provider composition`);
+    }
+    return {
+      providerId,
+      modelId,
+      registrationKind,
+      effectiveCompositionDigest: createHash("sha256")
+        .update(stableProviderComposition(effectiveProviderComposition(model, provider)))
+        .digest("hex"),
+    };
+  }
+
+  function providerCompositionSnapshotsMatch(
+    expected: ProviderCompositionSnapshot,
+    current: ProviderCompositionSnapshot,
+  ): boolean {
+    return (
+      current.providerId === expected.providerId &&
+      current.modelId === expected.modelId &&
+      current.registrationKind === expected.registrationKind &&
+      current.effectiveCompositionDigest === expected.effectiveCompositionDigest
+    );
+  }
+
+  function captureLiveProviderPreparation(providerId: string, modelId: string): LiveProviderPreparation {
+    const registry = mainModelRegistry;
+    if (!registry) {
+      throw new ExtensionProviderResolutionError(
+        `no live model registry is available for selected provider ${providerId}`,
+      );
+    }
+    return {
+      registry,
+      snapshot: captureEffectiveProviderComposition(
+        registry,
+        providerId,
+        modelId,
+        providerRegistrationKind(registry, providerId),
+      ),
+    };
+  }
+
+  function liveProviderPreparationIsCurrent(preparation: LiveProviderPreparation): boolean {
+    if (mainModelRegistry !== preparation.registry) return false;
+    try {
+      const current = captureEffectiveProviderComposition(
+        preparation.registry,
+        preparation.snapshot.providerId,
+        preparation.snapshot.modelId,
+        providerRegistrationKind(preparation.registry, preparation.snapshot.providerId),
+      );
+      return providerCompositionSnapshotsMatch(preparation.snapshot, current);
+    } catch {
+      return false;
+    }
+  }
+
+  function assertLiveProviderPreparationCurrent(preparation: LiveProviderPreparation): void {
+    if (liveProviderPreparationIsCurrent(preparation)) return;
+    throw new ExtensionProviderResolutionError(
+      `provider registration changed during selected-model preparation for ${preparation.snapshot.providerId}`,
+    );
+  }
+
   async function captureProviderComposition(
     registry: ModelRegistry,
     providerId: string,
     modelId: string,
+    registrationKind: ProviderRegistrationKind,
   ): Promise<ExtensionProviderRegistration> {
     const model = registry.find(providerId, modelId);
     const provider = registry.getProvider(providerId);
     if (!model || !provider) {
       throw new ExtensionProviderResolutionError(`${providerId}/${modelId} has no effective provider composition`);
     }
-    const initialComposition = stableProviderComposition(effectiveProviderComposition(model, provider));
+    const initialSnapshot = captureEffectiveProviderComposition(registry, providerId, modelId, registrationKind);
     const requestAuth = await withExtensionProviderDeadline(
       registry.getApiKeyAndHeaders(model),
       "request-auth resolution",
@@ -896,17 +975,18 @@ export default function (pi: ExtensionAPI) {
         `request-auth resolution failed for ${providerId}/${modelId}: ${requestAuth.error}`,
       );
     }
+    const currentSnapshot = captureEffectiveProviderComposition(registry, providerId, modelId, registrationKind);
+    if (!providerCompositionSnapshotsMatch(initialSnapshot, currentSnapshot)) {
+      throw new ExtensionProviderResolutionError(
+        `provider composition changed during request-auth resolution for ${providerId}/${modelId}`,
+      );
+    }
     const currentModel = registry.find(providerId, modelId);
     const currentProvider = registry.getProvider(providerId);
     if (!currentModel || !currentProvider) {
       throw new ExtensionProviderResolutionError(`${providerId}/${modelId} has no effective provider composition`);
     }
     const currentComposition = effectiveProviderComposition(currentModel, currentProvider);
-    if (stableProviderComposition(currentComposition) !== initialComposition) {
-      throw new ExtensionProviderResolutionError(
-        `provider composition changed during request-auth resolution for ${providerId}/${modelId}`,
-      );
-    }
     const composition = {
       ...currentComposition,
       requestAuth,
@@ -914,20 +994,47 @@ export default function (pi: ExtensionAPI) {
     return {
       providerId,
       modelId,
+      registrationKind,
+      effectiveCompositionDigest: currentSnapshot.effectiveCompositionDigest,
       compositionDigest: createHash("sha256").update(stableProviderComposition(composition)).digest("hex"),
     };
+  }
+
+  function providerRegistrationIsSynchronouslyCurrent(
+    snapshot: ExtensionProviderRegistration,
+    registry: ModelRegistry,
+  ): boolean {
+    try {
+      const current = captureEffectiveProviderComposition(
+        registry,
+        snapshot.providerId,
+        snapshot.modelId,
+        providerRegistrationKind(registry, snapshot.providerId),
+      );
+      return providerCompositionSnapshotsMatch(snapshot, current);
+    } catch {
+      return false;
+    }
+  }
+
+  function extensionProviderRegistrationIsSynchronouslyCurrent(snapshot: ExtensionProviderRegistration): boolean {
+    const registry = mainModelRegistry;
+    return registry !== null && providerRegistrationIsSynchronouslyCurrent(snapshot, registry);
   }
 
   async function extensionProviderRegistrationIsCurrent(snapshot: ExtensionProviderRegistration): Promise<boolean> {
     const registry = mainModelRegistry;
     if (!registry) return false;
     try {
-      const registrationKind = extensionProviderRegistrationKind(snapshot.providerId);
-      if (registrationKind) return false;
-      const current = await captureProviderComposition(registry, snapshot.providerId, snapshot.modelId);
+      const registrationKind = providerRegistrationKind(registry, snapshot.providerId);
+      if (!providerRegistrationIsSynchronouslyCurrent(snapshot, registry)) return false;
+      const current = await captureProviderComposition(registry, snapshot.providerId, snapshot.modelId, registrationKind);
       if (mainModelRegistry !== registry) return false;
-      if (extensionProviderRegistrationKind(snapshot.providerId) !== registrationKind) return false;
-      return current.compositionDigest === snapshot.compositionDigest;
+      if (!providerRegistrationIsSynchronouslyCurrent(snapshot, registry)) return false;
+      return (
+        current.registrationKind === snapshot.registrationKind &&
+        current.compositionDigest === snapshot.compositionDigest
+      );
     } catch {
       return false;
     }
@@ -940,7 +1047,14 @@ export default function (pi: ExtensionAPI) {
 
   async function resolveBranchModel(provider: string, modelId: string): Promise<BranchModelResolution> {
     const label = `${provider}/${modelId}`;
-    const modelRuntime = await prepareExtensionProviderRuntime(provider);
+    const livePreparation = captureLiveProviderPreparation(provider, modelId);
+    if (livePreparation.snapshot.registrationKind) {
+      throw new ExtensionProviderResolutionError(
+        `Pi ${VERSION} exposes no provider-scoped registration boundary for extension provider ${provider}`,
+      );
+    }
+    const modelRuntime = await prepareExtensionProviderRuntime(provider, livePreparation);
+    assertLiveProviderPreparationCurrent(livePreparation);
     const model = modelRuntime.getModel(provider, modelId) as BranchModel | undefined;
     if (!model) {
       const reason = `${label} is unavailable to the isolated branch runtime`;
@@ -950,7 +1064,18 @@ export default function (pi: ExtensionAPI) {
       const reason = `${label} has no configured credentials in the isolated branch runtime`;
       return { ok: false, reason };
     }
-    const providerRegistration = await captureProviderComposition(new ModelRegistry(modelRuntime), provider, modelId);
+    const providerRegistration = await captureProviderComposition(
+      new ModelRegistry(modelRuntime),
+      provider,
+      modelId,
+      livePreparation.snapshot.registrationKind,
+    );
+    assertLiveProviderPreparationCurrent(livePreparation);
+    if (!providerCompositionSnapshotsMatch(livePreparation.snapshot, providerRegistration)) {
+      throw new ExtensionProviderResolutionError(
+        `scoped provider composition differs from the live registry for ${label}`,
+      );
+    }
     return {
       ok: true,
       selection: {
@@ -2080,9 +2205,21 @@ ${context.command}
         } else {
           const separator = picked.indexOf("/");
           if (separator <= 0 || separator >= picked.length - 1) throw new Error(`invalid model selection: ${picked}`);
-          branchModel = (
-            await preparePinnedBranchModel({ provider: picked.slice(0, separator), modelId: picked.slice(separator + 1) })
-          ).model;
+          const prepared = await preparePinnedBranchModel({
+            provider: picked.slice(0, separator),
+            modelId: picked.slice(separator + 1),
+          });
+          if (!(await extensionProviderRegistrationIsCurrent(prepared.providerRegistration))) {
+            throw new ExtensionProviderResolutionError(
+              `provider registration changed during selected-model preparation for ${prepared.providerRegistration.providerId}`,
+            );
+          }
+          if (!extensionProviderRegistrationIsSynchronouslyCurrent(prepared.providerRegistration)) {
+            throw new ExtensionProviderResolutionError(
+              `provider registration changed during selected-model preparation for ${prepared.providerRegistration.providerId}`,
+            );
+          }
+          branchModel = prepared.model;
           writePinFile(modelPinFile, picked);
         }
       } catch (error) {
