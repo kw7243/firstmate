@@ -5533,6 +5533,118 @@ EOF
   pass "same-ID static provider hot reloads cannot reach an obsolete route"
 }
 
+test_header_auth_race_rechecks_registration_and_composition() {
+  local repo home out status
+  repo="$TMP_ROOT/header-auth-race-root"
+  home="$TMP_ROOT/header-auth-race-home"
+  mkdir -p "$home/state" "$home/config"
+  install_pi_branch_extension_fixture "$repo"
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+const prelude = process.env.DRIVER_PRELUDE;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, makeCtx, registryModels, home }; })()`);
+const { fire, dispatch, makeCtx, registryModels, home } = globalThis.__t;
+
+const providerId = "auth-race-provider";
+const modelId = "same-model";
+const modelA = {
+  provider: providerId,
+  id: modelId,
+  api: "openai-completions",
+  baseUrl: "https://route-a.invalid/v1",
+  apiKey: "route-a-key",
+};
+const modelB = { ...modelA, baseUrl: "https://route-b.invalid/v1" };
+registryModels.push(modelA);
+globalThis.__fmExtensionProviderConfigs = new Map();
+globalThis.__fmExtensionNativeProviders = new Map();
+const baseCtx = makeCtx({
+  model: { provider: providerId, id: modelId },
+  sessionManager: {
+    getSessionFile: () => `${home}/main.jsonl`,
+    getEntries: () => [],
+  },
+});
+const baseRegistry = baseCtx.modelRegistry;
+let pendingAuthRace = null;
+const ctx = {
+  ...baseCtx,
+  modelRegistry: {
+    ...baseRegistry,
+    async getApiKeyAndHeaders(model) {
+      const requestAuth = await baseRegistry.getApiKeyAndHeaders(model);
+      const race = pendingAuthRace;
+      if (!race) return requestAuth;
+      pendingAuthRace = null;
+      race.started();
+      await race.release;
+      return requestAuth;
+    },
+  },
+};
+const providerCalls = [];
+globalThis.__fmStockProviderStreamSimple = (model, context) => {
+  providerCalls.push({ model: structuredClone(model), context: structuredClone(context) });
+};
+async function invokeProvider(session, context) {
+  let beforeHeaders;
+  const factoryEntry = session.options.resourceLoader.options.extensionFactories[0];
+  const factory = typeof factoryEntry === "function" ? factoryEntry : factoryEntry.factory;
+  factory({ on: (event, handler) => { if (event === "before_provider_headers") beforeHeaders = handler; } });
+  if (!beforeHeaders) throw new Error("the branch installed no provider-header guard");
+  await beforeHeaders({}, { abort() {} });
+  return session.modelRuntime.streamSimple(session.model, context, {});
+}
+async function runRace(label, mutate) {
+  let signalStarted;
+  const started = new Promise((resolve) => { signalStarted = resolve; });
+  let releaseAuth;
+  const release = new Promise((resolve) => { releaseAuth = resolve; });
+  const privatePrompt = `captain context withheld during ${label}`;
+  await fire("before_agent_start", { prompt: privatePrompt }, ctx);
+  const callsBefore = providerCalls.length;
+  globalThis.__fmOnBranchPrompt = async ({ session }) => {
+    pendingAuthRace = { started: signalStarted, release };
+    const invocation = invokeProvider(session, { messages: session.ops });
+    await started;
+    mutate();
+    releaseAuth();
+    return invocation;
+  };
+  const offer = dispatch(`signal: ${label}`);
+  const failure = await offer.settlement.then(() => null, (error) => error);
+  if (!(failure instanceof Error) || !failure.message.includes("provider registration changed before request")) {
+    throw new Error(`${label} did not fail closed at the header boundary: ${String(failure)}`);
+  }
+  const session = globalThis.__fmSessions.at(-1);
+  if (!session?.disposed) throw new Error(`${label} left the obsolete branch live`);
+  if (!session.ops.some((op) => op.kind === "custom" && op.message.content.includes(privatePrompt))) {
+    throw new Error(`${label} did not exercise mirrored captain context`);
+  }
+  if (providerCalls.length !== callsBefore) throw new Error(`${label} reached the obsolete provider`);
+}
+
+await fire("session_start", {}, ctx);
+await runRace("registration kind changes during auth resolution", () => {
+  globalThis.__fmExtensionProviderConfigs.set(providerId, {
+    api: modelA.api,
+    baseUrl: modelA.baseUrl,
+    models: [{ ...modelA }],
+    streamSimple() {},
+  });
+});
+globalThis.__fmExtensionProviderConfigs.clear();
+await runRace("effective composition changes during auth resolution", () => {
+  registryModels[0] = modelB;
+});
+process.exit(0);
+EOF
+  status=$?
+  out=$(cat "$TMP_ROOT/node-output")
+  expect_code 0 "$status" "header auth resolution must recheck registration kind and composition: $out"
+  pass "header auth races recheck registration kind and effective composition"
+}
+
 test_provider_change_at_header_boundary_blocks_all_effective_streams() {
   if ! command -v node >/dev/null 2>&1; then
     echo "skip: node not found for the Pi provider dispatch test"
@@ -6800,6 +6912,7 @@ test_unpinned_branch_follows_main_effort_changes_live
 test_extension_provider_registration_falls_back_without_scoped_api
 test_cached_branch_rebinds_after_effective_provider_change
 test_static_same_id_provider_hot_reload_fails_closed_at_headers
+test_header_auth_race_rechecks_registration_and_composition
 test_provider_change_at_header_boundary_blocks_all_effective_streams
 test_runtime_only_main_credential_rejects_branch_construction
 test_unsupported_pi_version_rejects_before_runtime_creation

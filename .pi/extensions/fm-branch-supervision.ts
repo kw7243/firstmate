@@ -851,30 +851,10 @@ export default function (pi: ExtensionAPI) {
     return serialized;
   }
 
-  async function captureProviderComposition(
-    registry: ModelRegistry,
-    providerId: string,
-    modelId: string,
-  ): Promise<ExtensionProviderRegistration> {
-    const model = registry.find(providerId, modelId);
-    const provider = registry.getProvider(providerId);
-    if (!model || !provider) {
-      throw new ExtensionProviderResolutionError(`${providerId}/${modelId} has no effective provider composition`);
-    }
-    const requestAuth = await withExtensionProviderDeadline(
-      registry.getApiKeyAndHeaders(model),
-      "request-auth resolution",
-      () => undefined,
-    );
-    if (!requestAuth.ok) {
-      throw new ExtensionProviderResolutionError(
-        `request-auth resolution failed for ${providerId}/${modelId}: ${requestAuth.error}`,
-      );
-    }
-    const providerRecord = provider as unknown as Record<string, unknown>;
-    const composition = {
+  function effectiveProviderComposition(model: unknown, provider: unknown) {
+    const providerRecord = provider as Record<string, unknown>;
+    return {
       model,
-      requestAuth,
       provider: {
         id: providerRecord.id,
         name: providerRecord.name,
@@ -886,6 +866,44 @@ export default function (pi: ExtensionAPI) {
         cancelDeferred: providerRecord.cancelDeferred,
       },
     };
+  }
+
+  async function captureProviderComposition(
+    registry: ModelRegistry,
+    providerId: string,
+    modelId: string,
+  ): Promise<ExtensionProviderRegistration> {
+    const model = registry.find(providerId, modelId);
+    const provider = registry.getProvider(providerId);
+    if (!model || !provider) {
+      throw new ExtensionProviderResolutionError(`${providerId}/${modelId} has no effective provider composition`);
+    }
+    const initialComposition = stableProviderComposition(effectiveProviderComposition(model, provider));
+    const requestAuth = await withExtensionProviderDeadline(
+      registry.getApiKeyAndHeaders(model),
+      "request-auth resolution",
+      () => undefined,
+    );
+    if (!requestAuth.ok) {
+      throw new ExtensionProviderResolutionError(
+        `request-auth resolution failed for ${providerId}/${modelId}: ${requestAuth.error}`,
+      );
+    }
+    const currentModel = registry.find(providerId, modelId);
+    const currentProvider = registry.getProvider(providerId);
+    if (!currentModel || !currentProvider) {
+      throw new ExtensionProviderResolutionError(`${providerId}/${modelId} has no effective provider composition`);
+    }
+    const currentComposition = effectiveProviderComposition(currentModel, currentProvider);
+    if (stableProviderComposition(currentComposition) !== initialComposition) {
+      throw new ExtensionProviderResolutionError(
+        `provider composition changed during request-auth resolution for ${providerId}/${modelId}`,
+      );
+    }
+    const composition = {
+      ...currentComposition,
+      requestAuth,
+    };
     return {
       providerId,
       modelId,
@@ -894,15 +912,14 @@ export default function (pi: ExtensionAPI) {
   }
 
   async function extensionProviderRegistrationIsCurrent(snapshot: ExtensionProviderRegistration): Promise<boolean> {
-    if (!mainModelRegistry) return false;
+    const registry = mainModelRegistry;
+    if (!registry) return false;
     try {
-      if (
-        mainModelRegistry.getRegisteredNativeProvider(snapshot.providerId) ||
-        mainModelRegistry.getRegisteredProviderConfig(snapshot.providerId)
-      ) {
-        return false;
-      }
-      const current = await captureProviderComposition(mainModelRegistry, snapshot.providerId, snapshot.modelId);
+      const registrationKind = extensionProviderRegistrationKind(snapshot.providerId);
+      if (registrationKind) return false;
+      const current = await captureProviderComposition(registry, snapshot.providerId, snapshot.modelId);
+      if (mainModelRegistry !== registry) return false;
+      if (extensionProviderRegistrationKind(snapshot.providerId) !== registrationKind) return false;
       return current.compositionDigest === snapshot.compositionDigest;
     } catch {
       return false;
