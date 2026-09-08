@@ -173,6 +173,8 @@ const PROVIDER_REPROBE_MAX_MS = 60 * 60 * 1000;
 const EXTENSION_PROVIDER_OPERATION_TIMEOUT_MS = 5_000;
 class ExtensionProviderTimeoutError extends Error {}
 class ExtensionProviderResolutionError extends Error {}
+class ExtensionProviderCompositionChangedError extends ExtensionProviderResolutionError {}
+class ExtensionProviderDriftError extends ExtensionProviderResolutionError {}
 type ProviderScopedModelRuntimeConstructor = typeof ModelRuntime & {
   createForProvider?: (
     providerId: string,
@@ -931,24 +933,20 @@ export default function (pi: ExtensionAPI) {
     };
   }
 
-  function liveProviderPreparationIsCurrent(preparation: LiveProviderPreparation): boolean {
-    if (mainModelRegistry !== preparation.registry) return false;
-    try {
-      const current = captureEffectiveProviderComposition(
-        preparation.registry,
-        preparation.snapshot.providerId,
-        preparation.snapshot.modelId,
-        providerRegistrationKind(preparation.registry, preparation.snapshot.providerId),
-      );
-      return providerCompositionSnapshotsMatch(preparation.snapshot, current);
-    } catch {
-      return false;
-    }
-  }
-
   function assertLiveProviderPreparationCurrent(preparation: LiveProviderPreparation): void {
-    if (liveProviderPreparationIsCurrent(preparation)) return;
-    throw new ExtensionProviderResolutionError(
+    if (mainModelRegistry !== preparation.registry) {
+      throw new ExtensionProviderResolutionError(
+        `live model registry changed during selected-model preparation for ${preparation.snapshot.providerId}`,
+      );
+    }
+    const current = captureEffectiveProviderComposition(
+      preparation.registry,
+      preparation.snapshot.providerId,
+      preparation.snapshot.modelId,
+      providerRegistrationKind(preparation.registry, preparation.snapshot.providerId),
+    );
+    if (providerCompositionSnapshotsMatch(preparation.snapshot, current)) return;
+    throw new ExtensionProviderDriftError(
       `provider registration changed during selected-model preparation for ${preparation.snapshot.providerId}`,
     );
   }
@@ -977,7 +975,7 @@ export default function (pi: ExtensionAPI) {
     }
     const currentSnapshot = captureEffectiveProviderComposition(registry, providerId, modelId, registrationKind);
     if (!providerCompositionSnapshotsMatch(initialSnapshot, currentSnapshot)) {
-      throw new ExtensionProviderResolutionError(
+      throw new ExtensionProviderCompositionChangedError(
         `provider composition changed during request-auth resolution for ${providerId}/${modelId}`,
       );
     }
@@ -1022,27 +1020,69 @@ export default function (pi: ExtensionAPI) {
     return registry !== null && providerRegistrationIsSynchronouslyCurrent(snapshot, registry);
   }
 
-  async function extensionProviderRegistrationIsCurrent(snapshot: ExtensionProviderRegistration): Promise<boolean> {
+  async function assertExtensionProviderRegistrationCurrent(
+    snapshot: ExtensionProviderRegistration,
+    driftMessage = `supervision branch provider registration changed before request for ${snapshot.providerId}`,
+  ): Promise<void> {
     const registry = mainModelRegistry;
-    if (!registry) return false;
-    try {
-      const registrationKind = providerRegistrationKind(registry, snapshot.providerId);
-      if (!providerRegistrationIsSynchronouslyCurrent(snapshot, registry)) return false;
-      const current = await captureProviderComposition(registry, snapshot.providerId, snapshot.modelId, registrationKind);
-      if (mainModelRegistry !== registry) return false;
-      if (!providerRegistrationIsSynchronouslyCurrent(snapshot, registry)) return false;
-      return (
-        current.registrationKind === snapshot.registrationKind &&
-        current.compositionDigest === snapshot.compositionDigest
+    if (!registry) {
+      throw new ExtensionProviderResolutionError(
+        `no live model registry is available for selected provider ${snapshot.providerId}`,
       );
+    }
+    const drift = () => new ExtensionProviderDriftError(driftMessage);
+    const registrationKind = providerRegistrationKind(registry, snapshot.providerId);
+    const initial = captureEffectiveProviderComposition(
+      registry,
+      snapshot.providerId,
+      snapshot.modelId,
+      registrationKind,
+    );
+    if (!providerCompositionSnapshotsMatch(snapshot, initial)) throw drift();
+    let current: ExtensionProviderRegistration;
+    try {
+      current = await captureProviderComposition(registry, snapshot.providerId, snapshot.modelId, registrationKind);
+    } catch (error) {
+      if (error instanceof ExtensionProviderCompositionChangedError) throw drift();
+      throw error;
+    }
+    if (mainModelRegistry !== registry) {
+      throw new ExtensionProviderResolutionError(
+        `live model registry changed during provider freshness check for ${snapshot.providerId}`,
+      );
+    }
+    const finalRegistrationKind = providerRegistrationKind(registry, snapshot.providerId);
+    const final = captureEffectiveProviderComposition(
+      registry,
+      snapshot.providerId,
+      snapshot.modelId,
+      finalRegistrationKind,
+    );
+    if (
+      !providerCompositionSnapshotsMatch(snapshot, final) ||
+      current.registrationKind !== snapshot.registrationKind ||
+      current.compositionDigest !== snapshot.compositionDigest
+    ) {
+      throw drift();
+    }
+  }
+
+  async function extensionProviderRegistrationIsCurrent(snapshot: ExtensionProviderRegistration): Promise<boolean> {
+    try {
+      await assertExtensionProviderRegistrationCurrent(snapshot);
+      return true;
     } catch {
       return false;
     }
   }
 
   async function extensionProviderRegistrationMismatch(snapshot: ExtensionProviderRegistration): Promise<Error | null> {
-    if (await extensionProviderRegistrationIsCurrent(snapshot)) return null;
-    return new Error(`supervision branch provider registration changed before request for ${snapshot.providerId}`);
+    try {
+      await assertExtensionProviderRegistrationCurrent(snapshot);
+      return null;
+    } catch (error) {
+      return error instanceof Error ? error : new ExtensionProviderResolutionError(String(error));
+    }
   }
 
   async function resolveBranchModel(provider: string, modelId: string): Promise<BranchModelResolution> {
@@ -1759,7 +1799,11 @@ ${context.command}
         return branch;
       } catch (error) {
         if (buildRevision !== branchSelectionRevision) continue;
-        if (expectedGeneration === generation && !shuttingDown) {
+        if (
+          expectedGeneration === generation &&
+          !shuttingDown &&
+          !(error instanceof ExtensionProviderDriftError)
+        ) {
           branchBroken = error instanceof Error ? error.message : String(error);
         }
         throw error;
@@ -2209,15 +2253,11 @@ ${context.command}
             provider: picked.slice(0, separator),
             modelId: picked.slice(separator + 1),
           });
-          if (!(await extensionProviderRegistrationIsCurrent(prepared.providerRegistration))) {
-            throw new ExtensionProviderResolutionError(
-              `provider registration changed during selected-model preparation for ${prepared.providerRegistration.providerId}`,
-            );
-          }
+          const preparationDriftMessage =
+            `provider registration changed during selected-model preparation for ${prepared.providerRegistration.providerId}`;
+          await assertExtensionProviderRegistrationCurrent(prepared.providerRegistration, preparationDriftMessage);
           if (!extensionProviderRegistrationIsSynchronouslyCurrent(prepared.providerRegistration)) {
-            throw new ExtensionProviderResolutionError(
-              `provider registration changed during selected-model preparation for ${prepared.providerRegistration.providerId}`,
-            );
+            throw new ExtensionProviderDriftError(preparationDriftMessage);
           }
           branchModel = prepared.model;
           writePinFile(modelPinFile, picked);

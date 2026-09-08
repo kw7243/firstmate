@@ -3449,6 +3449,109 @@ EOF
   pass "supervision-model rejects registration races before persistence"
 }
 
+test_provider_preparation_drift_falls_back_without_latching() {
+  local repo home out status
+  repo="$TMP_ROOT/provider-preparation-drift-root"
+  home="$TMP_ROOT/provider-preparation-drift-home"
+  mkdir -p "$home/state" "$home/config"
+  install_pi_branch_extension_fixture "$repo"
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+const prelude = process.env.DRIVER_PRELUDE;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, makeCtx, registryModels, sentToMain, home }; })()`);
+const { fire, dispatch, makeCtx, registryModels, sentToMain, home } = globalThis.__t;
+import { existsSync } from "node:fs";
+
+const providerId = "static-reload";
+const modelId = "same-model";
+const modelA = {
+  provider: providerId,
+  id: modelId,
+  api: "openai-completions",
+  baseUrl: "https://route-a.invalid/v1",
+  apiKey: "route-a-key",
+};
+const modelB = {
+  ...modelA,
+  baseUrl: "https://route-b.invalid/v1",
+  apiKey: "route-b-key",
+};
+registryModels.push(modelA);
+globalThis.__fmExtensionProviderConfigs = new Map();
+globalThis.__fmExtensionNativeProviders = new Map();
+const ctx = makeCtx({
+  model: { provider: providerId, id: modelId },
+  sessionManager: {
+    getSessionFile: () => `${home}/main.jsonl`,
+    getEntries: () => [],
+  },
+});
+await fire("session_start", {}, ctx);
+
+let markCreateStarted;
+const createStarted = new Promise((resolve) => { markCreateStarted = resolve; });
+let releaseCreate;
+const createRelease = new Promise((resolve) => { releaseCreate = resolve; });
+globalThis.__fmModelRuntimeCreate = async (options) => {
+  if (options.providerId !== providerId) {
+    throw new Error(`the branch constructed the wrong provider: ${JSON.stringify(options)}`);
+  }
+  markCreateStarted();
+  await createRelease;
+};
+const stale = dispatch("signal: provider changes during branch preparation");
+if (!stale.accepted) throw new Error("the preparation-race wake was not accepted");
+await createStarted;
+registryModels[0] = modelB;
+releaseCreate();
+const staleFailure = await stale.settlement.then(() => null, (error) => error);
+delete globalThis.__fmModelRuntimeCreate;
+
+if (!(staleFailure instanceof Error) || !staleFailure.message.includes("provider registration changed during selected-model preparation")) {
+  throw new Error(`the stale preparation did not reject to main: ${String(staleFailure)}`);
+}
+if ((globalThis.__fmSessions ?? []).length !== 0) {
+  throw new Error("the stale preparation built a branch session");
+}
+if (existsSync(`${home}/config/supervision-branch-model`)) {
+  throw new Error("the stale preparation persisted a model pin");
+}
+if (sentToMain.length !== 0) {
+  throw new Error(`the stale preparation emitted branch success: ${JSON.stringify(sentToMain)}`);
+}
+
+globalThis.__fmOnBranchPrompt = async ({ session }) => {
+  const report = session.options.customTools.find((tool) => tool.name === "fm_branch_report");
+  const recorded = await report.execute(
+    "stable-provider-b",
+    { task: "branch-driver", verdict: "routine", summary: "stable provider B rebuilt successfully" },
+    undefined,
+    undefined,
+    {},
+  );
+  if (recorded.isError) throw new Error(`stable provider report failed: ${JSON.stringify(recorded)}`);
+};
+const retry = dispatch("signal: retry stable provider B");
+if (!retry.accepted) throw new Error("the preparation drift latched the supervision branch");
+await retry.settlement;
+const sessions = globalThis.__fmSessions ?? [];
+if (sessions.length !== 1 || sessions[0].model?.baseUrl !== modelB.baseUrl) {
+  throw new Error(`the retry did not rebuild stable provider B: ${JSON.stringify(sessions.map((session) => session.model))}`);
+}
+if (!sentToMain.some((sent) => sent.message.content.includes("stable provider B rebuilt successfully"))) {
+  throw new Error(`the stable retry produced no branch outcome: ${JSON.stringify(sentToMain)}`);
+}
+if (existsSync(`${home}/config/supervision-branch-model`)) {
+  throw new Error("the stable retry created an unsolicited model pin");
+}
+process.exit(0);
+EOF
+  status=$?
+  out=$(cat "$TMP_ROOT/node-output")
+  expect_code 0 "$status" "provider preparation drift must fall back once and rebuild when stable: $out"
+  pass "provider preparation drift falls back without latching"
+}
+
 test_branch_effort_pin_applies_and_absent_pin_follows_main() {
   local repo home out status
   repo="$TMP_ROOT/effortpin-root"
@@ -7178,6 +7281,7 @@ test_no_model_session_clears_unpinned_provider_selection
 test_unpinned_branch_follows_main_model_changes_live
 test_supervision_model_command_persists_and_rebinds_the_live_branch
 test_supervision_model_rejects_registration_race_during_preparation
+test_provider_preparation_drift_falls_back_without_latching
 test_supervision_model_picker_is_bounded_searchable_and_branch_only
 test_branch_model_picker_keeps_follow_main_first_under_ranking
 test_branch_effort_pin_applies_and_absent_pin_follows_main
