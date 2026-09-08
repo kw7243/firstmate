@@ -181,6 +181,11 @@ class StubModelRuntime {
     }
     return { aborted: Boolean(options?.signal?.aborted), errors: new Map() };
   }
+  streamSimple(model, context, options) {
+    const provider = this.getProvider(model.provider);
+    if (!provider) throw new Error(`unknown provider: ${model.provider}`);
+    return provider.streamSimple(model, context, options);
+  }
   getModel(provider, id) {
     return this.models.find((model) => model.provider === provider && model.id === id);
   }
@@ -5087,6 +5092,28 @@ const discoveryRuntime = await RealModelRuntime.create({
 const anthropicModel = discoveryRuntime.getModels("anthropic").find((model) => model.input.includes("text"));
 if (!anthropicModel) throw new Error("the real runtime exposed no Anthropic text model for stock-route coverage");
 
+const runtimeRefresh = RealModelRuntime.prototype.refresh;
+let lateRefreshArmed = false;
+let releaseLateRefresh = null;
+RealModelRuntime.prototype.refresh = function (options) {
+  if (
+    lateRefreshArmed &&
+    options?.allowNetwork === false &&
+    options?.signal === undefined &&
+    options?.providers === undefined
+  ) {
+    lateRefreshArmed = false;
+    return new Promise((resolveRefresh, rejectRefresh) => {
+      releaseLateRefresh = () => {
+        const settlement = runtimeRefresh.call(this, options);
+        settlement.then(resolveRefresh, rejectRefresh);
+        return settlement;
+      };
+    });
+  }
+  return runtimeRefresh.call(this, options);
+};
+
 const transportUrls = [];
 globalThis.fetch = async (input) => {
   transportUrls.push(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
@@ -5111,6 +5138,10 @@ async function runProviderCase(options) {
   writeFileSync(`${home}/config/supervision-branch-model`, `${options.providerId}/${options.modelId}\n`);
 
   await fire("session_start", {}, ctx);
+  if (options.lateRefreshRace) {
+    lateRefreshArmed = true;
+    releaseLateRefresh = null;
+  }
   const firstIndex = (globalThis.__fmSessions ?? []).length;
   const firstOffer = dispatch(`signal: establish ${options.label} provider branch`);
   await settle(
@@ -5123,6 +5154,13 @@ async function runProviderCase(options) {
   const first = globalThis.__fmSessions[firstIndex];
   if (options.initialBaseUrl && first.options.model?.baseUrl !== options.initialBaseUrl) {
     throw new Error(`${options.label} initial route bypassed its endpoint: ${JSON.stringify(first.options.model)}`);
+  }
+  if (options.lateRefreshRace) {
+    if (lateRefreshArmed || !releaseLateRefresh) {
+      throw new Error(`${options.label} did not start the implicit provider refresh`);
+    }
+    await releaseLateRefresh();
+    releaseLateRefresh = null;
   }
 
   if (options.initialTransportHost) {
@@ -5233,6 +5271,7 @@ await runProviderCase({
   modelId: "private-model",
   initialConfig: customProviderA,
   replacementConfig: customProviderB,
+  lateRefreshRace: true,
   initialBaseUrl: customProviderA.baseUrl,
   replacementBaseUrl: customProviderB.baseUrl,
   staleCallCount: () => providerACalls,
@@ -5276,12 +5315,13 @@ await runProviderCase({
   replacementCallCount: () => stockReplacementCalls,
 });
 
+RealModelRuntime.prototype.refresh = runtimeRefresh;
 process.exit(0);
 EOF
   status=$?
   out=$(cat "$TMP_ROOT/node-output")
   expect_code 0 "$status" "provider changes must block every stale selected stream before disclosure: $out"
-  pass "header-boundary provider changes block custom, config-only, and stock streams"
+  pass "header-boundary guard survives late refreshes across effective provider streams"
 }
 
 test_model_runtime_create_deadline_rejects_to_watcher_fallback() {

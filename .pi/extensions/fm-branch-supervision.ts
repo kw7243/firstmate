@@ -263,7 +263,7 @@ type BranchEffort = ReturnType<NonNullable<ExtensionAPI["getThinkingLevel"]>>;
 type ExtensionProviderRegistration =
   | { providerId: string; kind: "none" }
   | { providerId: string; kind: "native" | "config"; registration: unknown };
-type ExtensionProviderStreamSimple = NonNullable<ReturnType<ModelRuntime["getProvider"]>>["streamSimple"];
+type ExtensionProviderStreamSimple = ModelRuntime["streamSimple"];
 type PinnedBranchModel = {
   model: BranchModel;
   modelRuntime: ModelRuntime;
@@ -863,14 +863,19 @@ export default function (pi: ExtensionAPI) {
     modelRuntime: ModelRuntime,
     snapshot: ExtensionProviderRegistration,
   ): void {
-    const provider = modelRuntime.getProvider(snapshot.providerId);
-    if (!provider) return;
-    const streamSimple: ExtensionProviderStreamSimple = provider.streamSimple.bind(provider);
-    provider.streamSimple = (model, context, options) => {
-      const mismatch = extensionProviderRegistrationMismatch(snapshot);
-      if (mismatch) throw mismatch;
-      return streamSimple(model, context, options);
-    };
+    const streamSimple: ExtensionProviderStreamSimple = modelRuntime.streamSimple.bind(modelRuntime);
+    modelRuntime.streamSimple = (model, context, options) =>
+      streamSimple(model, context, {
+        ...options,
+        transformHeaders: async (headers) => {
+          const transformedHeaders = options?.transformHeaders
+            ? await options.transformHeaders(headers)
+            : headers;
+          const mismatch = extensionProviderRegistrationMismatch(snapshot);
+          if (mismatch) throw mismatch;
+          return transformedHeaders;
+        },
+      });
   }
 
   async function resolveBranchModel(provider: string, modelId: string): Promise<BranchModelResolution> {
