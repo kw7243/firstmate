@@ -135,10 +135,10 @@ jobs:
   tests-portable-serial:
     name: Behavior portable serial ${{ matrix.shard }}
     runs-on: ubuntu-latest
-    # Expanded coverage can put a shard near 20 min while duration hints lag.
-    # This cap preserves hang-tripwire headroom without becoming the expected
-    # healthy end of the lane.
-    timeout-minutes: 30
+    # Measured whole remainder is ~63 min of serial work; the balanced shards
+    # are ~12.7 min each. Cap is a hang tripwire with roughly 1.6x margin, not
+    # the expected healthy end of the lane.
+    timeout-minutes: 20
     strategy:
       # Every shard reports so one failure never hides another shard's result.
       fail-fast: false
