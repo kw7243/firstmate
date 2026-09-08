@@ -5009,7 +5009,10 @@ const modelDefinition = {
   contextWindow: 4096,
   maxTokens: 128,
 };
-registryModels.push({ provider: "private-proxy", id: "private-model", branchAvailable: false });
+registryModels.push(
+  { provider: "private-proxy", id: "private-model", branchAvailable: false },
+  { provider: "prototype-native", id: "private-model", branchAvailable: false },
+);
 let providerACalls = 0;
 let providerBCalls = 0;
 function completedStream(model, text) {
@@ -5134,7 +5137,9 @@ async function runProviderCase(options) {
   globalThis.__fmExtensionProviderConfigs = new Map(
     options.initialConfig ? [[options.providerId, options.initialConfig]] : [],
   );
-  globalThis.__fmExtensionNativeProviders = new Map();
+  globalThis.__fmExtensionNativeProviders = new Map(
+    options.initialNativeProvider ? [[options.providerId, options.initialNativeProvider]] : [],
+  );
   writeFileSync(`${home}/config/supervision-branch-model`, `${options.providerId}/${options.modelId}\n`);
 
   await fire("session_start", {}, ctx);
@@ -5180,7 +5185,12 @@ async function runProviderCase(options) {
   const staleCallsBefore = options.staleCallCount();
   let stalePrompt;
   globalThis.__fmOnBranchPrompt = () => {
-    globalThis.__fmExtensionProviderConfigs = new Map([[options.providerId, options.replacementConfig]]);
+    globalThis.__fmExtensionProviderConfigs = new Map(
+      options.replacementConfig ? [[options.providerId, options.replacementConfig]] : [],
+    );
+    globalThis.__fmExtensionNativeProviders = new Map(
+      options.replacementNativeProvider ? [[options.providerId, options.replacementNativeProvider]] : [],
+    );
     stalePrompt = stale.session.prompt(privatePrompt).then(
       () => null,
       (error) => error,
@@ -5278,6 +5288,68 @@ await runProviderCase({
   replacementCallCount: () => providerBCalls,
 });
 
+class PrototypeNativeProvider {
+  constructor(label, baseUrl, recordCall) {
+    this.id = "prototype-native";
+    this.name = `Prototype native ${label}`;
+    this.baseUrl = baseUrl;
+    this.auth = {
+      apiKey: {
+        name: "Prototype native API key",
+        check: async () => ({ source: `prototype native ${label}`, type: "api_key" }),
+        resolve: async () => ({
+          auth: { apiKey: `prototype-native-${label}`, baseUrl },
+          source: `prototype native ${label}`,
+        }),
+      },
+    };
+    this.models = [
+      {
+        ...modelDefinition,
+        provider: this.id,
+        api: "private-proxy-api",
+        baseUrl,
+      },
+    ];
+    this.label = label;
+    this.recordCall = recordCall;
+  }
+  getModels() {
+    return this.models;
+  }
+  stream(model, context, options) {
+    return this.streamSimple(model, context, options);
+  }
+  streamSimple(model) {
+    this.recordCall();
+    return completedStream(model, `prototype native ${this.label}`);
+  }
+}
+
+let nativeProviderACalls = 0;
+let nativeProviderBCalls = 0;
+const nativeProviderA = new PrototypeNativeProvider(
+  "A",
+  "https://native-a.proxy.invalid",
+  () => { nativeProviderACalls += 1; },
+);
+const nativeProviderB = new PrototypeNativeProvider(
+  "B",
+  "https://native-b.proxy.invalid",
+  () => { nativeProviderBCalls += 1; },
+);
+await runProviderCase({
+  label: "prototype-native",
+  providerId: nativeProviderA.id,
+  modelId: modelDefinition.id,
+  initialNativeProvider: nativeProviderA,
+  replacementNativeProvider: nativeProviderB,
+  initialBaseUrl: nativeProviderA.baseUrl,
+  replacementBaseUrl: nativeProviderB.baseUrl,
+  staleCallCount: () => nativeProviderACalls,
+  replacementCallCount: () => nativeProviderBCalls,
+});
+
 const configOnlyA = { baseUrl: "https://config-a.proxy.invalid" };
 const configOnlyB = { baseUrl: "https://config-b.proxy.invalid" };
 await runProviderCase({
@@ -5321,7 +5393,7 @@ EOF
   status=$?
   out=$(cat "$TMP_ROOT/node-output")
   expect_code 0 "$status" "provider changes must block every stale selected stream before disclosure: $out"
-  pass "header-boundary guard survives late refreshes across effective provider streams"
+  pass "header-boundary guard survives late refreshes and prototype-native providers"
 }
 
 test_model_runtime_create_deadline_rejects_to_watcher_fallback() {

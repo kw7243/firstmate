@@ -804,7 +804,7 @@ export default function (pi: ExtensionAPI) {
             kind: "native",
             registration: nativeProvider,
           };
-          modelRuntime.registerNativeProvider({ ...nativeProvider });
+          modelRuntime.registerNativeProvider(nativeProvider);
           registrations.set(providerId, registration);
           copied.push(providerId);
           continue;
