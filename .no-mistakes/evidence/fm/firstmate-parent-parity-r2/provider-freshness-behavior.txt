@@ -1,0 +1,16 @@
+ok - supervision-model rejects effective-composition and request-auth drift during effort selection
+ok - stable scoped/live auth mismatches latch as resolution failures
+ok - provider preparation drift falls back without latching
+ok - final-auth selection changes rebuild before branch publication
+ok - auth drift cannot publish a stale branch-session pointer
+ok - provider construction failures back off without broadening non-provider recovery
+ok - stable preflight auth timeouts retain provider latching
+ok - cached provider auth-race drift defers rebuilding until the next wake
+ok - cached provider preflight failures release only exact branch leases
+ok - provider replacement failures release only detached exact-generation branch leases
+ok - header auth races recheck registration kind and effective composition
+ok - stable header auth failures retain provider latching
+skip: installed @earendil-works/pi-coding-agent package not found
+ok - blocked scoped model runtime creation rejects on a bounded deadline to watcher fallback
+ok - blocked extension-provider refreshes reject on a bounded deadline to watcher fallback
+ok - supervision-model runs an effort picker after the model picker and persists both independently

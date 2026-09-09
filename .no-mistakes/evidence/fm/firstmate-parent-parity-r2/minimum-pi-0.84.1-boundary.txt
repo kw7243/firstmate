@@ -1,0 +1,1 @@
+ok - Pi 0.84.1 keeps healthy choices visible and rejects before global runtime construction

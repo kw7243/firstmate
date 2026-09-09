@@ -1,0 +1,7 @@
+history-preserving-parent-merge=PASS merge=af0976a94d5cfdda26174364743a0c4e2e190ad8 parents=082bed07d48a58837954c555f83b46556c3a8e77 72bfdd00a9757a2c43264e0caa9570ef9853f9a9 target-descends=yes
+protected-object=PASS path=bin/fm-watch.sh blob=4f3078fa8bb87a7a1133cf7774875cdf48a33e42 upstream-identical=yes
+protected-object=PASS path=tests/fm-wake-queue.test.sh blob=9e7faea0335cc4914bbf1166b5c1f3c8d4e136f8 upstream-identical=yes
+protected-object=PASS path=tests/fm-secondmate-harness.test.sh blob=602b2ff567cc6b7a8fbefc21b8549e297cdb105f upstream-identical=yes
+tabled-legacy-bearings-case=PASS fragment=c72af0b8940921d7735b69f45407c68c608a975c unchanged-from-base=yes
+bearings-test-membership=PASS invocations=63
+portable-serial-timeout=PASS minutes=20
