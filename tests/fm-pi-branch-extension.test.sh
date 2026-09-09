@@ -3491,13 +3491,22 @@ writeFileSync(effortPin, "low\n");
 const command = commands.get("supervision-model");
 if (!command) throw new Error("the supervision-model command was not registered");
 
-let markEffortStarted;
-const effortStarted = new Promise((resolve) => { markEffortStarted = resolve; });
-let releaseEffort;
-const effortRelease = new Promise((resolve) => { releaseEffort = resolve; });
 const baseCtx = makeCtx();
+const baseRegistry = baseCtx.modelRegistry;
+let liveApiKey = selectedA.apiKey;
+let markEffortStarted;
+let effortStarted;
+let releaseEffort;
+let effortRelease;
 const ctx = {
   ...baseCtx,
+  modelRegistry: {
+    ...baseRegistry,
+    async getApiKeyAndHeaders(model) {
+      const requestAuth = await baseRegistry.getApiKeyAndHeaders(model);
+      return model.provider === providerId ? { ...requestAuth, apiKey: liveApiKey } : requestAuth;
+    },
+  },
   ui: {
     ...baseCtx.ui,
     async select(title, options) {
@@ -3509,34 +3518,112 @@ const ctx = {
     },
   },
 };
-const selection = command.handler("", ctx);
-await effortStarted;
-registryModels[1] = selectedB;
-releaseEffort();
-await selection;
-
-if (readFileSync(modelPin, "utf8") !== "anthropic/main-model\n") {
-  throw new Error(`effort-time provider drift replaced the prior model pin: ${JSON.stringify(readFileSync(modelPin, "utf8"))}`);
+async function runDrift(label, mutate) {
+  effortStarted = new Promise((resolve) => { markEffortStarted = resolve; });
+  effortRelease = new Promise((resolve) => { releaseEffort = resolve; });
+  const noticeStart = notices.length;
+  const selection = command.handler("", ctx);
+  await effortStarted;
+  mutate();
+  releaseEffort();
+  await selection;
+  if (readFileSync(modelPin, "utf8") !== "anthropic/main-model\n") {
+    throw new Error(`${label} replaced the prior model pin: ${JSON.stringify(readFileSync(modelPin, "utf8"))}`);
+  }
+  if (readFileSync(effortPin, "utf8") !== "low\n") {
+    throw new Error(`${label} replaced the prior effort pin: ${JSON.stringify(readFileSync(effortPin, "utf8"))}`);
+  }
+  const newNotices = notices.slice(noticeStart);
+  if (
+    newNotices.length !== 1 ||
+    newNotices[0].type !== "error" ||
+    !newNotices[0].message.includes("provider registration changed during selected-model preparation")
+  ) {
+    throw new Error(`${label} did not emit one model-selection failure: ${JSON.stringify(newNotices)}`);
+  }
+  if (newNotices.some((notice) => notice.message.includes(`Supervision branch model: ${providerId}/${modelId}`))) {
+    throw new Error(`${label} emitted stale model success: ${JSON.stringify(newNotices)}`);
+  }
 }
-if (readFileSync(effortPin, "utf8") !== "low\n") {
-  throw new Error(`effort-time provider drift replaced the prior effort pin: ${JSON.stringify(readFileSync(effortPin, "utf8"))}`);
-}
-if (
-  notices.length !== 1 ||
-  notices[0].type !== "error" ||
-  !notices[0].message.includes("provider registration changed during selected-model preparation")
-) {
-  throw new Error(`effort-time provider drift did not emit one model-selection failure: ${JSON.stringify(notices)}`);
-}
-if (notices.some((notice) => notice.message.includes(`Supervision branch model: ${providerId}/${modelId}`))) {
-  throw new Error(`effort-time provider drift emitted stale model success: ${JSON.stringify(notices)}`);
-}
+await runDrift("effort-time effective-composition drift", () => { registryModels[1] = selectedB; });
+registryModels[1] = selectedA;
+await runDrift("effort-time request-auth drift", () => { liveApiKey = selectedB.apiKey; });
 process.exit(0);
 EOF
   status=$?
   out=$(cat "$TMP_ROOT/node-output")
   expect_code 0 "$status" "provider drift during effort selection must preserve both prior pins: $out"
-  pass "supervision-model rejects provider drift during effort selection"
+  pass "supervision-model rejects effective-composition and request-auth drift during effort selection"
+}
+
+test_stable_scoped_auth_mismatch_latches_resolution() {
+  local repo home out status
+  repo="$TMP_ROOT/stable-scoped-auth-mismatch-root"
+  home="$TMP_ROOT/stable-scoped-auth-mismatch-home"
+  mkdir -p "$home/state" "$home/config"
+  install_pi_branch_extension_fixture "$repo"
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+const prelude = process.env.DRIVER_PRELUDE;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, makeCtx, registryModels, home }; })()`);
+const { fire, dispatch, makeCtx, registryModels, home } = globalThis.__t;
+import { existsSync } from "node:fs";
+
+const providerId = "stable-auth-mismatch";
+const modelId = "same-model";
+registryModels.push({
+  provider: providerId,
+  id: modelId,
+  api: "openai-completions",
+  baseUrl: "https://stable-auth-mismatch.invalid/v1",
+  apiKey: "scoped-auth-key",
+});
+globalThis.__fmExtensionProviderConfigs = new Map();
+globalThis.__fmExtensionNativeProviders = new Map();
+const baseCtx = makeCtx({
+  model: { provider: providerId, id: modelId },
+  sessionManager: {
+    getSessionFile: () => `${home}/main.jsonl`,
+    getEntries: () => [],
+  },
+});
+const baseRegistry = baseCtx.modelRegistry;
+const ctx = {
+  ...baseCtx,
+  modelRegistry: {
+    ...baseRegistry,
+    async getApiKeyAndHeaders(model) {
+      const requestAuth = await baseRegistry.getApiKeyAndHeaders(model);
+      return model.provider === providerId ? { ...requestAuth, apiKey: "main-runtime-auth-key" } : requestAuth;
+    },
+  },
+};
+
+await fire("session_start", {}, ctx);
+const first = dispatch("signal: stable scoped auth mismatch");
+if (!first.accepted) throw new Error("the stable auth mismatch was not accepted for settlement");
+const failure = await first.settlement.then(() => null, (error) => error);
+if (!(failure instanceof Error) || !failure.message.includes("scoped provider composition differs from the live registry")) {
+  throw new Error(`the stable auth mismatch was not classified as resolution failure: ${String(failure)}`);
+}
+if ((globalThis.__fmSessions ?? []).length !== 0) {
+  throw new Error("the stable auth mismatch reached branch session construction");
+}
+if (existsSync(`${home}/state/.branch-session`)) {
+  throw new Error("the stable auth mismatch persisted a branch session pointer");
+}
+const createCount = (globalThis.__fmModelRuntimeCreateCalls ?? []).length;
+const latched = dispatch("signal: stable scoped auth mismatch remains latched");
+if (latched.accepted) throw new Error("the stable auth mismatch remained retryable as drift");
+if ((globalThis.__fmModelRuntimeCreateCalls ?? []).length !== createCount) {
+  throw new Error("the latched stable auth mismatch rebuilt another scoped runtime");
+}
+process.exit(0);
+EOF
+  status=$?
+  out=$(cat "$TMP_ROOT/node-output")
+  expect_code 0 "$status" "a stable scoped/live auth mismatch must fail construction and latch: $out"
+  pass "stable scoped/live auth mismatches latch as resolution failures"
 }
 
 test_provider_preparation_drift_falls_back_without_latching() {
@@ -4170,6 +4257,146 @@ EOF
   out=$(cat "$TMP_ROOT/node-output")
   expect_code 0 "$status" "cached provider preflight fallback must release only the exact branch lease: $out"
   pass "cached provider preflight failures release only exact branch leases"
+}
+
+test_detached_provider_fallback_releases_exact_branch_lease() {
+  local mode repo home out status
+  for mode in drift-provider selection-provider selection-session; do
+    repo="$TMP_ROOT/detached-provider-lease-$mode-root"
+    home="$TMP_ROOT/detached-provider-lease-$mode-home"
+    mkdir -p "$home/state" "$home/config"
+    install_pi_branch_extension_fixture "$repo"
+    DETACH_MODE="$mode" PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" \
+      FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" DRIVER_PRELUDE="$DRIVER_PRELUDE" \
+      node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+const prelude = process.env.DRIVER_PRELUDE;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, makeCtx, registryModels, home, realRoot }; })()`);
+const { fire, dispatch, makeCtx, registryModels, home, realRoot } = globalThis.__t;
+import { existsSync, readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+
+const mode = process.env.DETACH_MODE;
+const providerId = "detached-provider";
+const modelA = {
+  provider: providerId,
+  id: "model-a",
+  api: "openai-completions",
+  baseUrl: "https://detached-provider-a.invalid/v1",
+  apiKey: "detached-provider-a-key",
+};
+const modelB = {
+  ...modelA,
+  id: mode === "drift-provider" ? modelA.id : "model-b",
+  baseUrl: "https://detached-provider-b.invalid/v1",
+  apiKey: "detached-provider-b-key",
+};
+registryModels.push(modelA);
+if (modelB.id !== modelA.id) registryModels.push(modelB);
+globalThis.__fmExtensionProviderConfigs = new Map();
+globalThis.__fmExtensionNativeProviders = new Map();
+const ctx = makeCtx({
+  model: { provider: providerId, id: modelA.id },
+  sessionManager: {
+    getSessionFile: () => `${home}/main.jsonl`,
+    getEntries: () => [],
+  },
+});
+globalThis.__fmExecuteBranchBash = async (context) => {
+  const result = spawnSync("bash", ["-c", context.command], {
+    encoding: "utf8",
+    cwd: context.cwd,
+    env: context.env,
+  });
+  return {
+    content: [{ type: "text", text: `${result.stdout}${result.stderr}` }],
+    details: { stdout: result.stdout, stderr: result.stderr, exitCode: result.status },
+    isError: result.status !== 0,
+  };
+};
+let promptCount = 0;
+globalThis.__fmOnBranchPrompt = async ({ session }) => {
+  promptCount += 1;
+  const bash = session.options.customTools.find((tool) => tool.name === "bash");
+  const claimed = await bash.execute(
+    "claim-detached-provider-control",
+    { command: "bin/fm-lease.sh claim task-detached-provider --actor branch" },
+    undefined,
+    undefined,
+    {},
+  );
+  if (claimed.isError) throw new Error(`detached-provider control claim failed: ${JSON.stringify(claimed)}`);
+};
+function externalClaim(task, actor, holderPid, leaseGeneration) {
+  const result = spawnSync("bash", [`${realRoot}/bin/fm-lease.sh`, "claim", task, "--actor", actor], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      FM_HOME: home,
+      FM_STATE_OVERRIDE: `${home}/state`,
+      FM_ROOT_OVERRIDE: realRoot,
+      FM_SUPERVISION_ACTOR: actor,
+      FM_LEASE_HOLDER_PID: holderPid,
+      ...(leaseGeneration ? { FM_LEASE_GENERATION: leaseGeneration } : {}),
+    },
+  });
+  if (result.status !== 0) throw new Error(`could not claim ${task}: ${result.stderr}`);
+}
+
+await fire("session_start", {}, ctx);
+const control = dispatch("signal: retain detached-provider lease after non-provider failure");
+if (!control.accepted) throw new Error("the detached-provider control wake was not accepted");
+const controlFailure = await control.settlement.then(() => null, (error) => error);
+if (!(controlFailure instanceof Error) || !controlFailure.message.includes("produced no durable outcome")) {
+  throw new Error(`the detached-provider control did not fail as expected: ${String(controlFailure)}`);
+}
+const exactLease = `${home}/state/.lease-task-detached-provider`;
+if (!existsSync(exactLease)) throw new Error("the non-provider control released its branch lease");
+const leaseFields = readFileSync(exactLease, "utf8").trim().split("\t");
+const exactHolderPid = leaseFields[1];
+const exactGeneration = leaseFields[3];
+if (!exactHolderPid || !exactGeneration) throw new Error("the detached branch lease lacks exact identity");
+externalClaim("task-detached-other", "branch", exactHolderPid, "other-generation");
+externalClaim("task-detached-main", "main", String(process.pid));
+
+if (mode === "drift-provider") {
+  registryModels[0] = modelB;
+} else {
+  await fire("model_select", { model: modelB }, ctx);
+}
+if (mode.endsWith("provider")) {
+  globalThis.__fmModelRuntimeError = "synthetic detached provider construction failure";
+} else {
+  globalThis.__fmCreateSessionError = "synthetic detached non-provider session failure";
+}
+const failed = dispatch(`signal: detached replacement fails in ${mode}`);
+if (!failed.accepted) throw new Error(`the ${mode} replacement wake was not accepted`);
+const failure = await failed.settlement.then(() => null, (error) => error);
+const expectedFailure = mode.endsWith("provider")
+  ? "synthetic detached provider construction failure"
+  : "synthetic detached non-provider session failure";
+if (!(failure instanceof Error) || !failure.message.includes(expectedFailure)) {
+  throw new Error(`the ${mode} replacement lost its failure: ${String(failure)}`);
+}
+if (mode.endsWith("provider") && existsSync(exactLease)) {
+  throw new Error(`${mode} fallback retained the detached branch lease`);
+}
+if (mode === "selection-session" && !existsSync(exactLease)) {
+  throw new Error("a non-provider replacement failure released the detached branch lease");
+}
+if (!existsSync(`${home}/state/.lease-task-detached-other`)) {
+  throw new Error(`${mode} fallback deleted another branch lease generation`);
+}
+if (!existsSync(`${home}/state/.lease-task-detached-main`)) {
+  throw new Error(`${mode} fallback deleted main's lease`);
+}
+if (promptCount !== 1) throw new Error(`${mode} invoked a replacement branch prompt`);
+process.exit(0);
+EOF
+    status=$?
+    out=$(cat "$TMP_ROOT/node-output")
+    expect_code 0 "$status" "detached lease handling failed for $mode: $out"
+  done
+  pass "provider replacement failures release only detached exact-generation branch leases"
 }
 
 test_branch_effort_pin_applies_and_absent_pin_follows_main() {
@@ -7483,7 +7710,9 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const packageRoot = resolve(process.env.PI_PACKAGE_DIR);
-const { ModelRuntime: RealModelRuntime } = await import(pathToFileURL(`${packageRoot}/dist/index.js`).href);
+const { ModelRegistry: RealModelRegistry, ModelRuntime: RealModelRuntime } = await import(
+  pathToFileURL(`${packageRoot}/dist/index.js`).href
+);
 if (typeof RealModelRuntime.createForProvider !== "function") {
   registryModels.push({ provider: "anthropic", id: "main-model" });
   await fire("session_start", {}, makeCtx());
@@ -7522,7 +7751,8 @@ if (!authStatus.configured || authStatus.source !== "runtime") {
   throw new Error(`the main credential was not runtime-only: ${JSON.stringify(authStatus)}`);
 }
 
-const ctx = makeCtx({ model: selected, modelRegistry: mainRuntime });
+const mainRegistry = new RealModelRegistry(mainRuntime);
+const ctx = makeCtx({ model: selected, modelRegistry: mainRegistry });
 await fire("session_start", {}, ctx);
 const offer = dispatch("signal: selected stock provider has only a main-runtime credential");
 const failure = await offer.settlement.then(
@@ -7539,12 +7769,52 @@ if (
 if ((globalThis.__fmSessions ?? []).length !== 0) {
   throw new Error("a known main model with only a runtime credential built an unpinned branch session");
 }
+
+process.env.ANTHROPIC_API_KEY = "scoped-environment-key";
+const mainAuth = await mainRegistry.getApiKeyAndHeaders(selected);
+if (!mainAuth.ok || mainAuth.apiKey !== "main-runtime-only-key") {
+  throw new Error(`the real main runtime did not retain its runtime credential: ${JSON.stringify(mainAuth)}`);
+}
+const scopedProbe = await RealModelRuntime.createForProvider("anthropic", {
+  allowModelNetwork: false,
+  refreshOnCreate: false,
+  signal: new AbortController().signal,
+});
+const scopedRefresh = await scopedProbe.refresh({ providers: ["anthropic"], allowNetwork: false });
+const scopedRefreshError = scopedRefresh.errors.get("anthropic");
+if (scopedRefreshError) throw scopedRefreshError;
+const scopedModel = scopedProbe.getModel(selected.provider, selected.id);
+if (!scopedModel || !scopedProbe.hasConfiguredAuth("anthropic")) {
+  throw new Error("the real scoped runtime did not resolve the environment credential");
+}
+const scopedAuth = await new RealModelRegistry(scopedProbe).getApiKeyAndHeaders(scopedModel);
+if (!scopedAuth.ok || scopedAuth.apiKey !== "scoped-environment-key") {
+  throw new Error(`the real scoped runtime did not retain its distinct credential: ${JSON.stringify(scopedAuth)}`);
+}
+await fire("session_shutdown", {}, ctx);
+await fire("session_start", {}, ctx);
+const sessionCount = (globalThis.__fmSessions ?? []).length;
+const mismatch = dispatch("signal: stable real runtime and scoped credentials differ");
+if (!mismatch.accepted) throw new Error("the real auth mismatch was not accepted for settlement");
+const mismatchFailure = await mismatch.settlement.then(() => null, (error) => error);
+if (
+  !(mismatchFailure instanceof Error) ||
+  !mismatchFailure.message.includes("scoped provider composition differs from the live registry")
+) {
+  throw new Error(`the stable real auth mismatch was not classified as resolution failure: ${String(mismatchFailure)}`);
+}
+if ((globalThis.__fmSessions ?? []).length !== sessionCount) {
+  throw new Error("the stable real auth mismatch reached branch session construction");
+}
+if (dispatch("signal: stable real auth mismatch remains latched").accepted) {
+  throw new Error("the stable real auth mismatch remained retryable as drift");
+}
 process.exit(0);
 EOF
   status=$?
   out=$(cat "$TMP_ROOT/node-output")
-  expect_code 0 "$status" "a main-runtime-only credential must reject branch construction: $out"
-  pass "real Pi rejects unisolated runtimes and runtime-only credentials"
+  expect_code 0 "$status" "runtime-only or mismatched scoped credentials must reject branch construction: $out"
+  pass "real Pi rejects unisolated runtimes and mismatched scoped credentials"
 }
 
 test_missing_scoped_runtime_boundary_rejects_before_runtime_creation() {
@@ -7603,16 +7873,20 @@ const { fire, dispatch, makeCtx, registryModels } = globalThis.__t;
 
 registryModels.push({ provider: "anthropic", id: "main-model", baseUrl: "https://api.anthropic.com" });
 let rejectLateCreate;
-globalThis.__fmModelRuntimeCreate = (_options) =>
-  new Promise((_resolve, reject) => {
+let accelerateCreateDeadline = false;
+globalThis.__fmModelRuntimeCreate = (_options) => {
+  accelerateCreateDeadline = true;
+  return new Promise((_resolve, reject) => {
     rejectLateCreate = reject;
   });
+};
 
 await fire("session_start", {}, makeCtx());
 const realSetTimeout = globalThis.setTimeout;
 let deadlineMs = null;
 globalThis.setTimeout = (callback, delay, ...args) => {
-  if (deadlineMs === null) {
+  if (accelerateCreateDeadline) {
+    accelerateCreateDeadline = false;
     deadlineMs = Number(delay);
     return realSetTimeout(callback, 0, ...args);
   }
@@ -7676,21 +7950,25 @@ registryModels.push({ provider: "anthropic", id: "main-model", baseUrl: "https:/
 globalThis.__fmExtensionProviderConfigs = new Map();
 globalThis.__fmExtensionNativeProviders = new Map();
 let rejectLateRefresh;
-globalThis.__fmModelRuntimeRefresh = (_runtime, options) =>
-  new Promise((_resolve, reject) => {
+let accelerateRefreshDeadline = false;
+globalThis.__fmModelRuntimeRefresh = (_runtime, options) => {
+  accelerateRefreshDeadline = true;
+  return new Promise((_resolve, reject) => {
     if (!options?.signal) {
       reject(new Error("provider refresh received no cancellation signal"));
       return;
     }
     rejectLateRefresh = reject;
   });
+};
 
 await fire("session_start", {}, makeCtx());
 const realSetTimeout = globalThis.setTimeout;
-const deadlineMs = [];
+let deadlineMs = null;
 globalThis.setTimeout = (callback, delay, ...args) => {
-  deadlineMs.push(Number(delay));
-  if (deadlineMs.length === 2) {
+  if (accelerateRefreshDeadline) {
+    accelerateRefreshDeadline = false;
+    deadlineMs = Number(delay);
     return realSetTimeout(callback, 0, ...args);
   }
   return realSetTimeout(callback, delay, ...args);
@@ -7707,8 +7985,8 @@ try {
   globalThis.setTimeout = realSetTimeout;
 }
 if (!offer?.accepted) throw new Error("the refresh-deadline wake was not accepted for settlement");
-if (deadlineMs.length < 2 || deadlineMs.some((value) => !Number.isFinite(value) || value <= 0)) {
-  throw new Error(`provider setup had no positive finite deadlines: ${JSON.stringify(deadlineMs)}`);
+if (!Number.isFinite(deadlineMs) || deadlineMs <= 0) {
+  throw new Error(`the selected-provider refresh had no positive finite deadline: ${String(deadlineMs)}`);
 }
 if (!(failure instanceof Error) || !failure.message.includes("extension-provider availability refresh exceeded")) {
   throw new Error(`the blocked provider refresh did not reject to watcher fallback: ${String(failure)}`);
@@ -8001,11 +8279,18 @@ EOF
 
 if [ "${FM_PI_PROVIDER_FRESHNESS_REVIEW_ONLY:-0}" = 1 ]; then
   test_supervision_model_rejects_registration_drift_during_effort_selection
+  test_stable_scoped_auth_mismatch_latches_resolution
+  test_provider_preparation_drift_falls_back_without_latching
+  test_unchanged_provider_preparation_rejection_latches
   test_stable_provider_preflight_auth_timeout_latches
   test_cached_provider_auth_race_defers_rebuild_until_next_wake
   test_cached_provider_preflight_failure_releases_exact_branch_lease
+  test_detached_provider_fallback_releases_exact_branch_lease
   test_header_auth_race_rechecks_registration_and_composition
   test_stable_header_auth_failure_latches
+  test_runtime_only_main_credential_rejects_branch_construction
+  test_scoped_model_runtime_create_deadline_rejects_to_watcher_fallback
+  test_extension_provider_refresh_deadline_rejects_to_watcher_fallback
   test_supervision_model_command_picks_effort_after_the_model
   exit 0
 fi
@@ -8043,12 +8328,14 @@ test_unpinned_branch_follows_main_model_changes_live
 test_supervision_model_command_persists_and_rebinds_the_live_branch
 test_supervision_model_rejects_registration_race_during_preparation
 test_supervision_model_rejects_registration_drift_during_effort_selection
+test_stable_scoped_auth_mismatch_latches_resolution
 test_provider_preparation_drift_falls_back_without_latching
 test_provider_preparation_disappearance_falls_back_without_latching
 test_unchanged_provider_preparation_rejection_latches
 test_stable_provider_preflight_auth_timeout_latches
 test_cached_provider_auth_race_defers_rebuild_until_next_wake
 test_cached_provider_preflight_failure_releases_exact_branch_lease
+test_detached_provider_fallback_releases_exact_branch_lease
 test_supervision_model_picker_is_bounded_searchable_and_branch_only
 test_branch_model_picker_keeps_follow_main_first_under_ranking
 test_branch_effort_pin_applies_and_absent_pin_follows_main

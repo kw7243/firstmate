@@ -181,6 +181,9 @@ type ProviderScopedModelRuntimeConstructor = typeof ModelRuntime & {
     options: NonNullable<Parameters<typeof ModelRuntime.create>[0]>,
   ) => Promise<ModelRuntime>;
 };
+type RequiredProviderScopedModelRuntimeConstructor = ProviderScopedModelRuntimeConstructor & {
+  createForProvider: NonNullable<ProviderScopedModelRuntimeConstructor["createForProvider"]>;
+};
 async function withExtensionProviderDeadline<T>(
   operation: Promise<T>,
   phase: string,
@@ -209,7 +212,7 @@ async function withExtensionProviderDeadline<T>(
 }
 async function withExtensionProviderFreshness<T>(
   operation: Promise<T>,
-  assertCurrent: () => void,
+  assertCurrent: () => void | Promise<void>,
 ): Promise<T> {
   const outcome = await operation.then(
     (value) => ({ kind: "value" as const, value }),
@@ -217,7 +220,7 @@ async function withExtensionProviderFreshness<T>(
   );
   let freshnessFailure: { error: unknown } | null = null;
   try {
-    assertCurrent();
+    await assertCurrent();
   } catch (error) {
     freshnessFailure = { error };
   }
@@ -227,6 +230,10 @@ async function withExtensionProviderFreshness<T>(
   }
   if (freshnessFailure) throw freshnessFailure.error;
   return outcome.value;
+}
+
+function isExtensionProviderFailure(error: unknown): boolean {
+  return error instanceof ExtensionProviderTimeoutError || error instanceof ExtensionProviderResolutionError;
 }
 const PROCESSING_INSTRUCTION =
   "This is a supervision processing request delivered automatically by the supervision branch. " +
@@ -631,6 +638,7 @@ function collectMainDialog(sessionManager: ReadonlyEntries, collection: MirrorCo
 }
 
 export default function (pi: ExtensionAPI) {
+  type BranchLeaseIdentity = { holderPid: string; leaseGeneration: string };
   type ProviderRegistrationWatchOutcome =
     | { kind: "drift"; error: ExtensionProviderDriftError }
     | { kind: "failure"; error: Error };
@@ -645,6 +653,7 @@ export default function (pi: ExtensionAPI) {
     watchProviderRegistration: (listener: (outcome: ProviderRegistrationWatchOutcome) => void) => () => void;
   };
   let branch: BranchSession | null = null;
+  let detachedBranchLease: BranchLeaseIdentity | null = null;
   let branchBroken = "";
   let consecutiveProviderErrors = 0;
   let providerRecovery: ProviderRecovery | null = null;
@@ -798,30 +807,42 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
-  async function createExtensionProviderRuntime(providerId: string): Promise<ModelRuntime> {
+  function extensionProviderRuntimeConstructor(providerId: string): RequiredProviderScopedModelRuntimeConstructor {
     const constructor = ModelRuntime as ProviderScopedModelRuntimeConstructor;
     if (typeof constructor.createForProvider !== "function") {
       throw new ExtensionProviderResolutionError(
         `Pi ${VERSION} exposes no supported provider-scoped ModelRuntime construction boundary`,
       );
     }
+    return constructor as RequiredProviderScopedModelRuntimeConstructor;
+  }
+
+  async function createExtensionProviderRuntime(providerId: string): Promise<ModelRuntime> {
+    const constructor = extensionProviderRuntimeConstructor(providerId);
     const controller = new AbortController();
     const options = {
       allowModelNetwork: false,
       signal: controller.signal,
       refreshOnCreate: false,
     };
-    const modelRuntime = await withExtensionProviderDeadline(
-      constructor.createForProvider.call(constructor, providerId, options),
-      "runtime creation",
-      () => controller.abort(),
-    );
-    if (modelRuntime.getProviders().some((provider) => provider.id !== providerId)) {
+    try {
+      const modelRuntime = await withExtensionProviderDeadline(
+        constructor.createForProvider.call(constructor, providerId, options),
+        "runtime creation",
+        () => controller.abort(),
+      );
+      if (modelRuntime.getProviders().some((provider) => provider.id !== providerId)) {
+        throw new ExtensionProviderResolutionError(
+          `Pi ${VERSION} returned unrelated providers in the scoped runtime for ${providerId}`,
+        );
+      }
+      return modelRuntime;
+    } catch (error) {
+      if (isExtensionProviderFailure(error)) throw error;
       throw new ExtensionProviderResolutionError(
-        `Pi ${VERSION} returned unrelated providers in the scoped runtime for ${providerId}`,
+        `extension-provider runtime creation failed for ${providerId}: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
-    return modelRuntime;
   }
 
   function providerRegistrationKind(registry: ModelRegistry, providerId: string): ProviderRegistrationKind {
@@ -839,10 +860,8 @@ export default function (pi: ExtensionAPI) {
 
   async function prepareExtensionProviderRuntime(
     providerId: string,
-    preparation: LiveProviderPreparation,
+    assertCurrent: () => void | Promise<void>,
   ): Promise<ModelRuntime> {
-    assertLiveProviderPreparationCurrent(preparation);
-    const assertCurrent = () => assertLiveProviderPreparationCurrent(preparation);
     const modelRuntime = await withExtensionProviderFreshness(createExtensionProviderRuntime(providerId), assertCurrent);
     const controller = new AbortController();
     try {
@@ -1007,7 +1026,7 @@ export default function (pi: ExtensionAPI) {
     providerId: string,
     modelId: string,
     registrationKind: ProviderRegistrationKind,
-    assertCurrent: () => void,
+    assertCurrent: () => void | Promise<void>,
   ): Promise<ExtensionProviderRegistration> {
     const model = registry.find(providerId, modelId);
     const provider = registry.getProvider(providerId);
@@ -1021,21 +1040,30 @@ export default function (pi: ExtensionAPI) {
       model,
       provider,
     );
-    const requestAuth = await withExtensionProviderFreshness(
-      withExtensionProviderDeadline(
-        registry.getApiKeyAndHeaders(model),
-        "request-auth resolution",
-        () => undefined,
-      ).then((result) => {
-        if (!result.ok) {
-          throw new ExtensionProviderResolutionError(
-            `request-auth resolution failed for ${providerId}/${modelId}: ${result.error}`,
-          );
-        }
-        return result;
-      }),
-      assertCurrent,
-    );
+    const requestAuth = await (async () => {
+      try {
+        return await withExtensionProviderFreshness(
+          withExtensionProviderDeadline(
+            registry.getApiKeyAndHeaders(model),
+            "request-auth resolution",
+            () => undefined,
+          ).then((result) => {
+            if (!result.ok) {
+              throw new ExtensionProviderResolutionError(
+                `request-auth resolution failed for ${providerId}/${modelId}: ${result.error}`,
+              );
+            }
+            return result;
+          }),
+          assertCurrent,
+        );
+      } catch (error) {
+        if (isExtensionProviderFailure(error)) throw error;
+        throw new ExtensionProviderResolutionError(
+          `request-auth resolution failed for ${providerId}/${modelId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    })();
     const currentModel = registry.find(providerId, modelId);
     const currentProvider = registry.getProvider(providerId);
     if (!currentModel || !currentProvider) {
@@ -1156,6 +1184,16 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
+  async function assertLiveProviderRegistrationCurrent(
+    preparation: LiveProviderPreparation,
+    snapshot: ExtensionProviderRegistration,
+    driftMessage: string,
+  ): Promise<void> {
+    assertLiveProviderPreparationCurrent(preparation);
+    await assertExtensionProviderRegistrationCurrent(snapshot, driftMessage);
+    assertLiveProviderPreparationCurrent(preparation);
+  }
+
   async function resolveBranchModel(provider: string, modelId: string): Promise<BranchModelResolution> {
     const label = `${provider}/${modelId}`;
     const livePreparation = captureLiveProviderPreparation(provider, modelId);
@@ -1164,8 +1202,19 @@ export default function (pi: ExtensionAPI) {
         `Pi ${VERSION} exposes no provider-scoped registration boundary for extension provider ${provider}`,
       );
     }
-    const modelRuntime = await prepareExtensionProviderRuntime(provider, livePreparation);
+    extensionProviderRuntimeConstructor(provider);
+    const driftMessage = `provider registration changed during selected-model preparation for ${provider}`;
+    const liveProviderRegistration = await captureProviderComposition(
+      livePreparation.registry,
+      provider,
+      modelId,
+      livePreparation.snapshot.registrationKind,
+      () => assertLiveProviderPreparationCurrent(livePreparation),
+    );
     assertLiveProviderPreparationCurrent(livePreparation);
+    const assertCurrent = () =>
+      assertLiveProviderRegistrationCurrent(livePreparation, liveProviderRegistration, driftMessage);
+    const modelRuntime = await prepareExtensionProviderRuntime(provider, assertCurrent);
     const model = modelRuntime.getModel(provider, modelId) as BranchModel | undefined;
     if (!model) {
       const reason = `${label} is unavailable to the isolated branch runtime`;
@@ -1180,10 +1229,12 @@ export default function (pi: ExtensionAPI) {
       provider,
       modelId,
       livePreparation.snapshot.registrationKind,
-      () => assertLiveProviderPreparationCurrent(livePreparation),
+      assertCurrent,
     );
-    assertLiveProviderPreparationCurrent(livePreparation);
-    if (!providerCompositionSnapshotsMatch(livePreparation.snapshot, providerRegistration)) {
+    if (
+      !providerCompositionSnapshotsMatch(liveProviderRegistration, providerRegistration) ||
+      liveProviderRegistration.compositionDigest !== providerRegistration.compositionDigest
+    ) {
       throw new ExtensionProviderResolutionError(
         `scoped provider composition differs from the live registry for ${label}`,
       );
@@ -1201,7 +1252,9 @@ export default function (pi: ExtensionAPI) {
   async function preparePinnedBranchModel(pin: { provider: string; modelId: string }): Promise<PinnedBranchModel> {
     const resolved = await resolveBranchModel(pin.provider, pin.modelId);
     if (!resolved.ok) {
-      throw new Error(`supervision model pin ${resolved.reason} (config/supervision-branch-model)`);
+      throw new ExtensionProviderResolutionError(
+        `supervision model pin ${resolved.reason} (config/supervision-branch-model)`,
+      );
     }
     return resolved.selection;
   }
@@ -1821,10 +1874,11 @@ ${context.command}
   async function ensureBranch(
     expectedGeneration: number,
     recoveryProbe = false,
-    onProviderFallbackLease?: (lease: { holderPid: string; leaseGeneration: string }) => void,
+    onProviderFallbackLease?: (lease: BranchLeaseIdentity) => void,
   ): Promise<BranchSession> {
     if (!(await actingAsOwner(expectedGeneration))) throw new Error("supervision session was replaced or lost lock ownership");
     if (branchBroken && !(recoveryProbe && providerRecovery?.probeInFlight)) throw new Error(branchBroken);
+    let replacementLease = detachedBranchLease;
     if (branch) {
       const candidate = branch;
       let driftBeforePreflight: ExtensionProviderDriftError | null;
@@ -1845,6 +1899,8 @@ ${context.command}
         throw providerError;
       }
       if (driftBeforePreflight) {
+        replacementLease = branchLeaseIdentity(candidate);
+        detachedBranchLease = replacementLease;
         invalidateProviderMismatchedBranch(candidate);
       } else {
         let racedDrift: ExtensionProviderDriftError | null;
@@ -1911,9 +1967,19 @@ ${context.command}
           generation: expectedGeneration,
           selectionRevision: buildRevision,
         };
+        if (
+          replacementLease &&
+          detachedBranchLease &&
+          branchLeaseIdentitiesMatch(replacementLease, detachedBranchLease)
+        ) {
+          detachedBranchLease = null;
+        }
         return branch;
       } catch (error) {
         if (buildRevision !== branchSelectionRevision) continue;
+        if (replacementLease && isExtensionProviderFailure(error)) {
+          onProviderFallbackLease?.(replacementLease);
+        }
         if (
           expectedGeneration === generation &&
           !shuttingDown &&
@@ -1924,6 +1990,17 @@ ${context.command}
         throw error;
       }
     }
+  }
+
+  function branchLeaseIdentity(candidate: BranchSession): BranchLeaseIdentity {
+    return {
+      holderPid: candidate.leaseHolderPid,
+      leaseGeneration: candidate.leaseGeneration,
+    };
+  }
+
+  function branchLeaseIdentitiesMatch(left: BranchLeaseIdentity, right: BranchLeaseIdentity): boolean {
+    return left.holderPid === right.holderPid && left.leaseGeneration === right.leaseGeneration;
   }
 
   function invalidateProviderMismatchedBranch(candidate: BranchSession): void {
@@ -2104,6 +2181,7 @@ ${context.command}
     const stale = branch;
     branch = null;
     if (!stale) return;
+    detachedBranchLease = branchLeaseIdentity(stale);
     branchChain = branchChain
       .then(() => {
         stale.session.dispose();
@@ -2268,6 +2346,7 @@ ${context.command}
     branchBroken = "";
     consecutiveProviderErrors = 0;
     providerRecovery = null;
+    detachedBranchLease = null;
     leaseGeneration = randomUUID();
     generation += 1;
     mirrorCollection.collectAnchor = null;
@@ -2316,6 +2395,7 @@ ${context.command}
     // new from being accepted while the release runs.
     const closingGeneration = generation;
     shuttingDown = true;
+    detachedBranchLease = null;
     leaseGeneration = randomUUID();
     generation += 1;
     processing = null;
@@ -2373,11 +2453,20 @@ ${context.command}
       // second time through another isolated runtime.
       let branchModel: BranchModel | undefined;
       let preparedProviderRegistration: ExtensionProviderRegistration | null = null;
+      const preparedProviderDriftMessage = (): string =>
+        `provider registration changed during selected-model preparation for ${preparedProviderRegistration!.providerId}`;
       const assertPreparedProviderRegistrationCurrent = (): void => {
         if (!preparedProviderRegistration) return;
         assertExtensionProviderRegistrationSynchronouslyCurrent(
           preparedProviderRegistration,
-          `provider registration changed during selected-model preparation for ${preparedProviderRegistration.providerId}`,
+          preparedProviderDriftMessage(),
+        );
+      };
+      const assertPreparedProviderRegistrationFullyCurrent = async (): Promise<void> => {
+        if (!preparedProviderRegistration) return;
+        await assertExtensionProviderRegistrationCurrent(
+          preparedProviderRegistration,
+          preparedProviderDriftMessage(),
         );
       };
       try {
@@ -2464,6 +2553,16 @@ ${context.command}
           message: `The effort step failed (${error instanceof Error ? error.message : String(error)}); the branch keeps its current effort choice.`,
           warning: true,
         };
+      }
+      try {
+        await assertPreparedProviderRegistrationFullyCurrent();
+        assertPreparedProviderRegistrationCurrent();
+      } catch (error) {
+        ctx.ui.notify(
+          `Could not apply or save the supervision branch model: ${error instanceof Error ? error.message : String(error)}`,
+          "error",
+        );
+        return;
       }
       try {
         assertPreparedProviderRegistrationCurrent();
