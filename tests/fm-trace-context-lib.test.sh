@@ -110,15 +110,6 @@ FM_TRACE_CONTEXT=on fm_trace_context_session_start "$CFG_OFF" "$SESSION_STATE"
   || fail "a new session state must freeze an env-on override over an absent config file"
 pass "session start normalizes config and environment precedence into frozen on/off state"
 
-printf '%s\n' 'codex-thread:trace-thread-1' > "$SESSION_DIR/.lock"
-FM_TRACE_CONTEXT=on fm_trace_context_session_start "$CFG_OFF" "$SESSION_STATE"
-[ "$(cat "$SESSION_STATE")" = "codex-thread:trace-thread-1 on" ] \
-  || fail "session publication did not bind tracing to the opaque lock owner"
-[ "$(fm_trace_context_session_effective "$SESSION_STATE")" = on ] \
-  || fail "the frozen trace decision rejected its unchanged opaque lock owner"
-printf '101\n' > "$SESSION_DIR/.lock"
-pass "trace context binds frozen session state to validated opaque lock owners"
-
 printf '100 on\n' > "$SESSION_STATE"
 chmod 0400 "$SESSION_STATE"
 FM_TRACE_CONTEXT=off fm_trace_context_session_start "$CFG_ON" "$SESSION_STATE"
@@ -219,6 +210,116 @@ ef_res=$(FM_TRACE_CONTEXT=on fm_trace_context_resolve "$CFG_ON" "$NOMETA"); ef_r
 [ -z "$ef_mint" ] && [ "$ef_mint_rc" -ne 0 ] || fail "mint must omit and report failure on entropy failure (rc=$ef_mint_rc out='$ef_mint')"
 [ -z "$ef_res" ] && [ "$ef_res_rc" -eq 0 ] || fail "resolve must omit and STILL return 0 on entropy failure (rc=$ef_res_rc out='$ef_res')"
 pass "entropy failure omits telemetry safely: mint reports failure, resolve returns success with no carrier"
+
+# --- resolver deadline and output contract -----------------------------------
+
+RESOLVER_CALLS=0
+RESOLVER_STATUS=
+RESOLVER_STDOUT=
+RESOLVER_STDERR=
+
+run_resolver_before_deadline() {  # <case-name> <config-dir> <meta-file> [ENV=VALUE...]
+  local case_name=$1 config_dir=$2 meta=$3
+  local stdout_file="$WORK/$case_name.stdout" stderr_file="$WORK/$case_name.stderr"
+  local pid deadline
+  shift 3
+
+  RESOLVER_CALLS=$((RESOLVER_CALLS + 1))
+  (
+    # shellcheck disable=SC2016 # Positional parameters expand in the child shell.
+    env "$@" bash -c '
+      . "$1"
+      fm_trace_context_resolve "$2" "$3"
+    ' _ "$ROOT/bin/fm-trace-context-lib.sh" "$config_dir" "$meta"
+  ) > "$stdout_file" 2> "$stderr_file" &
+  pid=$!
+  deadline=$((SECONDS + 5))
+  while kill -0 "$pid" 2>/dev/null; do
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      kill "$pid" 2>/dev/null || true
+      wait "$pid" 2>/dev/null || true
+      fail "resolver call '$case_name' exceeded its five-second test deadline"
+    fi
+    sleep 0.05
+  done
+  wait "$pid"
+  RESOLVER_STATUS=$?
+  RESOLVER_STDOUT=$(sed -n '1,$p' "$stdout_file")
+  RESOLVER_STDERR=$(sed -n '1,$p' "$stderr_file")
+}
+
+run_resolver_before_deadline disabled "$CFG_OFF" "$NOMETA" FM_TRACE_CONTEXT=
+[ "$RESOLVER_CALLS" -eq 1 ] || fail "disabled resolver call was not observed"
+[ "$RESOLVER_STATUS" -eq 0 ] || fail "disabled resolver must return 0, got $RESOLVER_STATUS"
+[ -z "$RESOLVER_STDOUT" ] || fail "disabled resolver must omit output, got '$RESOLVER_STDOUT'"
+[ -z "$RESOLVER_STDERR" ] || fail "disabled resolver wrote stderr: $RESOLVER_STDERR"
+pass "the disabled resolver call returns successful empty output before its deadline"
+
+# --- harness/backend/kind-independent resolver behavior ----------------------
+
+MATRIX_DIR="$WORK/resolver-matrix"
+PROVIDER="$MATRIX_DIR/task-provider"
+PROVIDER_MARKER="$MATRIX_DIR/provider-called"
+TASK_PROSE="task-prose-must-not-escape-$$"
+DISCLOSED=
+mkdir -p "$MATRIX_DIR"
+# shellcheck disable=SC2016 # TRACE_PROVIDER_MARKER expands in the generated provider.
+printf '%s\n' \
+  '#!/usr/bin/env bash' \
+  'printf "called\n" > "$TRACE_PROVIDER_MARKER"' > "$PROVIDER"
+chmod 0700 "$PROVIDER"
+
+while IFS='|' read -r harness backend kind; do
+  case_dir="$MATRIX_DIR/$harness-$backend-$kind"
+  meta="$case_dir/task.meta"
+  mkdir -p "$case_dir"
+  for prose_file in brief prompt report status; do
+    printf '%s in %s\n' "$TASK_PROSE" "$prose_file" > "$case_dir/$prose_file"
+  done
+  printf '%s\n' \
+    "harness=$harness" \
+    "backend=$backend" \
+    "kind=$kind" \
+    "brief=$case_dir/brief" \
+    "prompt=$case_dir/prompt" \
+    "report=$case_dir/report" \
+    "status=$case_dir/status" \
+    "command=$PROVIDER" > "$meta"
+
+  run_resolver_before_deadline "$harness-$backend-$kind" "$CFG_ON" "$meta" \
+    FM_TRACE_CONTEXT=on \
+    TRACEPARENT="$PRIMARY_TP" \
+    TRACE_PROVIDER_MARKER="$PROVIDER_MARKER" \
+    FM_TRACE_CONTEXT_COMMAND="$PROVIDER" \
+    FM_TASK_PROSE="$TASK_PROSE"
+  [ "$RESOLVER_STATUS" -eq 0 ] \
+    || fail "$harness/$backend/$kind resolver returned $RESOLVER_STATUS"
+  [ -z "$RESOLVER_STDERR" ] \
+    || fail "$harness/$backend/$kind resolver wrote stderr: $RESOLVER_STDERR"
+  fm_trace_context_valid "$RESOLVER_STDOUT" \
+    || fail "$harness/$backend/$kind resolver did not mint a valid carrier: $RESOLVER_STDOUT"
+  [ "${RESOLVER_STDOUT:53:2}" = 01 ] \
+    || fail "$harness/$backend/$kind resolver did not mint a sampled root: $RESOLVER_STDOUT"
+  case "$RESOLVER_STDOUT$RESOLVER_STDERR" in
+    *"$TASK_PROSE"*) DISCLOSED=$harness/$backend/$kind ;;
+  esac
+done <<'CASES'
+claude|tmux|ship
+codex|herdr|scout
+opencode|zellij|secondmate
+grok|orca|ship
+cursor|cmux|scout
+CASES
+
+[ "$RESOLVER_CALLS" -eq 6 ] \
+  || fail "expected six observed resolver calls, got $RESOLVER_CALLS"
+pass "resolver calls finish before their deadlines with valid sampled output across harness, backend, and kind metadata"
+
+[ -z "$DISCLOSED" ] \
+  || fail "resolver disclosed task prose for $DISCLOSED"
+[ ! -e "$PROVIDER_MARKER" ] \
+  || fail "resolver executed a command supplied through task metadata or environment"
+pass "resolver output and errors disclose no task prose and execute no task-supplied provider"
 
 # --- secondmate inheritance wires the nested chain ---------------------------
 

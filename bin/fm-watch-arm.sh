@@ -376,7 +376,7 @@ handling_successor_generation() {
   [ -n "${FM_WATCH_PREDECESSOR_ARM_PID:-}" ] || return 0
   fm_recovery_marker_snapshot "$STATE/.watcher-down" || return 1
   case "$FM_RECOVERY_MARKER_TOKEN" in
-    pending:downtime:*|pending:handling:*) printf '%s' "${FM_RECOVERY_MARKER_TOKEN##*:}" ;;
+    pending:downtime:*|pending:handling:*|announced:downtime:*|announced:handling:*) printf '%s' "${FM_RECOVERY_MARKER_TOKEN##*:}" ;;
     acked:*|'') ;;
     *) return 1 ;;
   esac
@@ -421,13 +421,6 @@ if [ "$mode" = restart ]; then
         sleep 0.1
         i=$((i + 1))
       done
-      if healthy_watcher; then
-        cycle_mark_predecessor_successor "attached:$HEALTHY_PID"
-        report_attached
-        cycle_begin "$HEALTHY_PID" attached "$HEALTHY_IDENTITY"
-        attach_and_wait "$HEALTHY_PID"
-        exit $?
-      fi
     else
       if ! clear_stale_recorded_watcher_lock; then
         echo "watcher: FAILED - stale watcher recovery state could not be persisted" >&2
