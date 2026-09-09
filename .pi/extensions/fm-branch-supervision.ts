@@ -1069,26 +1069,47 @@ export default function (pi: ExtensionAPI) {
     };
   }
 
-  function providerRegistrationIsSynchronouslyCurrent(
+  function assertProviderRegistrationSynchronouslyCurrent(
     snapshot: ExtensionProviderRegistration,
     registry: ModelRegistry,
-  ): boolean {
-    try {
-      const current = captureEffectiveProviderComposition(
-        registry,
-        snapshot.providerId,
-        snapshot.modelId,
-        providerRegistrationKind(registry, snapshot.providerId),
-      );
-      return providerCompositionSnapshotsMatch(snapshot, current);
-    } catch {
-      return false;
+    driftMessage: string,
+  ): ProviderRegistrationKind {
+    const registrationKind = providerRegistrationKind(registry, snapshot.providerId);
+    const model = registry.find(snapshot.providerId, snapshot.modelId);
+    const provider = registry.getProvider(snapshot.providerId);
+    if (!model || !provider) throw new ExtensionProviderDriftError(driftMessage);
+    const current = createEffectiveProviderCompositionSnapshot(
+      snapshot.providerId,
+      snapshot.modelId,
+      registrationKind,
+      model,
+      provider,
+    );
+    if (!providerCompositionSnapshotsMatch(snapshot, current)) {
+      throw new ExtensionProviderDriftError(driftMessage);
     }
+    return registrationKind;
   }
 
-  function extensionProviderRegistrationIsSynchronouslyCurrent(snapshot: ExtensionProviderRegistration): boolean {
+  function assertExtensionProviderRegistrationSynchronouslyCurrent(
+    snapshot: ExtensionProviderRegistration,
+    driftMessage = `supervision branch provider registration changed before request for ${snapshot.providerId}`,
+  ): void {
     const registry = mainModelRegistry;
-    return registry !== null && providerRegistrationIsSynchronouslyCurrent(snapshot, registry);
+    if (!registry) throw new ExtensionProviderDriftError(driftMessage);
+    assertProviderRegistrationSynchronouslyCurrent(snapshot, registry, driftMessage);
+  }
+
+  function extensionProviderRegistrationDriftSynchronously(
+    snapshot: ExtensionProviderRegistration,
+  ): ExtensionProviderDriftError | null {
+    try {
+      assertExtensionProviderRegistrationSynchronouslyCurrent(snapshot);
+      return null;
+    } catch (error) {
+      if (error instanceof ExtensionProviderDriftError) return error;
+      throw error;
+    }
   }
 
   async function assertExtensionProviderRegistrationCurrent(
@@ -1102,19 +1123,7 @@ export default function (pi: ExtensionAPI) {
     }
     const assertCurrent = (): ProviderRegistrationKind => {
       if (mainModelRegistry !== registry) throw drift();
-      const registrationKind = providerRegistrationKind(registry, snapshot.providerId);
-      const model = registry.find(snapshot.providerId, snapshot.modelId);
-      const provider = registry.getProvider(snapshot.providerId);
-      if (!model || !provider) throw drift();
-      const current = createEffectiveProviderCompositionSnapshot(
-        snapshot.providerId,
-        snapshot.modelId,
-        registrationKind,
-        model,
-        provider,
-      );
-      if (!providerCompositionSnapshotsMatch(snapshot, current)) throw drift();
-      return registrationKind;
+      return assertProviderRegistrationSynchronouslyCurrent(snapshot, registry, driftMessage);
     };
     const registrationKind = assertCurrent();
     const current = await captureProviderComposition(
@@ -1262,20 +1271,6 @@ export default function (pi: ExtensionAPI) {
       modelRuntime: prepared.modelRuntime,
       providerRegistration: prepared.providerRegistration,
     };
-  }
-
-  async function effectiveBranchModel(selected: BranchModel | undefined): Promise<BranchModel | undefined> {
-    if (selected) return selected;
-    try {
-      const recorded = readFileSync(sessionPointer, "utf8").trim();
-      if (!recorded || !existsSync(recorded)) return undefined;
-      const context = SessionManager.open(recorded, sessionsDir).buildSessionContext();
-      if (context.messages.length === 0 || !context.model) return undefined;
-      const resolved = await resolveBranchModel(context.model.provider, context.model.modelId);
-      return resolved.ok ? resolved.selection.model : undefined;
-    } catch {
-      return undefined;
-    }
   }
 
   // The effort pin file's CURRENT state decides the branch's reasoning effort
@@ -1807,12 +1802,7 @@ ${context.command}
     }
     try {
       writeFileSync(sessionPointer, `${sessionManager.getSessionFile()}\n`);
-    } catch {
-      // The pointer is a durable record of the branch's current conversation
-      // for operators and for the effort picker's last-resort model lookup;
-      // reopening reads the in-memory record above, so a failed write costs
-      // neither the live session nor its replacement.
-    }
+    } catch {}
     return {
       session: created.session,
       sessionManager,
@@ -1828,16 +1818,24 @@ ${context.command}
     };
   }
 
-  async function ensureBranch(expectedGeneration: number, recoveryProbe = false): Promise<BranchSession> {
+  async function ensureBranch(
+    expectedGeneration: number,
+    recoveryProbe = false,
+    onProviderFallbackLease?: (lease: { holderPid: string; leaseGeneration: string }) => void,
+  ): Promise<BranchSession> {
     if (!(await actingAsOwner(expectedGeneration))) throw new Error("supervision session was replaced or lost lock ownership");
     if (branchBroken && !(recoveryProbe && providerRecovery?.probeInFlight)) throw new Error(branchBroken);
     if (branch) {
       const candidate = branch;
-      let drift: ExtensionProviderDriftError | null;
+      let driftBeforePreflight: ExtensionProviderDriftError | null;
       try {
-        drift = await extensionProviderRegistrationDrift(candidate.providerRegistration);
+        driftBeforePreflight = extensionProviderRegistrationDriftSynchronously(candidate.providerRegistration);
       } catch (error) {
         const providerError = error instanceof Error ? error : new ExtensionProviderResolutionError(String(error));
+        onProviderFallbackLease?.({
+          holderPid: candidate.leaseHolderPid,
+          leaseGeneration: candidate.leaseGeneration,
+        });
         if (
           candidate.generation === generation &&
           candidate.selectionRevision === branchSelectionRevision
@@ -1846,11 +1844,34 @@ ${context.command}
         }
         throw providerError;
       }
-      if (drift) {
-        if (branch === candidate) branch = null;
+      if (driftBeforePreflight) {
+        invalidateProviderMismatchedBranch(candidate);
+      } else {
+        let racedDrift: ExtensionProviderDriftError | null;
         try {
-          candidate.session.dispose();
-        } catch {}
+          racedDrift = await extensionProviderRegistrationDrift(candidate.providerRegistration);
+        } catch (error) {
+          const providerError = error instanceof Error ? error : new ExtensionProviderResolutionError(String(error));
+          onProviderFallbackLease?.({
+            holderPid: candidate.leaseHolderPid,
+            leaseGeneration: candidate.leaseGeneration,
+          });
+          if (
+            candidate.generation === generation &&
+            candidate.selectionRevision === branchSelectionRevision
+          ) {
+            recordSettledProviderError(`supervision branch provider freshness check failed: ${providerError.message}`);
+          }
+          throw providerError;
+        }
+        if (racedDrift) {
+          invalidateProviderMismatchedBranch(candidate);
+          onProviderFallbackLease?.({
+            holderPid: candidate.leaseHolderPid,
+            leaseGeneration: candidate.leaseGeneration,
+          });
+          throw racedDrift;
+        }
       }
     }
     if (branch) return branch;
@@ -1952,7 +1973,9 @@ ${context.command}
           }
           throw new Error("could not reconcile unread supervision outcomes into main");
         }
-        const branchForWake = await ensureBranch(acceptedGeneration, recoveryProbe);
+        const branchForWake = await ensureBranch(acceptedGeneration, recoveryProbe, (lease) => {
+          providerFallbackLease = lease;
+        });
         const { session, sessionManager } = branchForWake;
         await flushMirror(session, acceptedGeneration);
         if (!(await actingAsOwner(acceptedGeneration))) throw new Error("supervision session no longer owns the fleet lock");
@@ -2352,8 +2375,8 @@ ${context.command}
       let preparedProviderRegistration: ExtensionProviderRegistration | null = null;
       const assertPreparedProviderRegistrationCurrent = (): void => {
         if (!preparedProviderRegistration) return;
-        if (extensionProviderRegistrationIsSynchronouslyCurrent(preparedProviderRegistration)) return;
-        throw new ExtensionProviderDriftError(
+        assertExtensionProviderRegistrationSynchronouslyCurrent(
+          preparedProviderRegistration,
           `provider registration changed during selected-model preparation for ${preparedProviderRegistration.providerId}`,
         );
       };
@@ -2368,9 +2391,7 @@ ${context.command}
           const preparationDriftMessage =
             `provider registration changed during selected-model preparation for ${prepared.providerRegistration.providerId}`;
           await assertExtensionProviderRegistrationCurrent(prepared.providerRegistration, preparationDriftMessage);
-          if (!extensionProviderRegistrationIsSynchronouslyCurrent(prepared.providerRegistration)) {
-            throw new ExtensionProviderDriftError(preparationDriftMessage);
-          }
+          assertExtensionProviderRegistrationSynchronouslyCurrent(prepared.providerRegistration, preparationDriftMessage);
           branchModel = prepared.model;
           preparedProviderRegistration = prepared.providerRegistration;
         }
@@ -2562,7 +2583,7 @@ ${context.command}
     selectedModel: BranchModel | undefined,
     assertCurrent?: () => void,
   ): Promise<BranchEffortPick> {
-    const branchModel = await effectiveBranchModel(selectedModel);
+    const branchModel = selectedModel;
     assertCurrent?.();
     const currentPin = readEffortPin();
     const current = currentPin ?? "follows main";

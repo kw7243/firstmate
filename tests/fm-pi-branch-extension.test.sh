@@ -3909,6 +3909,269 @@ EOF
   pass "stable preflight auth timeouts retain provider latching"
 }
 
+test_cached_provider_auth_race_defers_rebuild_until_next_wake() {
+  local repo home out status
+  repo="$TMP_ROOT/provider-preflight-auth-race-root"
+  home="$TMP_ROOT/provider-preflight-auth-race-home"
+  mkdir -p "$home/state" "$home/config"
+  install_pi_branch_extension_fixture "$repo"
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+const prelude = process.env.DRIVER_PRELUDE;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, makeCtx, registryModels, home }; })()`);
+const { fire, dispatch, makeCtx, registryModels, home } = globalThis.__t;
+
+const providerId = "cached-auth-race";
+const modelId = "same-model";
+const modelA = {
+  provider: providerId,
+  id: modelId,
+  api: "openai-completions",
+  baseUrl: "https://cached-auth-a.invalid/v1",
+  apiKey: "cached-auth-a-key",
+};
+const modelB = {
+  ...modelA,
+  baseUrl: "https://cached-auth-b.invalid/v1",
+  apiKey: "cached-auth-b-key",
+};
+const modelC = {
+  ...modelA,
+  baseUrl: "https://cached-auth-c.invalid/v1",
+  apiKey: "cached-auth-c-key",
+};
+registryModels.push(modelA);
+globalThis.__fmExtensionProviderConfigs = new Map();
+globalThis.__fmExtensionNativeProviders = new Map();
+const baseCtx = makeCtx({
+  model: { provider: providerId, id: modelId },
+  sessionManager: {
+    getSessionFile: () => `${home}/main.jsonl`,
+    getEntries: () => [],
+  },
+});
+const baseRegistry = baseCtx.modelRegistry;
+let raceAuth = false;
+let markAuthStarted;
+const authStarted = new Promise((resolve) => { markAuthStarted = resolve; });
+let releaseAuth;
+const authRelease = new Promise((resolve) => { releaseAuth = resolve; });
+const ctx = {
+  ...baseCtx,
+  modelRegistry: {
+    ...baseRegistry,
+    async getApiKeyAndHeaders(model) {
+      if (raceAuth) {
+        markAuthStarted();
+        await authRelease;
+      }
+      return baseRegistry.getApiKeyAndHeaders(model);
+    },
+  },
+};
+let promptCount = 0;
+globalThis.__fmOnBranchPrompt = async ({ session }) => {
+  promptCount += 1;
+  const report = session.options.customTools.find((tool) => tool.name === "fm_branch_report");
+  const recorded = await report.execute(
+    `cached-auth-${promptCount}`,
+    { task: "branch-driver", verdict: "routine", summary: `cached provider prompt ${promptCount}` },
+    undefined,
+    undefined,
+    {},
+  );
+  if (recorded.isError) throw new Error(`cached provider report failed: ${JSON.stringify(recorded)}`);
+};
+
+await fire("session_start", {}, ctx);
+const control = dispatch("signal: establish cached provider A");
+if (!control.accepted) throw new Error("the cached-provider control wake was not accepted");
+await control.settlement;
+const firstSession = globalThis.__fmSessions?.[0];
+if (!firstSession || firstSession.disposed || firstSession.model?.baseUrl !== modelA.baseUrl) {
+  throw new Error(`the control did not establish provider A: ${JSON.stringify(firstSession?.model)}`);
+}
+
+const createCountBeforeRace = (globalThis.__fmModelRuntimeCreateCalls ?? []).length;
+raceAuth = true;
+const raced = dispatch("signal: provider changes during cached preflight auth");
+if (!raced.accepted) throw new Error("the cached auth-race wake was not accepted");
+await authStarted;
+registryModels[0] = modelB;
+releaseAuth();
+const racedFailure = await raced.settlement.then(() => null, (error) => error);
+raceAuth = false;
+if (!(racedFailure instanceof Error) || !racedFailure.message.includes("provider registration changed before request")) {
+  throw new Error(`cached preflight drift did not reject the current wake: ${String(racedFailure)}`);
+}
+if (!firstSession.disposed) throw new Error("cached preflight drift left provider A live");
+if ((globalThis.__fmSessions ?? []).length !== 1 || promptCount !== 1) {
+  throw new Error("cached preflight drift rebuilt provider B during the raced wake");
+}
+if ((globalThis.__fmModelRuntimeCreateCalls ?? []).length !== createCountBeforeRace) {
+  throw new Error("cached preflight drift constructed provider B during the raced wake");
+}
+
+const retry = dispatch("signal: retry stable provider B");
+if (!retry.accepted) throw new Error("cached preflight drift latched the stable replacement");
+await retry.settlement;
+const secondSession = globalThis.__fmSessions?.[1];
+if (!secondSession || secondSession.disposed || secondSession.model?.baseUrl !== modelB.baseUrl || promptCount !== 2) {
+  throw new Error(`the next wake did not rebuild stable provider B: ${JSON.stringify(secondSession?.model)}`);
+}
+
+registryModels[0] = modelC;
+const alreadyChanged = dispatch("signal: provider changed before cached preflight");
+if (!alreadyChanged.accepted) throw new Error("the already-changed provider control wake was not accepted");
+await alreadyChanged.settlement;
+const thirdSession = globalThis.__fmSessions?.[2];
+if (
+  !secondSession.disposed ||
+  !thirdSession ||
+  thirdSession.disposed ||
+  thirdSession.model?.baseUrl !== modelC.baseUrl ||
+  promptCount !== 3
+) {
+  throw new Error(`pre-existing drift did not rebuild on the current wake: ${JSON.stringify(thirdSession?.model)}`);
+}
+process.exit(0);
+EOF
+  status=$?
+  out=$(cat "$TMP_ROOT/node-output")
+  expect_code 0 "$status" "cached auth-race drift must defer replacement until the next stable wake: $out"
+  pass "cached provider auth-race drift defers rebuilding until the next wake"
+}
+
+test_cached_provider_preflight_failure_releases_exact_branch_lease() {
+  local repo home out status
+  repo="$TMP_ROOT/provider-preflight-lease-cleanup-root"
+  home="$TMP_ROOT/provider-preflight-lease-cleanup-home"
+  mkdir -p "$home/state" "$home/config"
+  install_pi_branch_extension_fixture "$repo"
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+const prelude = process.env.DRIVER_PRELUDE;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, makeCtx, registryModels, home, realRoot }; })()`);
+const { fire, dispatch, makeCtx, registryModels, home, realRoot } = globalThis.__t;
+import { existsSync, readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+
+const providerId = "cached-preflight-lease";
+const modelId = "same-model";
+registryModels.push({
+  provider: providerId,
+  id: modelId,
+  api: "openai-completions",
+  baseUrl: "https://cached-preflight-lease.invalid/v1",
+  apiKey: "cached-preflight-lease-key",
+});
+globalThis.__fmExtensionProviderConfigs = new Map();
+globalThis.__fmExtensionNativeProviders = new Map();
+const baseCtx = makeCtx({
+  model: { provider: providerId, id: modelId },
+  sessionManager: {
+    getSessionFile: () => `${home}/main.jsonl`,
+    getEntries: () => [],
+  },
+});
+const baseRegistry = baseCtx.modelRegistry;
+let failPreflightAuth = false;
+const ctx = {
+  ...baseCtx,
+  modelRegistry: {
+    ...baseRegistry,
+    getApiKeyAndHeaders(model) {
+      if (failPreflightAuth) {
+        return Promise.resolve({ ok: false, error: "synthetic cached preflight auth failure" });
+      }
+      return baseRegistry.getApiKeyAndHeaders(model);
+    },
+  },
+};
+globalThis.__fmExecuteBranchBash = async (context) => {
+  const result = spawnSync("bash", ["-c", context.command], {
+    encoding: "utf8",
+    cwd: context.cwd,
+    env: context.env,
+  });
+  return {
+    content: [{ type: "text", text: `${result.stdout}${result.stderr}` }],
+    details: { stdout: result.stdout, stderr: result.stderr, exitCode: result.status },
+    isError: result.status !== 0,
+  };
+};
+let promptCount = 0;
+globalThis.__fmOnBranchPrompt = async ({ session }) => {
+  promptCount += 1;
+  const bash = session.options.customTools.find((tool) => tool.name === "bash");
+  const claimed = await bash.execute(
+    "claim-cached-preflight-control",
+    { command: "bin/fm-lease.sh claim task-cached-preflight --actor branch" },
+    undefined,
+    undefined,
+    {},
+  );
+  if (claimed.isError) throw new Error(`cached preflight control claim failed: ${JSON.stringify(claimed)}`);
+};
+function externalClaim(task, actor, holderPid, leaseGeneration) {
+  const result = spawnSync("bash", [`${realRoot}/bin/fm-lease.sh`, "claim", task, "--actor", actor], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      FM_HOME: home,
+      FM_STATE_OVERRIDE: `${home}/state`,
+      FM_ROOT_OVERRIDE: realRoot,
+      FM_SUPERVISION_ACTOR: actor,
+      FM_LEASE_HOLDER_PID: holderPid,
+      ...(leaseGeneration ? { FM_LEASE_GENERATION: leaseGeneration } : {}),
+    },
+  });
+  if (result.status !== 0) throw new Error(`could not claim ${task}: ${result.stderr}`);
+}
+
+await fire("session_start", {}, ctx);
+const control = dispatch("signal: retain lease after non-provider failure");
+if (!control.accepted) throw new Error("the non-provider lease control wake was not accepted");
+const controlFailure = await control.settlement.then(() => null, (error) => error);
+if (!(controlFailure instanceof Error) || !controlFailure.message.includes("produced no durable outcome")) {
+  throw new Error(`the non-provider lease control did not fail as expected: ${String(controlFailure)}`);
+}
+const currentLease = `${home}/state/.lease-task-cached-preflight`;
+if (!existsSync(currentLease)) throw new Error("a non-provider failure released the cached branch lease");
+const leaseFields = readFileSync(currentLease, "utf8").trim().split("\t");
+const currentHolderPid = leaseFields[1];
+const currentLeaseGeneration = leaseFields[3];
+if (!currentHolderPid || !currentLeaseGeneration) throw new Error("the cached branch lease lacks exact identity");
+const cachedSession = globalThis.__fmSessions?.[0];
+if (!cachedSession || cachedSession.disposed) throw new Error("the non-provider failure did not retain its cached branch");
+
+externalClaim("task-cached-replacement", "branch", currentHolderPid, "replacement-generation");
+externalClaim("task-cached-main", "main", String(process.pid));
+failPreflightAuth = true;
+const failed = dispatch("signal: cached provider preflight fails");
+if (!failed.accepted) throw new Error("the cached preflight failure wake was not accepted");
+const failure = await failed.settlement.then(() => null, (error) => error);
+if (!(failure instanceof Error) || !failure.message.includes("synthetic cached preflight auth failure")) {
+  throw new Error(`the cached preflight failure lost its provider error: ${String(failure)}`);
+}
+if (existsSync(currentLease)) throw new Error("provider preflight fallback retained the exact cached branch lease");
+if (!existsSync(`${home}/state/.lease-task-cached-replacement`)) {
+  throw new Error("provider preflight fallback deleted another lease generation");
+}
+if (!existsSync(`${home}/state/.lease-task-cached-main`)) {
+  throw new Error("provider preflight fallback deleted main's lease");
+}
+if (cachedSession.disposed || (globalThis.__fmSessions ?? []).length !== 1 || promptCount !== 1) {
+  throw new Error("an unchanged-provider preflight failure rebuilt or invoked the cached branch");
+}
+process.exit(0);
+EOF
+  status=$?
+  out=$(cat "$TMP_ROOT/node-output")
+  expect_code 0 "$status" "cached provider preflight fallback must release only the exact branch lease: $out"
+  pass "cached provider preflight failures release only exact branch leases"
+}
+
 test_branch_effort_pin_applies_and_absent_pin_follows_main() {
   local repo home out status
   repo="$TMP_ROOT/effortpin-root"
@@ -4348,38 +4611,34 @@ if (globalThis.__fmSessions[1].options.thinkingLevel !== "high") {
   throw new Error(`the clamped build did not run at the reported level: ${globalThis.__fmSessions[1].options.thinkingLevel}`);
 }
 
-// When main's model cannot be resolved, the effort step derives Pi's level
-// set from the model recorded by the most recent branch conversation.
 uiSelections.push("openai/shallow-1", "max");
 await command.handler("", makeCtx());
 dispatch("signal: record shallow branch model");
 await settle(() => (globalThis.__fmSessions ?? []).length === 3, "shallow branch build");
 registryModels.find((model) => model.id === "main-model").branchAvailable = false;
+const unresolvedCreateStart = (globalThis.__fmModelRuntimeCreateCalls ?? []).length;
+const unresolvedRefreshStart = (globalThis.__fmModelRuntimeRefreshCalls ?? []).length;
 const restoredNoticeCount = notices.length;
 uiSelections.push("Follow main (anthropic/main-model)");
 await command.handler("", makeCtx());
 const restoredPicker = uiPrompts[uiPrompts.length - 1];
-if (JSON.stringify(restoredPicker.options.slice(1)) !== JSON.stringify(["off", "minimal", "low", "medium", "high"])) {
-  throw new Error(`the unresolved-main picker did not use Pi's levels for the recorded branch model: ${JSON.stringify(restoredPicker.options)}`);
+if (JSON.stringify(restoredPicker.options) !== JSON.stringify(["Follow main (medium)"])) {
+  throw new Error(`the unresolved-main picker exposed a prior provider's effort levels: ${JSON.stringify(restoredPicker.options)}`);
+}
+const unresolvedCreates = (globalThis.__fmModelRuntimeCreateCalls ?? []).slice(unresolvedCreateStart);
+if (unresolvedCreates.length !== 1 || unresolvedCreates.some((options) => options.providerId !== "anthropic")) {
+  throw new Error(`the unresolved Follow-main selection constructed a provider other than main's: ${JSON.stringify(unresolvedCreates)}`);
+}
+const unresolvedRefreshes = (globalThis.__fmModelRuntimeRefreshCalls ?? []).slice(unresolvedRefreshStart);
+if (
+  unresolvedRefreshes.length !== 1 ||
+  unresolvedRefreshes.some((call) => JSON.stringify(call.options?.providers) !== JSON.stringify(["anthropic"]))
+) {
+  throw new Error(`the unresolved Follow-main selection refreshed a provider other than main's: ${JSON.stringify(unresolvedRefreshes)}`);
 }
 const restoredNotices = notices.slice(restoredNoticeCount);
-if (restoredNotices.length !== 1 || !restoredNotices[0].message.includes("Effort: max, which this model runs at high.")) {
-  throw new Error(`the recorded branch model did not make clamp reporting honest: ${JSON.stringify(restoredNotices)}`);
-}
-
-// If neither main nor the recorded branch model can be resolved, no invented
-// catalog is offered and the report says the applied level is unknown.
-registryModels.find((model) => model.id === "shallow-1").branchAvailable = false;
-const unknownNoticeCount = notices.length;
-uiSelections.push("Follow main (anthropic/main-model)");
-await command.handler("", makeCtx());
-const unknownPicker = uiPrompts[uiPrompts.length - 1];
-if (JSON.stringify(unknownPicker.options) !== JSON.stringify(["Follow main (medium)"])) {
-  throw new Error(`the unknown-model picker invented effort levels: ${JSON.stringify(unknownPicker.options)}`);
-}
-const unknownNotices = notices.slice(unknownNoticeCount);
-if (unknownNotices.length !== 1 || !unknownNotices[0].message.includes("cannot be determined")) {
-  throw new Error(`the unknown effective effort was reported as applied: ${JSON.stringify(unknownNotices)}`);
+if (restoredNotices.length !== 1 || !restoredNotices[0].message.includes("cannot be determined")) {
+  throw new Error(`the unresolved Follow-main effort was reported as applied: ${JSON.stringify(restoredNotices)}`);
 }
 process.exit(0);
 EOF
@@ -7743,8 +8002,11 @@ EOF
 if [ "${FM_PI_PROVIDER_FRESHNESS_REVIEW_ONLY:-0}" = 1 ]; then
   test_supervision_model_rejects_registration_drift_during_effort_selection
   test_stable_provider_preflight_auth_timeout_latches
+  test_cached_provider_auth_race_defers_rebuild_until_next_wake
+  test_cached_provider_preflight_failure_releases_exact_branch_lease
   test_header_auth_race_rechecks_registration_and_composition
   test_stable_header_auth_failure_latches
+  test_supervision_model_command_picks_effort_after_the_model
   exit 0
 fi
 
@@ -7785,6 +8047,8 @@ test_provider_preparation_drift_falls_back_without_latching
 test_provider_preparation_disappearance_falls_back_without_latching
 test_unchanged_provider_preparation_rejection_latches
 test_stable_provider_preflight_auth_timeout_latches
+test_cached_provider_auth_race_defers_rebuild_until_next_wake
+test_cached_provider_preflight_failure_releases_exact_branch_lease
 test_supervision_model_picker_is_bounded_searchable_and_branch_only
 test_branch_model_picker_keeps_follow_main_first_under_ranking
 test_branch_effort_pin_applies_and_absent_pin_follows_main
