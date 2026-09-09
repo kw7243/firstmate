@@ -3449,6 +3449,96 @@ EOF
   pass "supervision-model rejects registration races before persistence"
 }
 
+test_supervision_model_rejects_registration_drift_during_effort_selection() {
+  local repo home out status
+  repo="$TMP_ROOT/modelcmd-effort-registration-race-root"
+  home="$TMP_ROOT/modelcmd-effort-registration-race-home"
+  mkdir -p "$home/state" "$home/config"
+  install_pi_branch_extension_fixture "$repo"
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+const prelude = process.env.DRIVER_PRELUDE;
+await eval(`(async () => { ${prelude}; globalThis.__t = { makeCtx, commands, registryModels, uiPrompts, notices, home }; })()`);
+const { makeCtx, commands, registryModels, uiPrompts, notices, home } = globalThis.__t;
+import { readFileSync, writeFileSync } from "node:fs";
+
+const providerId = "static-effort-race";
+const modelId = "selected-model";
+const selectedA = {
+  provider: providerId,
+  id: modelId,
+  api: "openai-completions",
+  baseUrl: "https://effort-route-a.invalid/v1",
+  apiKey: "effort-route-a-key",
+  reasoning: true,
+  thinkingLevelMap: { xhigh: "xhigh", max: "max" },
+};
+const selectedB = {
+  ...selectedA,
+  baseUrl: "https://effort-route-b.invalid/v1",
+  apiKey: "effort-route-b-key",
+};
+registryModels.push(
+  { provider: "anthropic", id: "main-model", reasoning: true },
+  selectedA,
+);
+globalThis.__fmExtensionProviderConfigs = new Map();
+globalThis.__fmExtensionNativeProviders = new Map();
+const modelPin = `${home}/config/supervision-branch-model`;
+const effortPin = `${home}/config/supervision-branch-effort`;
+writeFileSync(modelPin, "anthropic/main-model\n");
+writeFileSync(effortPin, "low\n");
+const command = commands.get("supervision-model");
+if (!command) throw new Error("the supervision-model command was not registered");
+
+let markEffortStarted;
+const effortStarted = new Promise((resolve) => { markEffortStarted = resolve; });
+let releaseEffort;
+const effortRelease = new Promise((resolve) => { releaseEffort = resolve; });
+const baseCtx = makeCtx();
+const ctx = {
+  ...baseCtx,
+  ui: {
+    ...baseCtx.ui,
+    async select(title, options) {
+      uiPrompts.push({ title, options });
+      if (title.startsWith("Supervision branch model")) return `${providerId}/${modelId}`;
+      markEffortStarted();
+      await effortRelease;
+      return "max";
+    },
+  },
+};
+const selection = command.handler("", ctx);
+await effortStarted;
+registryModels[1] = selectedB;
+releaseEffort();
+await selection;
+
+if (readFileSync(modelPin, "utf8") !== "anthropic/main-model\n") {
+  throw new Error(`effort-time provider drift replaced the prior model pin: ${JSON.stringify(readFileSync(modelPin, "utf8"))}`);
+}
+if (readFileSync(effortPin, "utf8") !== "low\n") {
+  throw new Error(`effort-time provider drift replaced the prior effort pin: ${JSON.stringify(readFileSync(effortPin, "utf8"))}`);
+}
+if (
+  notices.length !== 1 ||
+  notices[0].type !== "error" ||
+  !notices[0].message.includes("provider registration changed during selected-model preparation")
+) {
+  throw new Error(`effort-time provider drift did not emit one model-selection failure: ${JSON.stringify(notices)}`);
+}
+if (notices.some((notice) => notice.message.includes(`Supervision branch model: ${providerId}/${modelId}`))) {
+  throw new Error(`effort-time provider drift emitted stale model success: ${JSON.stringify(notices)}`);
+}
+process.exit(0);
+EOF
+  status=$?
+  out=$(cat "$TMP_ROOT/node-output")
+  expect_code 0 "$status" "provider drift during effort selection must preserve both prior pins: $out"
+  pass "supervision-model rejects provider drift during effort selection"
+}
+
 test_provider_preparation_drift_falls_back_without_latching() {
   local repo home out status
   repo="$TMP_ROOT/provider-preparation-drift-root"
@@ -3723,6 +3813,100 @@ EOF
   out=$(cat "$TMP_ROOT/node-output")
   expect_code 0 "$status" "an unchanged-provider creation rejection must retain the broken latch: $out"
   pass "unchanged provider preparation rejection retains the broken latch"
+}
+
+test_stable_provider_preflight_auth_timeout_latches() {
+  local repo home out status
+  repo="$TMP_ROOT/provider-preflight-auth-timeout-root"
+  home="$TMP_ROOT/provider-preflight-auth-timeout-home"
+  mkdir -p "$home/state" "$home/config"
+  install_pi_branch_extension_fixture "$repo"
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+const prelude = process.env.DRIVER_PRELUDE;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, makeCtx, registryModels, sentToMain, home }; })()`);
+const { fire, dispatch, makeCtx, registryModels, sentToMain, home } = globalThis.__t;
+
+const providerId = "stable-preflight-timeout";
+const modelId = "same-model";
+registryModels.push({
+  provider: providerId,
+  id: modelId,
+  api: "openai-completions",
+  baseUrl: "https://stable-preflight.invalid/v1",
+  apiKey: "stable-preflight-key",
+});
+globalThis.__fmExtensionProviderConfigs = new Map();
+globalThis.__fmExtensionNativeProviders = new Map();
+const baseCtx = makeCtx({
+  model: { provider: providerId, id: modelId },
+  sessionManager: {
+    getSessionFile: () => `${home}/main.jsonl`,
+    getEntries: () => [],
+  },
+});
+const baseRegistry = baseCtx.modelRegistry;
+let stallAuth = false;
+const ctx = {
+  ...baseCtx,
+  modelRegistry: {
+    ...baseRegistry,
+    getApiKeyAndHeaders(model) {
+      if (stallAuth) return new Promise(() => {});
+      return baseRegistry.getApiKeyAndHeaders(model);
+    },
+  },
+};
+let promptCount = 0;
+globalThis.__fmOnBranchPrompt = async ({ session }) => {
+  promptCount += 1;
+  const report = session.options.customTools.find((tool) => tool.name === "fm_branch_report");
+  const recorded = await report.execute(
+    `preflight-${promptCount}`,
+    { task: "branch-driver", verdict: "routine", summary: "initial stable-provider control" },
+    undefined,
+    undefined,
+    {},
+  );
+  if (recorded.isError) throw new Error(`stable-provider control report failed: ${JSON.stringify(recorded)}`);
+};
+await fire("session_start", {}, ctx);
+const control = dispatch("signal: establish stable provider branch");
+if (!control.accepted) throw new Error("the stable-provider control wake was not accepted");
+await control.settlement;
+const session = globalThis.__fmSessions?.[0];
+if (!session || session.disposed) throw new Error("the stable-provider control did not leave one live branch");
+
+stallAuth = true;
+const originalSetTimeout = globalThis.setTimeout;
+globalThis.setTimeout = (handler, delay, ...args) => originalSetTimeout(handler, delay === 5_000 ? 0 : delay, ...args);
+try {
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const failed = dispatch(`signal: stable preflight auth timeout ${attempt}`);
+    if (!failed.accepted) throw new Error(`stable preflight auth timeout ${attempt} latched too early`);
+    const failure = await failed.settlement.then(() => null, (error) => error);
+    if (!(failure instanceof Error) || !failure.message.includes("request-auth resolution exceeded 5000ms")) {
+      throw new Error(`stable preflight timeout ${attempt} lost its original error: ${String(failure)}`);
+    }
+    if (session.disposed || (globalThis.__fmSessions ?? []).length !== 1) {
+      throw new Error(`stable preflight timeout ${attempt} resynchronized an unchanged provider`);
+    }
+  }
+} finally {
+  globalThis.setTimeout = originalSetTimeout;
+}
+const latched = dispatch("signal: stable preflight auth remains latched");
+if (latched.accepted) throw new Error("repeated stable preflight auth timeouts did not latch provider dispatch");
+if (promptCount !== 1) throw new Error(`preflight auth timeouts reached the branch prompt ${promptCount - 1} times`);
+if (!sentToMain.some((sent) => sent.message.content.includes("paused after repeated provider errors"))) {
+  throw new Error(`stable preflight auth timeouts did not enter provider cooldown: ${JSON.stringify(sentToMain)}`);
+}
+process.exit(0);
+EOF
+  status=$?
+  out=$(cat "$TMP_ROOT/node-output")
+  expect_code 0 "$status" "stable preflight auth timeouts must latch without provider resynchronization: $out"
+  pass "stable preflight auth timeouts retain provider latching"
 }
 
 test_branch_effort_pin_applies_and_absent_pin_follows_main() {
@@ -6016,12 +6200,146 @@ globalThis.__fmExtensionProviderConfigs.clear();
 await runRace("effective composition changes during auth resolution", () => {
   registryModels[0] = modelB;
 });
+const callsBeforeRetry = providerCalls.length;
+globalThis.__fmOnBranchPrompt = async ({ session }) => {
+  await invokeProvider(session, { messages: session.ops });
+  const report = session.options.customTools.find((tool) => tool.name === "fm_branch_report");
+  const recorded = await report.execute(
+    "stable-header-retry",
+    { task: "branch-driver", verdict: "routine", summary: "stable replacement handled the retry" },
+    undefined,
+    undefined,
+    {},
+  );
+  if (recorded.isError) throw new Error(`stable replacement report failed: ${JSON.stringify(recorded)}`);
+};
+const retry = dispatch("signal: retry the stable replacement after header drift");
+if (!retry.accepted) throw new Error("proven header drift latched provider dispatch");
+await retry.settlement;
+const stableSession = globalThis.__fmSessions.at(-1);
+if (!stableSession || stableSession.disposed || stableSession.model?.baseUrl !== modelB.baseUrl) {
+  throw new Error(`the stable replacement did not rebuild after header drift: ${JSON.stringify(stableSession?.model)}`);
+}
+if (providerCalls.length !== callsBeforeRetry + 1) {
+  throw new Error(`the stable replacement was not invoked exactly once: ${JSON.stringify(providerCalls)}`);
+}
 process.exit(0);
 EOF
   status=$?
   out=$(cat "$TMP_ROOT/node-output")
   expect_code 0 "$status" "header auth resolution must recheck registration kind and composition: $out"
   pass "header auth races recheck registration kind and effective composition"
+}
+
+test_stable_header_auth_failure_latches() {
+  local repo home out status
+  repo="$TMP_ROOT/stable-header-auth-failure-root"
+  home="$TMP_ROOT/stable-header-auth-failure-home"
+  mkdir -p "$home/state" "$home/config"
+  install_pi_branch_extension_fixture "$repo"
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+const prelude = process.env.DRIVER_PRELUDE;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, makeCtx, registryModels, sentToMain, home }; })()`);
+const { fire, dispatch, makeCtx, registryModels, sentToMain, home } = globalThis.__t;
+
+const providerId = "stable-header-auth";
+const modelId = "same-model";
+registryModels.push({
+  provider: providerId,
+  id: modelId,
+  api: "openai-completions",
+  baseUrl: "https://stable-header.invalid/v1",
+  apiKey: "stable-header-key",
+});
+globalThis.__fmExtensionProviderConfigs = new Map();
+globalThis.__fmExtensionNativeProviders = new Map();
+const baseCtx = makeCtx({
+  model: { provider: providerId, id: modelId },
+  sessionManager: {
+    getSessionFile: () => `${home}/main.jsonl`,
+    getEntries: () => [],
+  },
+});
+const baseRegistry = baseCtx.modelRegistry;
+let failAuth = false;
+const ctx = {
+  ...baseCtx,
+  modelRegistry: {
+    ...baseRegistry,
+    getApiKeyAndHeaders(model) {
+      if (failAuth) return Promise.resolve({ ok: false, error: "synthetic stable header auth failure" });
+      return baseRegistry.getApiKeyAndHeaders(model);
+    },
+  },
+};
+const providerCalls = [];
+globalThis.__fmStockProviderStreamSimple = (...args) => {
+  providerCalls.push(args);
+};
+let abortCount = 0;
+async function invokeProvider(session) {
+  let beforeHeaders;
+  const factoryEntry = session.options.resourceLoader.options.extensionFactories[0];
+  const factory = typeof factoryEntry === "function" ? factoryEntry : factoryEntry.factory;
+  factory({ on: (event, handler) => { if (event === "before_provider_headers") beforeHeaders = handler; } });
+  if (!beforeHeaders) throw new Error("the branch installed no provider-header guard");
+  await beforeHeaders({}, { abort() { abortCount += 1; } });
+  return session.modelRuntime.streamSimple(session.model, { messages: session.ops }, {});
+}
+let promptCount = 0;
+globalThis.__fmOnBranchPrompt = async ({ session }) => {
+  promptCount += 1;
+  if (promptCount === 1) {
+    const report = session.options.customTools.find((tool) => tool.name === "fm_branch_report");
+    const recorded = await report.execute(
+      "stable-header-control",
+      { task: "branch-driver", verdict: "routine", summary: "initial stable header control" },
+      undefined,
+      undefined,
+      {},
+    );
+    if (recorded.isError) throw new Error(`stable header control report failed: ${JSON.stringify(recorded)}`);
+    return;
+  }
+  failAuth = true;
+  try {
+    await invokeProvider(session);
+  } finally {
+    failAuth = false;
+  }
+};
+await fire("session_start", {}, ctx);
+const control = dispatch("signal: establish stable header branch");
+if (!control.accepted) throw new Error("the stable-header control wake was not accepted");
+await control.settlement;
+const session = globalThis.__fmSessions?.[0];
+if (!session || session.disposed) throw new Error("the stable-header control did not leave one live branch");
+
+for (let attempt = 1; attempt <= 2; attempt += 1) {
+  const failed = dispatch(`signal: stable header auth failure ${attempt}`);
+  if (!failed.accepted) throw new Error(`stable header auth failure ${attempt} latched too early`);
+  const failure = await failed.settlement.then(() => null, (error) => error);
+  if (!(failure instanceof Error) || !failure.message.includes("synthetic stable header auth failure")) {
+    throw new Error(`stable header auth failure ${attempt} lost its original error: ${String(failure)}`);
+  }
+  if (session.disposed || (globalThis.__fmSessions ?? []).length !== 1) {
+    throw new Error(`stable header auth failure ${attempt} resynchronized an unchanged provider`);
+  }
+}
+const latched = dispatch("signal: stable header auth remains latched");
+if (latched.accepted) throw new Error("repeated stable header auth failures did not latch provider dispatch");
+if (abortCount !== 2) throw new Error(`stable header failures aborted ${abortCount} requests instead of two`);
+if (providerCalls.length !== 0) throw new Error(`stable header failures reached the provider: ${JSON.stringify(providerCalls)}`);
+if (!sentToMain.some((sent) => sent.message.content.includes("paused after repeated provider errors"))) {
+  throw new Error(`stable header auth failures did not enter provider cooldown: ${JSON.stringify(sentToMain)}`);
+}
+process.exit(0);
+EOF
+  status=$?
+  out=$(cat "$TMP_ROOT/node-output")
+  expect_code 0 "$status" "stable header auth failures must latch without provider resynchronization: $out"
+  pass "stable header auth failures retain provider latching"
 }
 
 test_provider_change_at_header_boundary_blocks_all_effective_streams() {
@@ -7422,6 +7740,14 @@ EOF
   pass "extension-registered providers fall back without hiding healthy picker choices"
 }
 
+if [ "${FM_PI_PROVIDER_FRESHNESS_REVIEW_ONLY:-0}" = 1 ]; then
+  test_supervision_model_rejects_registration_drift_during_effort_selection
+  test_stable_provider_preflight_auth_timeout_latches
+  test_header_auth_race_rechecks_registration_and_composition
+  test_stable_header_auth_failure_latches
+  exit 0
+fi
+
 if [ "${FM_PI_MINIMUM_BOUNDARY_ONLY:-0}" = 1 ]; then
   test_minimum_pi_unrelated_config_cannot_hide_or_block_selection
   exit 0
@@ -7454,9 +7780,11 @@ test_no_model_session_clears_unpinned_provider_selection
 test_unpinned_branch_follows_main_model_changes_live
 test_supervision_model_command_persists_and_rebinds_the_live_branch
 test_supervision_model_rejects_registration_race_during_preparation
+test_supervision_model_rejects_registration_drift_during_effort_selection
 test_provider_preparation_drift_falls_back_without_latching
 test_provider_preparation_disappearance_falls_back_without_latching
 test_unchanged_provider_preparation_rejection_latches
+test_stable_provider_preflight_auth_timeout_latches
 test_supervision_model_picker_is_bounded_searchable_and_branch_only
 test_branch_model_picker_keeps_follow_main_first_under_ranking
 test_branch_effort_pin_applies_and_absent_pin_follows_main
@@ -7465,6 +7793,7 @@ test_extension_provider_registration_falls_back_without_scoped_api
 test_cached_branch_rebinds_after_effective_provider_change
 test_static_same_id_provider_hot_reload_fails_closed_at_headers
 test_header_auth_race_rechecks_registration_and_composition
+test_stable_header_auth_failure_latches
 test_provider_change_at_header_boundary_blocks_all_effective_streams
 test_minimum_pi_unrelated_config_cannot_hide_or_block_selection
 test_runtime_only_main_credential_rejects_branch_construction

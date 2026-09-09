@@ -308,6 +308,12 @@ type PinnedBranchModel = {
 };
 type PreparedDefaultBranchModel = PinnedBranchModel & { settingsManager: SettingsManager };
 type BranchModelResolution = { ok: true; selection: PinnedBranchModel } | { ok: false; reason: string };
+type BranchEffortPick = {
+  branchModel: BranchModel | undefined;
+  currentPin: BranchEffort | null;
+  report: { message: string; warning: boolean };
+  desiredPin?: BranchEffort | null;
+};
 
 // Pi owns the effort vocabulary. The picker's options and every clamp still
 // come from Pi's own getSupportedThinkingLevels/clampThinkingLevel, so this
@@ -625,6 +631,9 @@ function collectMainDialog(sessionManager: ReadonlyEntries, collection: MirrorCo
 }
 
 export default function (pi: ExtensionAPI) {
+  type ProviderRegistrationWatchOutcome =
+    | { kind: "drift"; error: ExtensionProviderDriftError }
+    | { kind: "failure"; error: Error };
   type BranchSession = {
     session: AgentSession;
     sessionManager: SessionManager;
@@ -633,7 +642,7 @@ export default function (pi: ExtensionAPI) {
     leaseHolderPid: string;
     leaseGeneration: string;
     providerRegistration: ExtensionProviderRegistration;
-    watchProviderRegistrationMismatch: (listener: (error: Error) => void) => () => void;
+    watchProviderRegistration: (listener: (outcome: ProviderRegistrationWatchOutcome) => void) => () => void;
   };
   let branch: BranchSession | null = null;
   let branchBroken = "";
@@ -1126,21 +1135,15 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
-  async function extensionProviderRegistrationIsCurrent(snapshot: ExtensionProviderRegistration): Promise<boolean> {
-    try {
-      await assertExtensionProviderRegistrationCurrent(snapshot);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  async function extensionProviderRegistrationMismatch(snapshot: ExtensionProviderRegistration): Promise<Error | null> {
+  async function extensionProviderRegistrationDrift(
+    snapshot: ExtensionProviderRegistration,
+  ): Promise<ExtensionProviderDriftError | null> {
     try {
       await assertExtensionProviderRegistrationCurrent(snapshot);
       return null;
     } catch (error) {
-      return error instanceof Error ? error : new ExtensionProviderResolutionError(String(error));
+      if (error instanceof ExtensionProviderDriftError) return error;
+      throw error;
     }
   }
 
@@ -1648,7 +1651,7 @@ export default function (pi: ExtensionAPI) {
     leaseHolderPid: string;
     leaseGeneration: string;
     providerRegistration: ExtensionProviderRegistration;
-    watchProviderRegistrationMismatch: (listener: (error: Error) => void) => () => void;
+    watchProviderRegistration: (listener: (outcome: ProviderRegistrationWatchOutcome) => void) => () => void;
   }> {
     // Resolved first, before any session file or prompt work: a model pin Pi
     // cannot honor must fail before this build leaves anything behind. Every
@@ -1689,7 +1692,7 @@ export default function (pi: ExtensionAPI) {
     branchSessionFile = sessionManager.getSessionFile() ?? "";
     const preparedDefault = pinned ? undefined : await prepareEffectiveDefaultBranchModel(sessionManager);
     const providerRegistration = pinned?.providerRegistration ?? preparedDefault!.providerRegistration;
-    let providerRegistrationMismatchListener: ((error: Error) => void) | null = null;
+    let providerRegistrationListener: ((outcome: ProviderRegistrationWatchOutcome) => void) | null = null;
     // The branch loads no project resources at all: extensions off (so it can
     // never spawn its own branch), skills/context files off (they vary per
     // home and would destabilize the byte-stable prefix). Its whole standing
@@ -1708,12 +1711,20 @@ export default function (pi: ExtensionAPI) {
           name: "fm-branch-cache-key",
           factory: (branchPi: ExtensionAPI) => {
             branchPi.on("before_provider_headers", async (_event, ctx) => {
-              const providerRegistrationMismatch = await extensionProviderRegistrationMismatch(providerRegistration);
-              if (providerRegistrationMismatch) {
-                providerRegistrationMismatchListener?.(providerRegistrationMismatch);
-                ctx.abort();
-                throw providerRegistrationMismatch;
+              let outcome: ProviderRegistrationWatchOutcome | null = null;
+              try {
+                const drift = await extensionProviderRegistrationDrift(providerRegistration);
+                if (drift) outcome = { kind: "drift", error: drift };
+              } catch (error) {
+                outcome = {
+                  kind: "failure",
+                  error: error instanceof Error ? error : new ExtensionProviderResolutionError(String(error)),
+                };
               }
+              if (!outcome) return;
+              providerRegistrationListener?.(outcome);
+              ctx.abort();
+              throw outcome.error;
             });
             branchPi.on("before_provider_request", (event) => {
               const payload = event.payload;
@@ -1808,10 +1819,10 @@ ${context.command}
       leaseHolderPid,
       leaseGeneration: branchLeaseGeneration,
       providerRegistration,
-      watchProviderRegistrationMismatch: (listener) => {
-        providerRegistrationMismatchListener = listener;
+      watchProviderRegistration: (listener) => {
+        providerRegistrationListener = listener;
         return () => {
-          if (providerRegistrationMismatchListener === listener) providerRegistrationMismatchListener = null;
+          if (providerRegistrationListener === listener) providerRegistrationListener = null;
         };
       },
     };
@@ -1820,12 +1831,27 @@ ${context.command}
   async function ensureBranch(expectedGeneration: number, recoveryProbe = false): Promise<BranchSession> {
     if (!(await actingAsOwner(expectedGeneration))) throw new Error("supervision session was replaced or lost lock ownership");
     if (branchBroken && !(recoveryProbe && providerRecovery?.probeInFlight)) throw new Error(branchBroken);
-    if (branch && !(await extensionProviderRegistrationIsCurrent(branch.providerRegistration))) {
-      const stale = branch;
-      branch = null;
+    if (branch) {
+      const candidate = branch;
+      let drift: ExtensionProviderDriftError | null;
       try {
-        stale.session.dispose();
-      } catch {}
+        drift = await extensionProviderRegistrationDrift(candidate.providerRegistration);
+      } catch (error) {
+        const providerError = error instanceof Error ? error : new ExtensionProviderResolutionError(String(error));
+        if (
+          candidate.generation === generation &&
+          candidate.selectionRevision === branchSelectionRevision
+        ) {
+          recordSettledProviderError(`supervision branch provider freshness check failed: ${providerError.message}`);
+        }
+        throw providerError;
+      }
+      if (drift) {
+        if (branch === candidate) branch = null;
+        try {
+          candidate.session.dispose();
+        } catch {}
+      }
     }
     if (branch) return branch;
     while (true) {
@@ -1838,12 +1864,20 @@ ${context.command}
           } catch {}
           continue;
         }
-        const providerRegistrationMismatch = await extensionProviderRegistrationMismatch(created.providerRegistration);
-        if (providerRegistrationMismatch) {
+        let providerRegistrationDrift: ExtensionProviderDriftError | null;
+        try {
+          providerRegistrationDrift = await extensionProviderRegistrationDrift(created.providerRegistration);
+        } catch (error) {
           try {
             created.session.dispose();
           } catch {}
-          throw providerRegistrationMismatch;
+          throw error;
+        }
+        if (providerRegistrationDrift) {
+          try {
+            created.session.dispose();
+          } catch {}
+          throw providerRegistrationDrift;
         }
         if (!(await actingAsOwner(expectedGeneration))) {
           try {
@@ -1953,9 +1987,12 @@ ${context.command}
         const entryOffset = sessionManager.getEntries().length;
         wakeTaskScope = heartbeat ? null : { rows: [...scope.eligibleSeqs], tasks: new Set(scope.eligibleTasks) };
         let stopProviderRegistrationWatch = () => {};
-        const providerRegistrationMismatch = new Promise<{ kind: "mismatch"; error: Error }>((resolveMismatch) => {
-          stopProviderRegistrationWatch = branchForWake.watchProviderRegistrationMismatch((error) => {
-            resolveMismatch({ kind: "mismatch", error });
+        const providerRegistrationWatch = new Promise<{
+          kind: "provider-registration";
+          outcome: ProviderRegistrationWatchOutcome;
+        }>((resolveWatch) => {
+          stopProviderRegistrationWatch = branchForWake.watchProviderRegistration((outcome) => {
+            resolveWatch({ kind: "provider-registration", outcome });
           });
         });
         try {
@@ -1967,14 +2004,23 @@ ${context.command}
               () => ({ kind: "settled" as const }),
               (error: unknown) => ({ kind: "error" as const, error }),
             );
-          const promptOutcome = await Promise.race([prompt, providerRegistrationMismatch]);
-          if (promptOutcome.kind === "mismatch") {
+          const promptOutcome = await Promise.race([prompt, providerRegistrationWatch]);
+          if (promptOutcome.kind === "provider-registration") {
             providerFallbackLease = {
               holderPid: branchForWake.leaseHolderPid,
               leaseGeneration: branchForWake.leaseGeneration,
             };
-            invalidateProviderMismatchedBranch(branchForWake);
-            throw promptOutcome.error;
+            if (promptOutcome.outcome.kind === "drift") {
+              invalidateProviderMismatchedBranch(branchForWake);
+            } else if (
+              branchForWake.generation === generation &&
+              branchForWake.selectionRevision === branchSelectionRevision
+            ) {
+              recordSettledProviderError(
+                `supervision branch provider freshness check failed: ${promptOutcome.outcome.error.message}`,
+              );
+            }
+            throw promptOutcome.outcome.error;
           }
           if (promptOutcome.kind === "error") throw promptOutcome.error;
         } finally {
@@ -2303,10 +2349,16 @@ ${context.command}
       // builds its menu from, so it is captured here rather than resolved a
       // second time through another isolated runtime.
       let branchModel: BranchModel | undefined;
+      let preparedProviderRegistration: ExtensionProviderRegistration | null = null;
+      const assertPreparedProviderRegistrationCurrent = (): void => {
+        if (!preparedProviderRegistration) return;
+        if (extensionProviderRegistrationIsSynchronouslyCurrent(preparedProviderRegistration)) return;
+        throw new ExtensionProviderDriftError(
+          `provider registration changed during selected-model preparation for ${preparedProviderRegistration.providerId}`,
+        );
+      };
       try {
-        if (picked === FOLLOW_MAIN_VALUE) {
-          clearPinFile(modelPinFile);
-        } else {
+        if (picked !== FOLLOW_MAIN_VALUE) {
           const separator = picked.indexOf("/");
           if (separator <= 0 || separator >= picked.length - 1) throw new Error(`invalid model selection: ${picked}`);
           const prepared = await preparePinnedBranchModel({
@@ -2320,7 +2372,7 @@ ${context.command}
             throw new ExtensionProviderDriftError(preparationDriftMessage);
           }
           branchModel = prepared.model;
-          writePinFile(modelPinFile, picked);
+          preparedProviderRegistration = prepared.providerRegistration;
         }
       } catch (error) {
         ctx.ui.notify(
@@ -2329,8 +2381,7 @@ ${context.command}
         );
         return;
       }
-      // The model choice is persisted; report it exactly, then run the effort
-      // step on the model the branch will actually use.
+      // The resolved model drives the effort step in this same invocation.
       let modelReport: { message: string; warning: boolean };
       if (picked !== FOLLOW_MAIN_VALUE) {
         modelReport = { message: `Supervision branch model: ${picked}.`, warning: false };
@@ -2346,6 +2397,8 @@ ${context.command}
               warning: true,
             };
           } else if (following.ok) {
+            preparedProviderRegistration = following.selection.providerRegistration;
+            assertPreparedProviderRegistrationCurrent();
             branchModel = following.selection.model;
             modelReport = {
               message: `Supervision branch follows main's model (${modelLabel(following.selection.model)}).`,
@@ -2358,6 +2411,13 @@ ${context.command}
             };
           }
         } catch (error) {
+          if (error instanceof ExtensionProviderDriftError) {
+            ctx.ui.notify(
+              `Could not apply or save the supervision branch model: ${error.message}`,
+              "error",
+            );
+            return;
+          }
           modelReport = {
             message: `Supervision branch pin cleared, but main's model could not be applied (${error instanceof Error ? error.message : String(error)}); supervision falls back safely to main until the branch can use that model.`,
             warning: true,
@@ -2365,17 +2425,46 @@ ${context.command}
         }
       }
 
-      // The model choice is already persisted, so a failing effort step must
-      // never swallow it: the branch still rebinds and the captain still
-      // hears what took effect and what did not.
       let effortReport: { message: string; warning: boolean };
+      let effortPick: BranchEffortPick | null = null;
       try {
-        effortReport = await pickBranchEffort(ctx, branchModel);
+        effortPick = await pickBranchEffort(ctx, branchModel, assertPreparedProviderRegistrationCurrent);
+        assertPreparedProviderRegistrationCurrent();
+        effortReport = effortPick.report;
       } catch (error) {
+        if (error instanceof ExtensionProviderDriftError) {
+          ctx.ui.notify(
+            `Could not apply or save the supervision branch model: ${error.message}`,
+            "error",
+          );
+          return;
+        }
         effortReport = {
           message: `The effort step failed (${error instanceof Error ? error.message : String(error)}); the branch keeps its current effort choice.`,
           warning: true,
         };
+      }
+      try {
+        assertPreparedProviderRegistrationCurrent();
+        if (picked === FOLLOW_MAIN_VALUE) clearPinFile(modelPinFile);
+        else writePinFile(modelPinFile, picked);
+      } catch (error) {
+        ctx.ui.notify(
+          `Could not apply or save the supervision branch model: ${error instanceof Error ? error.message : String(error)}`,
+          "error",
+        );
+        return;
+      }
+      if (effortPick && "desiredPin" in effortPick) {
+        try {
+          if (effortPick.desiredPin === null) clearPinFile(effortPinFile);
+          else writePinFile(effortPinFile, effortPick.desiredPin!);
+        } catch (error) {
+          effortReport = {
+            message: `The effort choice could not be saved (${error instanceof Error ? error.message : String(error)}). ${describeBranchEffort(effortPick.currentPin, effortPick.branchModel)}`,
+            warning: true,
+          };
+        }
       }
       branchSelectionRevision += 1;
       releaseBranchForSelectionChange();
@@ -2471,34 +2560,48 @@ ${context.command}
   async function pickBranchEffort(
     ctx: { ui: { select: (title: string, options: string[]) => Promise<string | undefined> } },
     selectedModel: BranchModel | undefined,
-  ): Promise<{ message: string; warning: boolean }> {
+    assertCurrent?: () => void,
+  ): Promise<BranchEffortPick> {
     const branchModel = await effectiveBranchModel(selectedModel);
+    assertCurrent?.();
     const currentPin = readEffortPin();
     const current = currentPin ?? "follows main";
     const main = mainEffort();
     const followMainEffort = `Follow main${main ? ` (${main})` : ""}`;
     const levels = branchModel ? getSupportedThinkingLevels(branchModel) : [];
     const picked = await ctx.ui.select(`Supervision branch effort (now: ${current})`, [followMainEffort, ...levels]);
+    assertCurrent?.();
     if (picked === undefined) {
-      return { message: describeBranchEffort(currentPin, branchModel), warning: branchModel === undefined };
-    }
-    try {
-      if (picked === followMainEffort) {
-        clearPinFile(effortPinFile);
-      } else if ((BRANCH_EFFORT_LEVELS as readonly string[]).includes(picked)) {
-        writePinFile(effortPinFile, picked);
-      } else {
-        throw new Error(`invalid effort selection: ${picked}`);
-      }
-    } catch (error) {
       return {
-        message: `The effort choice could not be saved (${error instanceof Error ? error.message : String(error)}). ${describeBranchEffort(currentPin, branchModel)}`,
-        warning: true,
+        branchModel,
+        currentPin,
+        report: { message: describeBranchEffort(currentPin, branchModel), warning: branchModel === undefined },
       };
     }
+    if (picked === followMainEffort) {
+      return {
+        branchModel,
+        currentPin,
+        desiredPin: null,
+        report: { message: describeBranchEffort(null, branchModel), warning: branchModel === undefined },
+      };
+    }
+    if (!(BRANCH_EFFORT_LEVELS as readonly string[]).includes(picked)) {
+      return {
+        branchModel,
+        currentPin,
+        report: {
+          message: `The effort choice could not be saved (invalid effort selection: ${picked}). ${describeBranchEffort(currentPin, branchModel)}`,
+          warning: true,
+        },
+      };
+    }
+    const desiredPin = picked as BranchEffort;
     return {
-      message: describeBranchEffort(readEffortPin(), branchModel),
-      warning: branchModel === undefined,
+      branchModel,
+      currentPin,
+      desiredPin,
+      report: { message: describeBranchEffort(desiredPin, branchModel), warning: branchModel === undefined },
     };
   }
 
