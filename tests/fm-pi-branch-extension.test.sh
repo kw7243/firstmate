@@ -3612,11 +3612,17 @@ if ((globalThis.__fmSessions ?? []).length !== 0) {
 if (existsSync(`${home}/state/.branch-session`)) {
   throw new Error("the stable auth mismatch persisted a branch session pointer");
 }
+const second = dispatch("signal: stable scoped auth mismatch repeats");
+if (!second.accepted) throw new Error("one stable auth mismatch latched before the provider-error threshold");
+const secondFailure = await second.settlement.then(() => null, (error) => error);
+if (!(secondFailure instanceof Error) || !secondFailure.message.includes("scoped provider composition differs from the live registry")) {
+  throw new Error(`the repeated stable auth mismatch lost its resolution failure: ${String(secondFailure)}`);
+}
 const createCount = (globalThis.__fmModelRuntimeCreateCalls ?? []).length;
-const latched = dispatch("signal: stable scoped auth mismatch remains latched");
-if (latched.accepted) throw new Error("the stable auth mismatch remained retryable as drift");
+const latched = dispatch("signal: repeated stable scoped auth mismatch remains latched");
+if (latched.accepted) throw new Error("repeated stable auth mismatches remained retryable as drift");
 if ((globalThis.__fmModelRuntimeCreateCalls ?? []).length !== createCount) {
-  throw new Error("the latched stable auth mismatch rebuilt another scoped runtime");
+  throw new Error("the provider cooldown rebuilt another scoped runtime");
 }
 process.exit(0);
 EOF
@@ -3840,7 +3846,205 @@ EOF
   pass "provider preparation disappearance stays retryable after every settlement"
 }
 
-test_unchanged_provider_preparation_rejection_latches() {
+test_selection_change_during_final_auth_rebuilds_before_publication() {
+  local repo home out status
+  repo="$TMP_ROOT/final-auth-selection-race-root"
+  home="$TMP_ROOT/final-auth-selection-race-home"
+  mkdir -p "$home/state" "$home/config"
+  install_pi_branch_extension_fixture "$repo"
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+const prelude = process.env.DRIVER_PRELUDE;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, makeCtx, registryModels, home }; })()`);
+const { fire, dispatch, makeCtx, registryModels, home } = globalThis.__t;
+import { existsSync, readFileSync } from "node:fs";
+
+const modelA = {
+  provider: "final-auth-a",
+  id: "model-a",
+  api: "openai-completions",
+  baseUrl: "https://final-auth-a.invalid/v1",
+  apiKey: "final-auth-a-key",
+};
+const modelB = {
+  provider: "final-auth-b",
+  id: "model-b",
+  api: "openai-completions",
+  baseUrl: "https://final-auth-b.invalid/v1",
+  apiKey: "final-auth-b-key",
+};
+registryModels.push(modelA, modelB);
+globalThis.__fmExtensionProviderConfigs = new Map();
+globalThis.__fmExtensionNativeProviders = new Map();
+const baseCtx = makeCtx({
+  model: { provider: modelA.provider, id: modelA.id },
+  sessionManager: {
+    getSessionFile: () => `${home}/main.jsonl`,
+    getEntries: () => [],
+  },
+});
+const baseRegistry = baseCtx.modelRegistry;
+let markFinalAuthStarted;
+const finalAuthStarted = new Promise((resolve) => { markFinalAuthStarted = resolve; });
+let releaseFinalAuth;
+const finalAuthRelease = new Promise((resolve) => { releaseFinalAuth = resolve; });
+let holdFinalAuth = true;
+const ctx = {
+  ...baseCtx,
+  modelRegistry: {
+    ...baseRegistry,
+    async getApiKeyAndHeaders(model) {
+      if (holdFinalAuth && model.provider === modelA.provider && (globalThis.__fmSessions ?? []).length === 1) {
+        holdFinalAuth = false;
+        markFinalAuthStarted();
+        await finalAuthRelease;
+      }
+      return baseRegistry.getApiKeyAndHeaders(model);
+    },
+  },
+};
+globalThis.__fmOnBranchPrompt = async ({ session }) => {
+  const report = session.options.customTools.find((tool) => tool.name === "fm_branch_report");
+  const recorded = await report.execute(
+    "selected-after-final-auth",
+    { task: "branch-driver", verdict: "routine", summary: "the newest selected provider handled the wake" },
+    undefined,
+    undefined,
+    {},
+  );
+  if (recorded.isError) throw new Error(`replacement provider report failed: ${JSON.stringify(recorded)}`);
+};
+
+await fire("session_start", {}, ctx);
+const raced = dispatch("signal: selection changes during final auth");
+if (!raced.accepted) throw new Error("the final-auth selection race was not accepted for settlement");
+await finalAuthStarted;
+if (existsSync(`${home}/state/.branch-session`)) {
+  throw new Error("the candidate branch was published before its final auth check settled");
+}
+await fire("model_select", { model: { provider: modelB.provider, id: modelB.id } });
+releaseFinalAuth();
+await raced.settlement;
+
+const sessions = globalThis.__fmSessions ?? [];
+if (sessions.length !== 2 || !sessions[0].disposed || sessions[1].disposed) {
+  throw new Error(`the stale construction was not replaced exactly once: ${JSON.stringify(sessions.map((session) => ({ model: session.model, disposed: session.disposed })))}`);
+}
+if (sessions[0].ops.some((operation) => operation.kind === "prompt")) {
+  throw new Error("the stale provider received the accepted wake");
+}
+if (sessions[1].model?.provider !== modelB.provider || sessions[1].model?.id !== modelB.id) {
+  throw new Error(`the replacement did not use the newest selection: ${JSON.stringify(sessions[1].model)}`);
+}
+if ((globalThis.__fmPrompts ?? []).length !== 1) {
+  throw new Error(`the selection race delivered ${globalThis.__fmPrompts?.length ?? 0} branch prompts`);
+}
+if (readFileSync(`${home}/state/.branch-session`, "utf8").trim() !== sessions[1].options.sessionManager.getSessionFile()) {
+  throw new Error("the durable pointer did not name the winning selected-provider session");
+}
+process.exit(0);
+EOF
+  status=$?
+  out=$(cat "$TMP_ROOT/node-output")
+  expect_code 0 "$status" "a selection change during final auth must rebuild before branch publication: $out"
+  pass "final-auth selection changes rebuild before branch publication"
+}
+
+test_auth_drift_before_pointer_publication_leaves_no_stale_pointer() {
+  local repo home out status
+  repo="$TMP_ROOT/pre-pointer-auth-drift-root"
+  home="$TMP_ROOT/pre-pointer-auth-drift-home"
+  mkdir -p "$home/state" "$home/config"
+  install_pi_branch_extension_fixture "$repo"
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+const prelude = process.env.DRIVER_PRELUDE;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, settle, makeCtx, registryModels, home }; })()`);
+const { fire, dispatch, settle, makeCtx, registryModels, home } = globalThis.__t;
+import { existsSync, readFileSync } from "node:fs";
+
+const providerId = "pre-pointer-auth";
+const modelId = "same-model";
+const model = {
+  provider: providerId,
+  id: modelId,
+  api: "openai-completions",
+  baseUrl: "https://pre-pointer-auth.invalid/v1",
+  apiKey: "auth-a",
+};
+registryModels.push(model);
+globalThis.__fmExtensionProviderConfigs = new Map();
+globalThis.__fmExtensionNativeProviders = new Map();
+const baseCtx = makeCtx({
+  model: { provider: providerId, id: modelId },
+  sessionManager: {
+    getSessionFile: () => `${home}/main.jsonl`,
+    getEntries: () => [],
+  },
+});
+const baseRegistry = baseCtx.modelRegistry;
+let liveApiKey = "auth-a";
+const ctx = {
+  ...baseCtx,
+  modelRegistry: {
+    ...baseRegistry,
+    async getApiKeyAndHeaders(selected) {
+      const requestAuth = await baseRegistry.getApiKeyAndHeaders(selected);
+      return selected.provider === providerId ? { ...requestAuth, apiKey: liveApiKey } : requestAuth;
+    },
+  },
+};
+let releaseCreate;
+globalThis.__fmCreateGate = new Promise((resolve) => { releaseCreate = resolve; });
+
+await fire("session_start", {}, ctx);
+const stale = dispatch("signal: auth changes before pointer publication");
+if (!stale.accepted) throw new Error("the pre-pointer auth race was not accepted for settlement");
+await settle(() => globalThis.__fmCreateStarted === 1, "branch session construction before auth drift");
+liveApiKey = "auth-b";
+releaseCreate();
+const staleFailure = await stale.settlement.then(() => null, (error) => error);
+delete globalThis.__fmCreateGate;
+if (!(staleFailure instanceof Error) || !staleFailure.message.includes("provider registration changed before request")) {
+  throw new Error(`the pre-pointer auth drift did not reject the stale construction: ${String(staleFailure)}`);
+}
+if (existsSync(`${home}/state/.branch-session`)) {
+  throw new Error("auth drift left a durable pointer to the rejected branch session");
+}
+const rejected = globalThis.__fmSessions?.[0];
+if (!rejected?.disposed || rejected.ops.some((operation) => operation.kind === "prompt")) {
+  throw new Error("the auth-stale branch was retained or received the wake");
+}
+
+liveApiKey = "auth-a";
+globalThis.__fmOnBranchPrompt = async ({ session }) => {
+  const report = session.options.customTools.find((tool) => tool.name === "fm_branch_report");
+  const recorded = await report.execute(
+    "stable-after-auth-drift",
+    { task: "branch-driver", verdict: "routine", summary: "stable auth rebuilt the supervision branch" },
+    undefined,
+    undefined,
+    {},
+  );
+  if (recorded.isError) throw new Error(`stable auth report failed: ${JSON.stringify(recorded)}`);
+};
+const retry = dispatch("signal: retry after auth drift");
+if (!retry.accepted) throw new Error("proven pre-pointer auth drift latched provider dispatch");
+await retry.settlement;
+const winning = globalThis.__fmSessions?.[1];
+if (!winning || winning.disposed) throw new Error("stable auth did not rebuild a live branch");
+if (readFileSync(`${home}/state/.branch-session`, "utf8").trim() !== winning.options.sessionManager.getSessionFile()) {
+  throw new Error("the durable pointer did not publish the stable retry");
+}
+process.exit(0);
+EOF
+  status=$?
+  out=$(cat "$TMP_ROOT/node-output")
+  expect_code 0 "$status" "auth drift before pointer publication must leave no stale durable pointer: $out"
+  pass "auth drift cannot publish a stale branch-session pointer"
+}
+
+test_unchanged_provider_preparation_failures_back_off_and_preserve_controls() {
   local repo home out status
   repo="$TMP_ROOT/provider-preparation-rejection-control-root"
   home="$TMP_ROOT/provider-preparation-rejection-control-home"
@@ -3871,35 +4075,85 @@ await fire("session_start", {}, makeCtx({
   },
 }));
 
+let now = 1_000_000;
+Date.now = () => now;
 let createAttempts = 0;
 globalThis.__fmModelRuntimeCreate = async (options) => {
   if (options.providerId !== providerId) {
     throw new Error(`the branch constructed the wrong provider: ${JSON.stringify(options)}`);
   }
   createAttempts += 1;
-  throw new Error("synthetic unchanged provider creation failure");
+  if (createAttempts <= 3) throw new Error("synthetic unchanged provider creation failure");
 };
-const failed = dispatch("signal: unchanged provider creation rejects");
-if (!failed.accepted) throw new Error("the unchanged-provider control wake was not accepted");
-const failure = await failed.settlement.then(() => null, (error) => error);
-if (!(failure instanceof Error) || !failure.message.includes("synthetic unchanged provider creation failure")) {
-  throw new Error(`the unchanged-provider rejection was masked: ${String(failure)}`);
+globalThis.__fmOnBranchPrompt = async ({ session }) => {
+  const report = session.options.customTools.find((tool) => tool.name === "fm_branch_report");
+  const recorded = await report.execute(
+    "recovered-provider-construction",
+    { task: "branch-driver", verdict: "routine", summary: "provider construction recovered after backoff" },
+    undefined,
+    undefined,
+    {},
+  );
+  if (recorded.isError) throw new Error(`recovery report failed: ${JSON.stringify(recorded)}`);
+};
+
+for (let attempt = 1; attempt <= 2; attempt += 1) {
+  const failed = dispatch(`signal: unchanged provider creation rejects ${attempt}`);
+  if (!failed.accepted) throw new Error(`unchanged-provider failure ${attempt} latched too early`);
+  const failure = await failed.settlement.then(() => null, (error) => error);
+  if (!(failure instanceof Error) || !failure.message.includes("synthetic unchanged provider creation failure")) {
+    throw new Error(`unchanged-provider failure ${attempt} was masked: ${String(failure)}`);
+  }
 }
 if ((globalThis.__fmSessions ?? []).length !== 0) {
   throw new Error("the rejected unchanged provider built a branch session");
 }
-const latched = dispatch("signal: unchanged provider creation remains latched");
-if (latched.accepted) throw new Error("an unchanged-provider rejection did not latch the branch");
-if (createAttempts !== 1) throw new Error(`the latched branch retried provider creation ${createAttempts} times`);
-if (sentToMain.length !== 0) {
-  throw new Error(`the rejected provider emitted branch success: ${JSON.stringify(sentToMain)}`);
+if (dispatch("signal: provider construction remains inside cooldown").accepted) {
+  throw new Error("repeated unchanged-provider failures did not enter cooldown");
+}
+if (!sentToMain.some((sent) => sent.message.content.includes("paused after repeated provider errors"))) {
+  throw new Error(`repeated construction failures emitted no provider cooldown note: ${JSON.stringify(sentToMain)}`);
+}
+
+now += (5 * 60 * 1000) - 1;
+if (dispatch("signal: construction probe before cooldown").accepted) {
+  throw new Error("provider construction re-probed before the first cooldown elapsed");
+}
+now += 1;
+const failedProbe = dispatch("signal: failed provider construction cooldown probe");
+if (!failedProbe.accepted) throw new Error("provider construction did not admit its first cooldown probe");
+const failedProbeError = await failedProbe.settlement.then(() => null, (error) => error);
+if (!(failedProbeError instanceof Error) || !failedProbeError.message.includes("synthetic unchanged provider creation failure")) {
+  throw new Error(`the failed construction probe lost its provider error: ${String(failedProbeError)}`);
+}
+if (createAttempts !== 3) throw new Error(`the failed cooldown probe made ${createAttempts} construction attempts`);
+
+now += 5 * 60 * 1000;
+if (dispatch("signal: construction probe inside doubled cooldown").accepted) {
+  throw new Error("a failed construction probe did not double the cooldown");
+}
+now += 5 * 60 * 1000;
+globalThis.__fmCreateSessionError = "synthetic non-provider session failure";
+const nonProvider = dispatch("signal: non-provider failure during a provider recovery probe");
+if (!nonProvider.accepted) throw new Error("the doubled cooldown did not admit its next recovery probe");
+const nonProviderFailure = await nonProvider.settlement.then(() => null, (error) => error);
+delete globalThis.__fmCreateSessionError;
+if (!(nonProviderFailure instanceof Error) || !nonProviderFailure.message.includes("synthetic non-provider session failure")) {
+  throw new Error(`the non-provider control lost its failure: ${String(nonProviderFailure)}`);
+}
+if (createAttempts !== 4 || (globalThis.__fmSessions ?? []).length !== 0) {
+  throw new Error(`the non-provider probe crossed its construction boundary: attempts=${createAttempts}`);
+}
+now += 2 * 60 * 60 * 1000;
+if (dispatch("signal: non-provider failure must not gain a provider probe").accepted) {
+  throw new Error("a non-provider failure entered the provider recovery state machine");
 }
 process.exit(0);
 EOF
   status=$?
   out=$(cat "$TMP_ROOT/node-output")
-  expect_code 0 "$status" "an unchanged-provider creation rejection must retain the broken latch: $out"
-  pass "unchanged provider preparation rejection retains the broken latch"
+  expect_code 0 "$status" "unchanged-provider construction failures must back off while non-provider failures stay permanent: $out"
+  pass "provider construction failures back off without broadening non-provider recovery"
 }
 
 test_stable_provider_preflight_auth_timeout_latches() {
@@ -7806,8 +8060,19 @@ if (
 if ((globalThis.__fmSessions ?? []).length !== sessionCount) {
   throw new Error("the stable real auth mismatch reached branch session construction");
 }
-if (dispatch("signal: stable real auth mismatch remains latched").accepted) {
-  throw new Error("the stable real auth mismatch remained retryable as drift");
+const repeatedMismatch = dispatch("signal: stable real auth mismatch repeats");
+if (!repeatedMismatch.accepted) {
+  throw new Error("one stable real auth mismatch latched before the provider-error threshold");
+}
+const repeatedMismatchFailure = await repeatedMismatch.settlement.then(() => null, (error) => error);
+if (
+  !(repeatedMismatchFailure instanceof Error) ||
+  !repeatedMismatchFailure.message.includes("scoped provider composition differs from the live registry")
+) {
+  throw new Error(`the repeated real auth mismatch lost its resolution failure: ${String(repeatedMismatchFailure)}`);
+}
+if (dispatch("signal: repeated stable real auth mismatch remains latched").accepted) {
+  throw new Error("repeated stable real auth mismatches remained retryable as drift");
 }
 process.exit(0);
 EOF
@@ -8281,7 +8546,9 @@ if [ "${FM_PI_PROVIDER_FRESHNESS_REVIEW_ONLY:-0}" = 1 ]; then
   test_supervision_model_rejects_registration_drift_during_effort_selection
   test_stable_scoped_auth_mismatch_latches_resolution
   test_provider_preparation_drift_falls_back_without_latching
-  test_unchanged_provider_preparation_rejection_latches
+  test_selection_change_during_final_auth_rebuilds_before_publication
+  test_auth_drift_before_pointer_publication_leaves_no_stale_pointer
+  test_unchanged_provider_preparation_failures_back_off_and_preserve_controls
   test_stable_provider_preflight_auth_timeout_latches
   test_cached_provider_auth_race_defers_rebuild_until_next_wake
   test_cached_provider_preflight_failure_releases_exact_branch_lease
@@ -8331,7 +8598,9 @@ test_supervision_model_rejects_registration_drift_during_effort_selection
 test_stable_scoped_auth_mismatch_latches_resolution
 test_provider_preparation_drift_falls_back_without_latching
 test_provider_preparation_disappearance_falls_back_without_latching
-test_unchanged_provider_preparation_rejection_latches
+test_selection_change_during_final_auth_rebuilds_before_publication
+test_auth_drift_before_pointer_publication_leaves_no_stale_pointer
+test_unchanged_provider_preparation_failures_back_off_and_preserve_controls
 test_stable_provider_preflight_auth_timeout_latches
 test_cached_provider_auth_race_defers_rebuild_until_next_wake
 test_cached_provider_preflight_failure_releases_exact_branch_lease

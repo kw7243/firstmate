@@ -1736,8 +1736,6 @@ export default function (pi: ExtensionAPI) {
     if (!sessionManager) {
       sessionManager = SessionManager.create(fmRoot, sessionsDir);
     }
-    branchSessionGeneration = branchGeneration;
-    branchSessionFile = sessionManager.getSessionFile() ?? "";
     const preparedDefault = pinned ? undefined : await prepareEffectiveDefaultBranchModel(sessionManager);
     const providerRegistration = pinned?.providerRegistration ?? preparedDefault!.providerRegistration;
     let providerRegistrationListener: ((outcome: ProviderRegistrationWatchOutcome) => void) | null = null;
@@ -1853,9 +1851,6 @@ ${context.command}
       } catch {}
       throw new Error("supervision session was replaced or lost lock ownership");
     }
-    try {
-      writeFileSync(sessionPointer, `${sessionManager.getSessionFile()}\n`);
-    } catch {}
     return {
       session: created.session,
       sessionManager,
@@ -1956,12 +1951,47 @@ ${context.command}
           } catch {}
           throw providerRegistrationDrift;
         }
-        if (!(await actingAsOwner(expectedGeneration))) {
+        if (buildRevision !== branchSelectionRevision) {
+          try {
+            created.session.dispose();
+          } catch {}
+          continue;
+        }
+        let synchronousProviderRegistrationDrift: ExtensionProviderDriftError | null;
+        try {
+          synchronousProviderRegistrationDrift = extensionProviderRegistrationDriftSynchronously(
+            created.providerRegistration,
+          );
+        } catch (error) {
+          try {
+            created.session.dispose();
+          } catch {}
+          throw error;
+        }
+        if (synchronousProviderRegistrationDrift) {
+          try {
+            created.session.dispose();
+          } catch {}
+          throw synchronousProviderRegistrationDrift;
+        }
+        if (buildRevision !== branchSelectionRevision) {
+          try {
+            created.session.dispose();
+          } catch {}
+          continue;
+        }
+        if (!generationOwnsLockSync(expectedGeneration)) {
           try {
             created.session.dispose();
           } catch {}
           throw new Error("supervision session was replaced or lost lock ownership");
         }
+        const createdSessionFile = created.sessionManager.getSessionFile() ?? "";
+        try {
+          writeFileSync(sessionPointer, `${createdSessionFile}\n`);
+        } catch {}
+        branchSessionGeneration = expectedGeneration;
+        branchSessionFile = createdSessionFile;
         branch = {
           ...created,
           generation: expectedGeneration,
@@ -1980,12 +2010,15 @@ ${context.command}
         if (replacementLease && isExtensionProviderFailure(error)) {
           onProviderFallbackLease?.(replacementLease);
         }
-        if (
-          expectedGeneration === generation &&
-          !shuttingDown &&
-          !(error instanceof ExtensionProviderDriftError)
-        ) {
-          branchBroken = error instanceof Error ? error.message : String(error);
+        if (expectedGeneration === generation && !shuttingDown) {
+          const detail = error instanceof Error ? error.message : String(error);
+          if (!(error instanceof ExtensionProviderDriftError)) {
+            if (isExtensionProviderFailure(error)) recordSettledProviderError(detail);
+            else {
+              branchBroken = detail;
+              providerRecovery = null;
+            }
+          }
         }
         throw error;
       }
