@@ -882,6 +882,23 @@ export default function (pi: ExtensionAPI) {
     };
   }
 
+  function createEffectiveProviderCompositionSnapshot(
+    providerId: string,
+    modelId: string,
+    registrationKind: ProviderRegistrationKind,
+    model: unknown,
+    provider: unknown,
+  ): ProviderCompositionSnapshot {
+    return {
+      providerId,
+      modelId,
+      registrationKind,
+      effectiveCompositionDigest: createHash("sha256")
+        .update(stableProviderComposition(effectiveProviderComposition(model, provider)))
+        .digest("hex"),
+    };
+  }
+
   function captureEffectiveProviderComposition(
     registry: ModelRegistry,
     providerId: string,
@@ -893,14 +910,7 @@ export default function (pi: ExtensionAPI) {
     if (!model || !provider) {
       throw new ExtensionProviderResolutionError(`${providerId}/${modelId} has no effective provider composition`);
     }
-    return {
-      providerId,
-      modelId,
-      registrationKind,
-      effectiveCompositionDigest: createHash("sha256")
-        .update(stableProviderComposition(effectiveProviderComposition(model, provider)))
-        .digest("hex"),
-    };
+    return createEffectiveProviderCompositionSnapshot(providerId, modelId, registrationKind, model, provider);
   }
 
   function providerCompositionSnapshotsMatch(
@@ -934,21 +944,28 @@ export default function (pi: ExtensionAPI) {
   }
 
   function assertLiveProviderPreparationCurrent(preparation: LiveProviderPreparation): void {
-    if (mainModelRegistry !== preparation.registry) {
-      throw new ExtensionProviderResolutionError(
-        `live model registry changed during selected-model preparation for ${preparation.snapshot.providerId}`,
+    const drift = () =>
+      new ExtensionProviderDriftError(
+        `provider registration changed during selected-model preparation for ${preparation.snapshot.providerId}`,
       );
+    if (mainModelRegistry !== preparation.registry) {
+      throw drift();
     }
-    const current = captureEffectiveProviderComposition(
-      preparation.registry,
+    const registrationKind = providerRegistrationKind(preparation.registry, preparation.snapshot.providerId);
+    const model = preparation.registry.find(preparation.snapshot.providerId, preparation.snapshot.modelId);
+    const provider = preparation.registry.getProvider(preparation.snapshot.providerId);
+    if (!model || !provider) {
+      throw drift();
+    }
+    const current = createEffectiveProviderCompositionSnapshot(
       preparation.snapshot.providerId,
       preparation.snapshot.modelId,
-      providerRegistrationKind(preparation.registry, preparation.snapshot.providerId),
+      registrationKind,
+      model,
+      provider,
     );
     if (providerCompositionSnapshotsMatch(preparation.snapshot, current)) return;
-    throw new ExtensionProviderDriftError(
-      `provider registration changed during selected-model preparation for ${preparation.snapshot.providerId}`,
-    );
+    throw drift();
   }
 
   async function captureProviderComposition(
@@ -962,7 +979,13 @@ export default function (pi: ExtensionAPI) {
     if (!model || !provider) {
       throw new ExtensionProviderResolutionError(`${providerId}/${modelId} has no effective provider composition`);
     }
-    const initialSnapshot = captureEffectiveProviderComposition(registry, providerId, modelId, registrationKind);
+    const initialSnapshot = createEffectiveProviderCompositionSnapshot(
+      providerId,
+      modelId,
+      registrationKind,
+      model,
+      provider,
+    );
     const requestAuth = await withExtensionProviderDeadline(
       registry.getApiKeyAndHeaders(model),
       "request-auth resolution",
@@ -973,16 +996,24 @@ export default function (pi: ExtensionAPI) {
         `request-auth resolution failed for ${providerId}/${modelId}: ${requestAuth.error}`,
       );
     }
-    const currentSnapshot = captureEffectiveProviderComposition(registry, providerId, modelId, registrationKind);
-    if (!providerCompositionSnapshotsMatch(initialSnapshot, currentSnapshot)) {
+    const currentModel = registry.find(providerId, modelId);
+    const currentProvider = registry.getProvider(providerId);
+    if (!currentModel || !currentProvider) {
       throw new ExtensionProviderCompositionChangedError(
         `provider composition changed during request-auth resolution for ${providerId}/${modelId}`,
       );
     }
-    const currentModel = registry.find(providerId, modelId);
-    const currentProvider = registry.getProvider(providerId);
-    if (!currentModel || !currentProvider) {
-      throw new ExtensionProviderResolutionError(`${providerId}/${modelId} has no effective provider composition`);
+    const currentSnapshot = createEffectiveProviderCompositionSnapshot(
+      providerId,
+      modelId,
+      registrationKind,
+      currentModel,
+      currentProvider,
+    );
+    if (!providerCompositionSnapshotsMatch(initialSnapshot, currentSnapshot)) {
+      throw new ExtensionProviderCompositionChangedError(
+        `provider composition changed during request-auth resolution for ${providerId}/${modelId}`,
+      );
     }
     const currentComposition = effectiveProviderComposition(currentModel, currentProvider);
     const composition = {
@@ -1024,19 +1055,21 @@ export default function (pi: ExtensionAPI) {
     snapshot: ExtensionProviderRegistration,
     driftMessage = `supervision branch provider registration changed before request for ${snapshot.providerId}`,
   ): Promise<void> {
+    const drift = () => new ExtensionProviderDriftError(driftMessage);
     const registry = mainModelRegistry;
     if (!registry) {
-      throw new ExtensionProviderResolutionError(
-        `no live model registry is available for selected provider ${snapshot.providerId}`,
-      );
+      throw drift();
     }
-    const drift = () => new ExtensionProviderDriftError(driftMessage);
     const registrationKind = providerRegistrationKind(registry, snapshot.providerId);
-    const initial = captureEffectiveProviderComposition(
-      registry,
+    const initialModel = registry.find(snapshot.providerId, snapshot.modelId);
+    const initialProvider = registry.getProvider(snapshot.providerId);
+    if (!initialModel || !initialProvider) throw drift();
+    const initial = createEffectiveProviderCompositionSnapshot(
       snapshot.providerId,
       snapshot.modelId,
       registrationKind,
+      initialModel,
+      initialProvider,
     );
     if (!providerCompositionSnapshotsMatch(snapshot, initial)) throw drift();
     let current: ExtensionProviderRegistration;
@@ -1047,16 +1080,18 @@ export default function (pi: ExtensionAPI) {
       throw error;
     }
     if (mainModelRegistry !== registry) {
-      throw new ExtensionProviderResolutionError(
-        `live model registry changed during provider freshness check for ${snapshot.providerId}`,
-      );
+      throw drift();
     }
     const finalRegistrationKind = providerRegistrationKind(registry, snapshot.providerId);
-    const final = captureEffectiveProviderComposition(
-      registry,
+    const finalModel = registry.find(snapshot.providerId, snapshot.modelId);
+    const finalProvider = registry.getProvider(snapshot.providerId);
+    if (!finalModel || !finalProvider) throw drift();
+    const final = createEffectiveProviderCompositionSnapshot(
       snapshot.providerId,
       snapshot.modelId,
       finalRegistrationKind,
+      finalModel,
+      finalProvider,
     );
     if (
       !providerCompositionSnapshotsMatch(snapshot, final) ||
