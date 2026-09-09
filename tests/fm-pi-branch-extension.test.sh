@@ -3553,18 +3553,23 @@ EOF
 }
 
 test_provider_preparation_disappearance_falls_back_without_latching() {
-  local repo home out status
-  repo="$TMP_ROOT/provider-preparation-disappearance-root"
-  home="$TMP_ROOT/provider-preparation-disappearance-home"
-  mkdir -p "$home/state" "$home/config"
-  install_pi_branch_extension_fixture "$repo"
-  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
-    DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+  local repo home out status settlement reject_creation
+  for settlement in resolved rejected; do
+    repo="$TMP_ROOT/provider-preparation-disappearance-$settlement-root"
+    home="$TMP_ROOT/provider-preparation-disappearance-$settlement-home"
+    reject_creation=0
+    [ "$settlement" = rejected ] && reject_creation=1
+    mkdir -p "$home/state" "$home/config"
+    install_pi_branch_extension_fixture "$repo"
+    REJECT_SCOPED_CREATION="$reject_creation" \
+      PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+      DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 const prelude = process.env.DRIVER_PRELUDE;
 await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, makeCtx, registryModels, sentToMain, home }; })()`);
 const { fire, dispatch, makeCtx, registryModels, sentToMain, home } = globalThis.__t;
 import { existsSync } from "node:fs";
 
+const rejectScopedCreation = process.env.REJECT_SCOPED_CREATION === "1";
 const providerId = "static-disappearance";
 const modelId = "same-model";
 const modelA = {
@@ -3601,6 +3606,7 @@ globalThis.__fmModelRuntimeCreate = async (options) => {
   }
   markCreateStarted();
   await createRelease;
+  if (rejectScopedCreation) throw new Error("synthetic scoped creation rejection");
 };
 const stale = dispatch("signal: provider disappears during branch preparation");
 if (!stale.accepted) throw new Error("the preparation-disappearance wake was not accepted");
@@ -3650,10 +3656,73 @@ if (existsSync(`${home}/config/supervision-branch-model`)) {
 }
 process.exit(0);
 EOF
+    status=$?
+    out=$(cat "$TMP_ROOT/node-output")
+    expect_code 0 "$status" "$settlement provider disappearance during preparation must remain retryable: $out"
+  done
+  pass "provider preparation disappearance stays retryable after every settlement"
+}
+
+test_unchanged_provider_preparation_rejection_latches() {
+  local repo home out status
+  repo="$TMP_ROOT/provider-preparation-rejection-control-root"
+  home="$TMP_ROOT/provider-preparation-rejection-control-home"
+  mkdir -p "$home/state" "$home/config"
+  install_pi_branch_extension_fixture "$repo"
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+const prelude = process.env.DRIVER_PRELUDE;
+await eval(`(async () => { ${prelude}; globalThis.__t = { fire, dispatch, makeCtx, registryModels, sentToMain, home }; })()`);
+const { fire, dispatch, makeCtx, registryModels, sentToMain, home } = globalThis.__t;
+
+const providerId = "static-rejection-control";
+const modelId = "same-model";
+registryModels.push({
+  provider: providerId,
+  id: modelId,
+  api: "openai-completions",
+  baseUrl: "https://unchanged.invalid/v1",
+  apiKey: "unchanged-key",
+});
+globalThis.__fmExtensionProviderConfigs = new Map();
+globalThis.__fmExtensionNativeProviders = new Map();
+await fire("session_start", {}, makeCtx({
+  model: { provider: providerId, id: modelId },
+  sessionManager: {
+    getSessionFile: () => `${home}/main.jsonl`,
+    getEntries: () => [],
+  },
+}));
+
+let createAttempts = 0;
+globalThis.__fmModelRuntimeCreate = async (options) => {
+  if (options.providerId !== providerId) {
+    throw new Error(`the branch constructed the wrong provider: ${JSON.stringify(options)}`);
+  }
+  createAttempts += 1;
+  throw new Error("synthetic unchanged provider creation failure");
+};
+const failed = dispatch("signal: unchanged provider creation rejects");
+if (!failed.accepted) throw new Error("the unchanged-provider control wake was not accepted");
+const failure = await failed.settlement.then(() => null, (error) => error);
+if (!(failure instanceof Error) || !failure.message.includes("synthetic unchanged provider creation failure")) {
+  throw new Error(`the unchanged-provider rejection was masked: ${String(failure)}`);
+}
+if ((globalThis.__fmSessions ?? []).length !== 0) {
+  throw new Error("the rejected unchanged provider built a branch session");
+}
+const latched = dispatch("signal: unchanged provider creation remains latched");
+if (latched.accepted) throw new Error("an unchanged-provider rejection did not latch the branch");
+if (createAttempts !== 1) throw new Error(`the latched branch retried provider creation ${createAttempts} times`);
+if (sentToMain.length !== 0) {
+  throw new Error(`the rejected provider emitted branch success: ${JSON.stringify(sentToMain)}`);
+}
+process.exit(0);
+EOF
   status=$?
   out=$(cat "$TMP_ROOT/node-output")
-  expect_code 0 "$status" "provider disappearance during preparation must remain retryable: $out"
-  pass "provider preparation disappearance falls back without latching"
+  expect_code 0 "$status" "an unchanged-provider creation rejection must retain the broken latch: $out"
+  pass "unchanged provider preparation rejection retains the broken latch"
 }
 
 test_branch_effort_pin_applies_and_absent_pin_follows_main() {
@@ -7387,6 +7456,7 @@ test_supervision_model_command_persists_and_rebinds_the_live_branch
 test_supervision_model_rejects_registration_race_during_preparation
 test_provider_preparation_drift_falls_back_without_latching
 test_provider_preparation_disappearance_falls_back_without_latching
+test_unchanged_provider_preparation_rejection_latches
 test_supervision_model_picker_is_bounded_searchable_and_branch_only
 test_branch_model_picker_keeps_follow_main_first_under_ranking
 test_branch_effort_pin_applies_and_absent_pin_follows_main

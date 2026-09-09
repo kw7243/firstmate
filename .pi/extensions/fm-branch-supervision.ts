@@ -207,6 +207,27 @@ async function withExtensionProviderDeadline<T>(
   if (outcome.kind === "error") throw outcome.error;
   return outcome.value;
 }
+async function withExtensionProviderFreshness<T>(
+  operation: Promise<T>,
+  assertCurrent: () => void,
+): Promise<T> {
+  const outcome = await operation.then(
+    (value) => ({ kind: "value" as const, value }),
+    (error: unknown) => ({ kind: "error" as const, error }),
+  );
+  let freshnessFailure: { error: unknown } | null = null;
+  try {
+    assertCurrent();
+  } catch (error) {
+    freshnessFailure = { error };
+  }
+  if (outcome.kind === "error") {
+    if (freshnessFailure?.error instanceof ExtensionProviderDriftError) throw freshnessFailure.error;
+    throw outcome.error;
+  }
+  if (freshnessFailure) throw freshnessFailure.error;
+  return outcome.value;
+}
 const PROCESSING_INSTRUCTION =
   "This is a supervision processing request delivered automatically by the supervision branch. " +
   "It was not typed by the captain. " +
@@ -812,27 +833,31 @@ export default function (pi: ExtensionAPI) {
     preparation: LiveProviderPreparation,
   ): Promise<ModelRuntime> {
     assertLiveProviderPreparationCurrent(preparation);
-    const modelRuntime = await createExtensionProviderRuntime(providerId);
-    assertLiveProviderPreparationCurrent(preparation);
+    const assertCurrent = () => assertLiveProviderPreparationCurrent(preparation);
+    const modelRuntime = await withExtensionProviderFreshness(createExtensionProviderRuntime(providerId), assertCurrent);
     const controller = new AbortController();
     try {
-      const result = await withExtensionProviderDeadline(
-        modelRuntime.refresh({ providers: [providerId], allowNetwork: false, signal: controller.signal }),
-        "availability refresh",
-        () => controller.abort(),
+      await withExtensionProviderFreshness(
+        withExtensionProviderDeadline(
+          modelRuntime.refresh({ providers: [providerId], allowNetwork: false, signal: controller.signal }),
+          "availability refresh",
+          () => controller.abort(),
+        ).then((result) => {
+          const error = result.errors.get(providerId);
+          if (error) {
+            throw new ExtensionProviderResolutionError(
+              `extension-provider availability refresh failed for ${providerId}: ${error.message}`,
+            );
+          }
+          if (modelRuntime.getProviders().some((provider) => provider.id !== providerId)) {
+            throw new ExtensionProviderResolutionError(
+              `Pi ${VERSION} added unrelated providers while refreshing the scoped runtime for ${providerId}`,
+            );
+          }
+          return result;
+        }),
+        assertCurrent,
       );
-      assertLiveProviderPreparationCurrent(preparation);
-      const error = result.errors.get(providerId);
-      if (error) {
-        throw new ExtensionProviderResolutionError(
-          `extension-provider availability refresh failed for ${providerId}: ${error.message}`,
-        );
-      }
-      if (modelRuntime.getProviders().some((provider) => provider.id !== providerId)) {
-        throw new ExtensionProviderResolutionError(
-          `Pi ${VERSION} added unrelated providers while refreshing the scoped runtime for ${providerId}`,
-        );
-      }
     } catch (error) {
       if (error instanceof ExtensionProviderTimeoutError || error instanceof ExtensionProviderResolutionError) throw error;
       throw new ExtensionProviderResolutionError(
@@ -973,6 +998,7 @@ export default function (pi: ExtensionAPI) {
     providerId: string,
     modelId: string,
     registrationKind: ProviderRegistrationKind,
+    assertCurrent: () => void,
   ): Promise<ExtensionProviderRegistration> {
     const model = registry.find(providerId, modelId);
     const provider = registry.getProvider(providerId);
@@ -986,16 +1012,21 @@ export default function (pi: ExtensionAPI) {
       model,
       provider,
     );
-    const requestAuth = await withExtensionProviderDeadline(
-      registry.getApiKeyAndHeaders(model),
-      "request-auth resolution",
-      () => undefined,
+    const requestAuth = await withExtensionProviderFreshness(
+      withExtensionProviderDeadline(
+        registry.getApiKeyAndHeaders(model),
+        "request-auth resolution",
+        () => undefined,
+      ).then((result) => {
+        if (!result.ok) {
+          throw new ExtensionProviderResolutionError(
+            `request-auth resolution failed for ${providerId}/${modelId}: ${result.error}`,
+          );
+        }
+        return result;
+      }),
+      assertCurrent,
     );
-    if (!requestAuth.ok) {
-      throw new ExtensionProviderResolutionError(
-        `request-auth resolution failed for ${providerId}/${modelId}: ${requestAuth.error}`,
-      );
-    }
     const currentModel = registry.find(providerId, modelId);
     const currentProvider = registry.getProvider(providerId);
     if (!currentModel || !currentProvider) {
@@ -1060,41 +1091,34 @@ export default function (pi: ExtensionAPI) {
     if (!registry) {
       throw drift();
     }
-    const registrationKind = providerRegistrationKind(registry, snapshot.providerId);
-    const initialModel = registry.find(snapshot.providerId, snapshot.modelId);
-    const initialProvider = registry.getProvider(snapshot.providerId);
-    if (!initialModel || !initialProvider) throw drift();
-    const initial = createEffectiveProviderCompositionSnapshot(
+    const assertCurrent = (): ProviderRegistrationKind => {
+      if (mainModelRegistry !== registry) throw drift();
+      const registrationKind = providerRegistrationKind(registry, snapshot.providerId);
+      const model = registry.find(snapshot.providerId, snapshot.modelId);
+      const provider = registry.getProvider(snapshot.providerId);
+      if (!model || !provider) throw drift();
+      const current = createEffectiveProviderCompositionSnapshot(
+        snapshot.providerId,
+        snapshot.modelId,
+        registrationKind,
+        model,
+        provider,
+      );
+      if (!providerCompositionSnapshotsMatch(snapshot, current)) throw drift();
+      return registrationKind;
+    };
+    const registrationKind = assertCurrent();
+    const current = await captureProviderComposition(
+      registry,
       snapshot.providerId,
       snapshot.modelId,
       registrationKind,
-      initialModel,
-      initialProvider,
+      () => {
+        assertCurrent();
+      },
     );
-    if (!providerCompositionSnapshotsMatch(snapshot, initial)) throw drift();
-    let current: ExtensionProviderRegistration;
-    try {
-      current = await captureProviderComposition(registry, snapshot.providerId, snapshot.modelId, registrationKind);
-    } catch (error) {
-      if (error instanceof ExtensionProviderCompositionChangedError) throw drift();
-      throw error;
-    }
-    if (mainModelRegistry !== registry) {
-      throw drift();
-    }
-    const finalRegistrationKind = providerRegistrationKind(registry, snapshot.providerId);
-    const finalModel = registry.find(snapshot.providerId, snapshot.modelId);
-    const finalProvider = registry.getProvider(snapshot.providerId);
-    if (!finalModel || !finalProvider) throw drift();
-    const final = createEffectiveProviderCompositionSnapshot(
-      snapshot.providerId,
-      snapshot.modelId,
-      finalRegistrationKind,
-      finalModel,
-      finalProvider,
-    );
+    assertCurrent();
     if (
-      !providerCompositionSnapshotsMatch(snapshot, final) ||
       current.registrationKind !== snapshot.registrationKind ||
       current.compositionDigest !== snapshot.compositionDigest
     ) {
@@ -1144,6 +1168,7 @@ export default function (pi: ExtensionAPI) {
       provider,
       modelId,
       livePreparation.snapshot.registrationKind,
+      () => assertLiveProviderPreparationCurrent(livePreparation),
     );
     assertLiveProviderPreparationCurrent(livePreparation);
     if (!providerCompositionSnapshotsMatch(livePreparation.snapshot, providerRegistration)) {
