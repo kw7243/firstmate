@@ -73,7 +73,7 @@ That override is what keeps "Follow main" honest: a branch conversation that ran
 Only when main's own model is genuinely unknown does an unpinned build pass no model override; it still supplies a bounded runtime prepared for Pi's recorded or configured default, and falls safely back to main when that default cannot be identified without all-provider construction.
 When main's model is known but cannot be resolved or lacks credentials in the isolated branch runtime, the branch rejects construction to the watcher's captain-facing main path, and the command says plainly that supervision is falling back to main.
 A pin naming a model Pi cannot hand back, because the model is unknown or has no configured credentials, is never silently downgraded onto main's model: the branch refuses to build and rejects the accepted wake to the watcher's captain-facing main path, exactly as any other unreachable branch does.
-Picking also releases the live branch so the next wake reopens this session's own branch conversation under the new model without waiting for a session replacement.
+Picking releases the live branch; an unpublished in-flight build is discarded and rebuilt under the new choice before it can receive its accepted wake, while otherwise the next wake reopens this session's own branch conversation without waiting for a session replacement.
 
 The effort file holds one Pi thinking level followed by one newline, and the two pins are independent: a captain may pin a model, an effort, both, or neither.
 The effort step runs after the model step because the effective branch model decides which levels exist: its menu is Pi's own supported-level list, so a model that maps no extended levels simply does not offer them and a non-reasoning model offers only `off`.
@@ -89,6 +89,7 @@ An effort token Pi would not recognize at all is treated as no pin rather than p
 
 Cancelling the model picker cancels the whole command and changes neither choice.
 Cancelling only the effort picker keeps the standing effort choice and still applies the model pick made in the same run, and the command's one closing message reports both choices as they will actually take effect.
+If the selected provider's effective model, routing, headers, or request authorization drifts while the flow is settling, the command saves neither choice and leaves both prior pins intact.
 Both choices are local to each Firstmate home and are not part of secondmate inherited configuration, the same as the Pi Calm preference; a secondmate home pins its own supervision model and effort with its own `/supervision-model`.
 
 ## Backlog backend (.tasks.toml / config/backlog-backend)

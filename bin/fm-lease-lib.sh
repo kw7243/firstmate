@@ -31,8 +31,10 @@
 #     process, and a non-Pi home never honors a leftover Pi lease. A lease held by the
 #     live current session but an abandoned branch conversation is recovered
 #     by the branch extension's generation-activation cleanup. Branch claims
-#     carry the current conversation generation so failed-turn cleanup cannot
-#     delete a same-process replacement conversation's lease.
+#     carry the current conversation generation, and provider-fallback cleanup
+#     is armed only with the exact captured holder and generation, so failed-turn
+#     or fallback cleanup cannot delete a same-process replacement conversation's
+#     lease. Non-provider failures never arm that targeted fallback cleanup.
 #
 # THREAT MODEL (deliberate, captain-decided): these guards are
 # CONFUSED-AGENT-GRADE, the same grade bin/fm-gate-refuse-lib.sh documents

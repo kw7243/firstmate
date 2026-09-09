@@ -214,18 +214,28 @@ if (scopedRuntimeAvailable) {
     throw new Error("branch session store directory was not created");
   }
 } else {
-  if (!offerFailure.message.includes("no supported provider-scoped ModelRuntime")) {
-    throw new Error(`the missing scoped runtime boundary reported the wrong failure: ${offerFailure.message}`);
+  // With Follow-main and a deliberately empty live registry, resolution may
+  // reject before it reaches the scoped-runtime capability check. The pinned
+  // probe below supplies a concrete provider and still proves that boundary.
+  if (
+    !offerFailure.message.includes("no bounded effective default model") &&
+    !offerFailure.message.includes("no supported provider-scoped ModelRuntime")
+  ) {
+    throw new Error(`the empty-registry fallback reported the wrong failure: ${offerFailure.message}`);
   }
   if (existsSync(`${home}/state/.branch-session`)) {
     throw new Error("Pi without a scoped runtime constructor persisted a branch session pointer");
   }
 }
 
-// A model pin the branch's REAL runtime cannot resolve must refuse the build
-// and reject the offer back to watcher-owned main delivery rather than
-// silently running the branch on whatever model main would have used.
-writeFileSync(`${home}/config/supervision-branch-model`, "openai/no-such-live-model\n");
+// A real catalog model with no configured credentials is unusable by this
+// empty agent dir. Pinning it reaches the scoped-runtime boundary on releases
+// without that API, and on a compatible release must still refuse the build
+// rather than silently running the branch on another model.
+const unusableLiveModel = modelRegistry.getAll().find((model) => model.provider && model.id);
+if (!unusableLiveModel) throw new Error("the real SDK exposed no catalog model for the unusable-pin probe");
+const unusableLivePin = `${unusableLiveModel.provider}/${unusableLiveModel.id}`;
+writeFileSync(`${home}/config/supervision-branch-model`, `${unusableLivePin}\n`);
 for (const handler of piHandlers.get("session_shutdown") ?? []) {
   await handler({ type: "session_shutdown", reason: "new" }, sessionCtx);
 }
@@ -242,7 +252,7 @@ if (offers.length !== 2 || !offers[1].accepted) {
 const pinFailure = await offers[1].settlement.then(() => null, (error) => error);
 if (!(pinFailure instanceof Error) ||
     (scopedRuntimeAvailable &&
-      (!pinFailure.message.includes("openai/no-such-live-model") ||
+      (!pinFailure.message.includes(unusableLivePin) ||
         !pinFailure.message.includes("supervision model pin"))) ||
     (!scopedRuntimeAvailable && !pinFailure.message.includes("no supported provider-scoped ModelRuntime"))) {
   throw new Error(`the rejected real-SDK settlement did not name the unusable pin: ${String(pinFailure)}`);
