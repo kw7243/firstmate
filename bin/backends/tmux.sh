@@ -107,15 +107,14 @@ fm_backend_tmux_current_path() {  # <target>
   tmux display-message -p -t "$1" '#{pane_current_path}' 2>/dev/null
 }
 
-# fm_backend_tmux_send_text_line: send one literal shell line and submit it with
-# C-j, Readline's unambiguous accept-line key. Return/C-m can be rebound by
-# ble.sh to insert a newline while rapid input is still being processed, which
-# leaves consecutive spawn-time commands concatenated in a multiline buffer.
-# Used only for fixed spawn-time shell commands (`treehouse get` and exports),
-# with no composer verification.
+# fm_backend_tmux_send_text_line: send one shell line and C-j in one tmux
+# request. C-j is Readline's unambiguous accept-line key; Return/C-m can be
+# rebound by ble.sh to insert a newline while rapid input is still being
+# processed, leaving consecutive spawn-time commands concatenated in a
+# multiline buffer. Used only for fixed spawn-time shell commands (`treehouse
+# get` and exports), with no composer verification.
 fm_backend_tmux_send_text_line() {  # <target> <text>
-  tmux send-keys -t "$1" -l "$2" || return
-  tmux send-keys -t "$1" C-j
+  tmux send-keys -t "$1" "$2" C-j
 }
 
 # fm_backend_tmux_send_literal: send TEXT as literal bytes with no

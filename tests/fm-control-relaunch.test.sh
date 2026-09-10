@@ -68,17 +68,6 @@ case "${1:-}" in
       esac
     done
     payload=${1:-}
-    case "$payload" in
-      'export GOTMPDIR='*)
-        if [ -n "${FM_FAKE_TRACE_PREPARE:-}" ]; then
-          : > "$FM_FAKE_TRACE_PREPARE"
-          while [ ! -e "$FM_FAKE_TRACE_RELEASE" ]; do /bin/sleep 0.01; done
-        fi
-        ;;
-      'export TRACEPARENT='*)
-        [ -z "${FM_FAKE_TRACE_EXPORTED:-}" ] || : > "$FM_FAKE_TRACE_EXPORTED"
-        ;;
-    esac
     if [ "$literal" = 1 ]; then
       printf '%s\n' "$payload" >> "$D/literal"
       case "$payload" in
@@ -93,6 +82,17 @@ case "${1:-}" in
       esac
     else
       printf '%s\n' "$payload" >> "$D/keys"
+      case "$payload" in
+        'export GOTMPDIR='*)
+          if [ -n "${FM_FAKE_TRACE_PREPARE:-}" ]; then
+            : > "$FM_FAKE_TRACE_PREPARE"
+            while [ ! -e "$FM_FAKE_TRACE_RELEASE" ]; do /bin/sleep 0.01; done
+          fi
+          ;;
+        'export TRACEPARENT='*)
+          [ -z "${FM_FAKE_TRACE_EXPORTED:-}" ] || : > "$FM_FAKE_TRACE_EXPORTED"
+          ;;
+      esac
     fi
     exit 0 ;;
   display-message)

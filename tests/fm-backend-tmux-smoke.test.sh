@@ -103,15 +103,42 @@ case "$out" in
   *captain-on-deck-line*) : ;;
   *) fail "real tmux: fm_backend_tmux_send_text_line did not submit and echo the line"$'\n'"$out" ;;
 esac
-pass "real tmux: fm_backend_tmux_send_text_line sends literal text and submits with C-j"
+pass "real tmux: fm_backend_tmux_send_text_line sends text and submits atomically with C-j"
 
-# --- rapid shell lines with ble.sh -------------------------------------------
+# --- rapid shell lines with divergent C-m/C-j bindings ----------------------
 
-# ble.sh deliberately distinguishes Return/C-m from C-j while its multiline
-# editor is active. Drive the public spawn-time shell-line primitive three
-# times without sleeps in a fresh shell to pin the delivery race that can leave
-# every command unsubmitted and concatenated in a multiline buffer. A portable
-# Readline binding preserves the same C-m/C-j divergence when ble.sh is absent.
+# Drive the public spawn-time shell-line primitive three times without sleeps
+# against a portable Readline binding that makes Return/C-m insert a newline.
+# The commands execute only if the primitive submits each one with C-j.
+READLINE_WINDOW="fm-readline-shell-line"
+READLINE_TARGET="$SESSION:$READLINE_WINDOW"
+tmux new-window -d -t "$SESSION:" -n "$READLINE_WINDOW" -c "${HOME:-/tmp}" \
+  'bash --noprofile --norc -i' \
+  || fail "real tmux: could not create the disposable Readline test window"
+# shellcheck disable=SC2016
+READLINE_SETUP='__fm_return_newline() { READLINE_LINE="${READLINE_LINE:0:READLINE_POINT}"$'\''\\n'\''"${READLINE_LINE:READLINE_POINT}"; READLINE_POINT=$((READLINE_POINT + 1)); }; bind -x '\''"\\C-m":__fm_return_newline'\''; printf '\''readline-shell-%s\\n'\'' ready'
+tmux send-keys -t "$READLINE_TARGET" -l "$READLINE_SETUP"
+tmux send-keys -t "$READLINE_TARGET" C-j
+wait_for_capture_text "$READLINE_TARGET" "readline-shell-ready" \
+  || fail "the disposable shell did not install the Readline C-m newline fixture"
+
+fm_backend_tmux_send_text_line "$READLINE_TARGET" "printf 'readline-first-%s\\n' executed"
+fm_backend_tmux_send_text_line "$READLINE_TARGET" "printf 'readline-second-%s\\n' executed"
+fm_backend_tmux_send_text_line "$READLINE_TARGET" "printf 'readline-third-%s\\n' executed"
+wait_for_capture_text "$READLINE_TARGET" "readline-third-executed" \
+  || fail "rapid spawn-time shell lines were left unsubmitted by the Readline fixture"
+out=$(fm_backend_tmux_capture "$READLINE_TARGET" 40) \
+  || fail "could not capture the disposable Readline test window"
+for token in readline-first-executed readline-second-executed readline-third-executed; do
+  case "$out" in
+    *"$token"*) : ;;
+    *) fail "rapid spawn-time shell line did not execute independently: $token"$'\n'"$out" ;;
+  esac
+done
+pass "real tmux + Readline C-m newline fixture: rapid spawn-time shell lines execute independently"
+
+# When ble.sh is installed, run the same case against its real multiline
+# editor as an additional integration check.
 BLESH=${FM_TEST_BLESH:-${HOME:-}/.local/share/blesh/ble.sh}
 if [ -r "$BLESH" ]; then
   BLE_WINDOW="fm-ble-shell-line"
@@ -140,33 +167,6 @@ if [ -r "$BLESH" ]; then
     esac
   done
   pass "real tmux + ble.sh: rapid spawn-time shell lines execute independently"
-else
-  READLINE_WINDOW="fm-readline-shell-line"
-  READLINE_TARGET="$SESSION:$READLINE_WINDOW"
-  tmux new-window -d -t "$SESSION:" -n "$READLINE_WINDOW" -c "${HOME:-/tmp}" \
-    'bash --noprofile --norc -i' \
-    || fail "real tmux: could not create the disposable Readline test window"
-  # shellcheck disable=SC2016
-  READLINE_SETUP='__fm_return_newline() { READLINE_LINE="${READLINE_LINE:0:READLINE_POINT}"$'\''\\n'\''"${READLINE_LINE:READLINE_POINT}"; READLINE_POINT=$((READLINE_POINT + 1)); }; bind -x '\''"\\C-m":__fm_return_newline'\''; printf '\''readline-shell-%s\\n'\'' ready'
-  tmux send-keys -t "$READLINE_TARGET" -l "$READLINE_SETUP"
-  tmux send-keys -t "$READLINE_TARGET" C-j
-  wait_for_capture_text "$READLINE_TARGET" "readline-shell-ready" \
-    || fail "the disposable shell did not install the Readline C-m newline fixture"
-
-  fm_backend_tmux_send_text_line "$READLINE_TARGET" "printf 'readline-first-%s\\n' executed"
-  fm_backend_tmux_send_text_line "$READLINE_TARGET" "printf 'readline-second-%s\\n' executed"
-  fm_backend_tmux_send_text_line "$READLINE_TARGET" "printf 'readline-third-%s\\n' executed"
-  wait_for_capture_text "$READLINE_TARGET" "readline-third-executed" \
-    || fail "rapid spawn-time shell lines were left unsubmitted by the Readline fixture"
-  out=$(fm_backend_tmux_capture "$READLINE_TARGET" 40) \
-    || fail "could not capture the disposable Readline test window"
-  for token in readline-first-executed readline-second-executed readline-third-executed; do
-    case "$out" in
-      *"$token"*) : ;;
-      *) fail "rapid spawn-time shell line did not execute independently: $token"$'\n'"$out" ;;
-    esac
-  done
-  pass "real tmux + Readline C-m newline fixture: rapid spawn-time shell lines execute independently"
 fi
 
 # --- send_literal + send_key(Enter), the two-step form fm-spawn.sh uses for the
