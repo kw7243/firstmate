@@ -1,0 +1,28 @@
+environment: tmux 3.4; GNU bash, version 5.2.21(1)-release (x86_64-pc-linux-gnu); ble.sh=/home/ubuntu/.local/share/blesh/ble.sh
+
+baseline Enter/C-m path: executed=0/3 (commands remain pending)
+bash-5.2$ __fm_return_newline() { READLINE_LINE="${READLINE_LINE:0:READLINE_POINT}"$'\n'"${READLINE_LINE:READLINE_POINT}"; READLINE_POINT=$((READLINE_POINT + 1)); }; bind -x '"\C-m
+":__fm_return_newline'; printf 'readline-shell-%s\n' ready
+readline-shell-ready
+bash-5.2$ printf 'baseline-one-%s\n' executed
+printf 'baseline-two-%s\n' executed
+printf 'baseline-three-%s\n' executed
+
+target atomic C-j path: executed=3/3
+bash-5.2$ printf 'target-one-%s\n' executed
+target-one-executed
+bash-5.2$ printf 'target-two-%s\n' executed
+target-two-executed
+bash-5.2$ printf 'target-three-%s\n' executed
+target-three-executed
+bash-5.2$
+
+real ble.sh ordinary Codex-worker launch: started=yes
+bash-5.2$ source -- /home/ubuntu/.local/share/blesh/ble.sh --attach=none; ble-attach; printf 'blesh-%s\n' ready
+bash-5.2$ blesh-ready
+bash-5.2$ export GOTMPDIR=/tmp/ordinary-crewmate-gotmp
+bash-5.2$ export FM_TASK_ID=ordinary-crewmate
+bash-5.2$ export TRACEPARENT=00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01
+bash-5.2$ printf 'ordinary-codex-worker-%s GOTMPDIR=%s FM_TASK_ID=%s TRACEPARENT=%s\n' started "$GOTMPDIR" "$FM_TASK_ID" "$TRACEPARENT"
+ordinary-codex-worker-started GOTMPDIR=/tmp/ordinary-crewmate-gotmp FM_TASK_ID=ordinary-crewmate TRACEPARENT=00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01
+bash-5.2$
