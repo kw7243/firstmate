@@ -1,0 +1,8 @@
+Script started on 2026-09-10 04:11:51+00:00 [COMMAND="/tmp/fm-tmux-base.fBOJZV/tests/fm-backend-tmux-smoke.test.sh" <not executed on terminal>]
+@1
+ok - real tmux: fm_backend_tmux_create_task creates a window and refuses a duplicate
+ok - real tmux: fm_backend_tmux_send_text_line sends text and submits atomically with C-j
+ok - real tmux + Readline fixture: Return/C-m demonstrably leaves a shell line pending
+not ok - rapid spawn-time shell lines were left unsubmitted by the Readline fixture
+
+Script done on 2026-09-10 04:12:04+00:00 [COMMAND_EXIT_CODE="1"]

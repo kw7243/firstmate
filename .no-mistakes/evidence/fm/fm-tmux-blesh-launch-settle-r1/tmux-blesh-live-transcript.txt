@@ -1,0 +1,14 @@
+Script started on 2026-09-10 04:06:18+00:00 [COMMAND="./tests/fm-backend-tmux-smoke.test.sh" <not executed on terminal>]
+@1
+ok - real tmux: fm_backend_tmux_create_task creates a window and refuses a duplicate
+ok - real tmux: fm_backend_tmux_send_text_line sends text and submits atomically with C-j
+ok - real tmux + Readline fixture: Return/C-m demonstrably leaves a shell line pending
+ok - real tmux + Readline C-m newline fixture: rapid spawn-time shell lines execute independently
+ok - real tmux + ble.sh: rapid spawn-time shell lines execute independently
+ok - real tmux: fm_backend_tmux_send_literal + fm_backend_tmux_send_key Enter submit as two separate steps
+ok - real tmux: fm_backend_tmux_capture's -S -N bound trims old history for a small window and reaches it for a large one
+ok - real tmux: fm_backend_tmux_resolve_bare_selector (list-live) finds the created window by name
+ok - real tmux: fm_backend_tmux_resolve_bare_selector fails for a window that does not exist
+ok - real tmux: kill removes the window and the readable session inventory authoritatively classifies it missing
+
+Script done on 2026-09-10 04:06:21+00:00 [COMMAND_EXIT_CODE="0"]
