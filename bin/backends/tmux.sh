@@ -107,12 +107,15 @@ fm_backend_tmux_current_path() {  # <target>
   tmux display-message -p -t "$1" '#{pane_current_path}' 2>/dev/null
 }
 
-# fm_backend_tmux_send_text_line: send one line of TEXT then Enter, with no
-# composer verification - used for the fixed spawn-time commands
-# (`treehouse get`, the GOTMPDIR export) that already ran this exact sequence
-# inline in fm-spawn.sh. Mirrors `tmux send-keys -t "$T" "<text>" Enter`.
+# fm_backend_tmux_send_text_line: send one literal shell line and submit it with
+# C-j, Readline's unambiguous accept-line key. Return/C-m can be rebound by
+# ble.sh to insert a newline while rapid input is still being processed, which
+# leaves consecutive spawn-time commands concatenated in a multiline buffer.
+# Used only for fixed spawn-time shell commands (`treehouse get` and exports),
+# with no composer verification.
 fm_backend_tmux_send_text_line() {  # <target> <text>
-  tmux send-keys -t "$1" "$2" Enter
+  tmux send-keys -t "$1" -l "$2" || return
+  tmux send-keys -t "$1" C-j
 }
 
 # fm_backend_tmux_send_literal: send TEXT as literal bytes with no

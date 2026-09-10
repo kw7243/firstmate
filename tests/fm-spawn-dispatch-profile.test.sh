@@ -84,7 +84,7 @@ make_seeded_secondmate_home() {
 }
 
 run_spawn() {
-  local home=$1 wt=$2 fakebin=$3 launchlog=$4
+  local home=$1 wt=$2 fakebin=$3 launchlog=$4 status
   shift 4
   : > "$launchlog"
   # CLAUDE_CONFIG_DIR is forwarded onto claude launches by fm-spawn, so pin it
@@ -97,6 +97,13 @@ run_spawn() {
     FM_FAKE_CURSOR_LIST_STATUS="${FM_TEST_CURSOR_LIST_STATUS:-0}" \
     GROK_HOME="$home/grok-home" \
     fm_test_run_spawn "$home" "$wt" "$fakebin" "$@"
+  status=$?
+  if [ -f "$launchlog" ]; then
+    awk '!/^treehouse get$/ && !/^export GOTMPDIR=/ && !/^export FM_TASK_ID=/ && !/^export TRACEPARENT=/' \
+      "$launchlog" > "$launchlog.launches"
+    mv "$launchlog.launches" "$launchlog"
+  fi
+  return "$status"
 }
 
 # Ship spawns carry an explicit delivery contract (AGENTS.md section 7); these
