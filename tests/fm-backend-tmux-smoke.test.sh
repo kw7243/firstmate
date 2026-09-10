@@ -116,11 +116,24 @@ tmux new-window -d -t "$SESSION:" -n "$READLINE_WINDOW" -c "${HOME:-/tmp}" \
   'bash --noprofile --norc -i' \
   || fail "real tmux: could not create the disposable Readline test window"
 # shellcheck disable=SC2016
-READLINE_SETUP='__fm_return_newline() { READLINE_LINE="${READLINE_LINE:0:READLINE_POINT}"$'\''\\n'\''"${READLINE_LINE:READLINE_POINT}"; READLINE_POINT=$((READLINE_POINT + 1)); }; bind -x '\''"\\C-m":__fm_return_newline'\''; printf '\''readline-shell-%s\\n'\'' ready'
+READLINE_SETUP='__fm_return_newline() { READLINE_LINE="${READLINE_LINE:0:READLINE_POINT}"$'\''\n'\''"${READLINE_LINE:READLINE_POINT}"; READLINE_POINT=$((READLINE_POINT + 1)); }; bind -x '\''"\C-m":__fm_return_newline'\''; printf '\''readline-shell-%s\n'\'' ready'
 tmux send-keys -t "$READLINE_TARGET" -l "$READLINE_SETUP"
 tmux send-keys -t "$READLINE_TARGET" C-j
 wait_for_capture_text "$READLINE_TARGET" "readline-shell-ready" \
   || fail "the disposable shell did not install the Readline C-m newline fixture"
+
+# Prove the masking condition itself so this case cannot pass vacuously when
+# the binding is malformed: Return/C-m must leave the command pending.
+tmux send-keys -t "$READLINE_TARGET" "printf 'readline-return-%s\\n' pending" Enter
+sleep 0.2
+out=$(fm_backend_tmux_capture "$READLINE_TARGET" 20) \
+  || fail "could not capture the disposable Readline test window after Return"
+case "$out" in
+  *readline-return-pending*) fail "the Readline fixture did not make Return/C-m leave the command pending"$'\n'"$out" ;;
+esac
+tmux send-keys -t "$READLINE_TARGET" C-c
+sleep 0.1
+pass "real tmux + Readline fixture: Return/C-m demonstrably leaves a shell line pending"
 
 fm_backend_tmux_send_text_line "$READLINE_TARGET" "printf 'readline-first-%s\\n' executed"
 fm_backend_tmux_send_text_line "$READLINE_TARGET" "printf 'readline-second-%s\\n' executed"
