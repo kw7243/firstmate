@@ -291,6 +291,10 @@ Send in-scope work to the fitting secondmate unless it is blocked or the captain
 If no secondmate scope fits, use the main home or discuss creating an appropriate persistent secondmate.
 For one-off or infrequent operational work, start with the simplest direct end-to-end path.
 Do not build wrappers, control planes, policy layers, custom verifiers, or automation unless the direct path exposes a concrete blocker or repeated need that justifies the added machinery.
+Before writing code, understand the problem by reading the touched code and tracing the real flow.
+Then stop at the first adequate rung: skip what need not exist (YAGNI); reuse what the codebase already has; use the standard library; use the native platform; use an installed dependency; use one clear line; only then write the minimum new code that works.
+Be lazy about the solution, never about understanding.
+Do not simplify away trust-boundary validation, data-loss handling, security, or accessibility.
 
 Before commissioning an investigation, consult existing reports and established evidence.
 Classify the deliverable:
