@@ -73,7 +73,7 @@ if fm_backend_tmux_create_task "$SESSION" "$WINDOW" "$HOME" 2>/dev/null; then
 fi
 pass "real tmux: fm_backend_tmux_create_task creates a window and refuses a duplicate"
 
-# --- send text + Enter -------------------------------------------------------
+# --- spawn-time shell-line submission ---------------------------------------
 
 # A newly-created interactive shell can exist before its startup files and line
 # editor are ready to accept Enter. Prove command execution with an output token
@@ -103,7 +103,84 @@ case "$out" in
   *captain-on-deck-line*) : ;;
   *) fail "real tmux: fm_backend_tmux_send_text_line did not submit and echo the line"$'\n'"$out" ;;
 esac
-pass "real tmux: fm_backend_tmux_send_text_line sends literal text and submits with Enter"
+pass "real tmux: fm_backend_tmux_send_text_line sends text and submits atomically with C-j"
+
+# --- rapid shell lines with divergent C-m/C-j bindings ----------------------
+
+# Drive the public spawn-time shell-line primitive three times without sleeps
+# against a portable Readline binding that makes Return/C-m insert a newline.
+# The commands execute only if the primitive submits each one with C-j.
+READLINE_WINDOW="fm-readline-shell-line"
+READLINE_TARGET="$SESSION:$READLINE_WINDOW"
+tmux new-window -d -t "$SESSION:" -n "$READLINE_WINDOW" -c "${HOME:-/tmp}" \
+  'bash --noprofile --norc -i' \
+  || fail "real tmux: could not create the disposable Readline test window"
+# shellcheck disable=SC2016
+READLINE_SETUP='__fm_return_newline() { READLINE_LINE="${READLINE_LINE:0:READLINE_POINT}"$'\''\n'\''"${READLINE_LINE:READLINE_POINT}"; READLINE_POINT=$((READLINE_POINT + 1)); }; bind -x '\''"\C-m":__fm_return_newline'\''; printf '\''readline-shell-%s\n'\'' ready'
+tmux send-keys -t "$READLINE_TARGET" -l "$READLINE_SETUP"
+tmux send-keys -t "$READLINE_TARGET" C-j
+wait_for_capture_text "$READLINE_TARGET" "readline-shell-ready" \
+  || fail "the disposable shell did not install the Readline C-m newline fixture"
+
+# Prove the masking condition itself so this case cannot pass vacuously when
+# the binding is malformed: Return/C-m must leave the command pending.
+tmux send-keys -t "$READLINE_TARGET" "printf 'readline-return-%s\\n' pending" Enter
+sleep 0.2
+out=$(fm_backend_tmux_capture "$READLINE_TARGET" 20) \
+  || fail "could not capture the disposable Readline test window after Return"
+case "$out" in
+  *readline-return-pending*) fail "the Readline fixture did not make Return/C-m leave the command pending"$'\n'"$out" ;;
+esac
+tmux send-keys -t "$READLINE_TARGET" C-c
+sleep 0.1
+pass "real tmux + Readline fixture: Return/C-m demonstrably leaves a shell line pending"
+
+fm_backend_tmux_send_text_line "$READLINE_TARGET" "printf 'readline-first-%s\\n' executed"
+fm_backend_tmux_send_text_line "$READLINE_TARGET" "printf 'readline-second-%s\\n' executed"
+fm_backend_tmux_send_text_line "$READLINE_TARGET" "printf 'readline-third-%s\\n' executed"
+wait_for_capture_text "$READLINE_TARGET" "readline-third-executed" \
+  || fail "rapid spawn-time shell lines were left unsubmitted by the Readline fixture"
+out=$(fm_backend_tmux_capture "$READLINE_TARGET" 40) \
+  || fail "could not capture the disposable Readline test window"
+for token in readline-first-executed readline-second-executed readline-third-executed; do
+  case "$out" in
+    *"$token"*) : ;;
+    *) fail "rapid spawn-time shell line did not execute independently: $token"$'\n'"$out" ;;
+  esac
+done
+pass "real tmux + Readline C-m newline fixture: rapid spawn-time shell lines execute independently"
+
+# When ble.sh is installed, run the same case against its real multiline
+# editor as an additional integration check.
+BLESH=${FM_TEST_BLESH:-${HOME:-}/.local/share/blesh/ble.sh}
+if [ -r "$BLESH" ]; then
+  BLE_WINDOW="fm-ble-shell-line"
+  BLE_TARGET="$SESSION:$BLE_WINDOW"
+  tmux new-window -d -t "$SESSION:" -n "$BLE_WINDOW" -c "${HOME:-/tmp}" \
+    'bash --noprofile --norc -i' \
+    || fail "real tmux: could not create the disposable ble.sh test window"
+  printf -v BLESH_Q '%q' "$BLESH"
+  tmux send-keys -t "$BLE_TARGET" -l \
+    "source -- $BLESH_Q --attach=none; ble-attach; printf 'ble-shell-%s\\n' ready"
+  tmux send-keys -t "$BLE_TARGET" C-j
+  wait_for_capture_text "$BLE_TARGET" "ble-shell-ready" \
+    || fail "the disposable shell did not load and attach real ble.sh"
+
+  fm_backend_tmux_send_text_line "$BLE_TARGET" "printf 'ble-first-%s\\n' executed"
+  fm_backend_tmux_send_text_line "$BLE_TARGET" "printf 'ble-second-%s\\n' executed"
+  fm_backend_tmux_send_text_line "$BLE_TARGET" "printf 'ble-third-%s\\n' executed"
+  wait_for_capture_text "$BLE_TARGET" "ble-third-executed" \
+    || fail "rapid spawn-time shell lines were left unsubmitted by ble.sh"
+  out=$(fm_backend_tmux_capture "$BLE_TARGET" 40) \
+    || fail "could not capture the disposable ble.sh test window"
+  for token in ble-first-executed ble-second-executed ble-third-executed; do
+    case "$out" in
+      *"$token"*) : ;;
+      *) fail "rapid spawn-time shell line did not execute independently: $token"$'\n'"$out" ;;
+    esac
+  done
+  pass "real tmux + ble.sh: rapid spawn-time shell lines execute independently"
+fi
 
 # --- send_literal + send_key(Enter), the two-step form fm-spawn.sh uses for the
 # harness launch command (literal send, settle, then a separate Enter) --------
