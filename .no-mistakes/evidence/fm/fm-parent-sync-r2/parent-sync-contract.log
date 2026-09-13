@@ -1,0 +1,27 @@
+target=f8ddaad38261c1ca3ae0f5c9da5f8e716ced3e82
+fork_base_parent=ef26489dc0066ef0fbf4eae749a6b623892eeec8
+merged_upstream_parent=b182d0f908b78d08c7ccb8dce3775bdca8c5d657
+merged_upstream_parent_is_ancestor=yes
+all_non_AGENTS_paths_match_upstream_parent=yes
+fork_only_tree_delta:
+M	AGENTS.md
+fork_only_numstat:
+4	0	AGENTS.md
+fork_only_AGENTS_contract_patch:
+diff --git a/AGENTS.md b/AGENTS.md
+index f4940d9..ecbbbcf 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -291,8 +291,12 @@ Keep `local-only` work in the main home.
+ Send in-scope work to the fitting secondmate unless it is blocked or the captain explicitly redirects it; do not read the secondmate's chat because marked routed replies return through its status or referenced document.
+ If no secondmate scope fits, use the main home or discuss creating an appropriate persistent secondmate.
+ For one-off or infrequent operational work, start with the simplest direct end-to-end path.
+ Do not build wrappers, control planes, policy layers, custom verifiers, or automation unless the direct path exposes a concrete blocker or repeated need that justifies the added machinery.
++Before writing code, understand the problem by reading the touched code and tracing the real flow.
++Then stop at the first adequate rung: skip what need not exist (YAGNI); reuse what the codebase already has; use the standard library; use the native platform; use an installed dependency; use one clear line; only then write the minimum new code that works.
++Be lazy about the solution, never about understanding.
++Do not simplify away trust-boundary validation, data-loss handling, security, or accessibility.
+ 
+ Before commissioning an investigation, consult existing reports and established evidence.
+ Classify the deliverable:
+ 

@@ -1,0 +1,193 @@
+# Live scenario: ordinary Codex crewmate launch
+target_commit=f8ddaad38261c1ca3ae0f5c9da5f8e716ced3e82
+codex_version=codex-cli 0.153.4
+tmux_version=tmux 3.4
+treehouse_version=v2.1.1
+Logged in using ChatGPT
+A new version of treehouse is available: v2.1.1 → v2.3.0
+Run "treehouse update" to update
+
+Created /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M2E7V8H2KCRHN0WA7CNAJFJQ/.nm-live-codex-spawn/project/treehouse.toml
+
+## Spawn command and product response
+spawned codex-unsandboxed-live harness=codex kind=scout window=livefm:fm-codex-unsandboxed-live worktree=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M2E7V8H2KCRHN0WA7CNAJFJQ/.nm-live-codex-spawn/pool/.treehouse/project-31eb8e/1/project
+
+## Persisted task record
+window=livefm:fm-codex-unsandboxed-live
+endpoint_task_id=codex-unsandboxed-live
+worktree=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M2E7V8H2KCRHN0WA7CNAJFJQ/.nm-live-codex-spawn/pool/.treehouse/project-31eb8e/1/project
+project=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M2E7V8H2KCRHN0WA7CNAJFJQ/.nm-live-codex-spawn/project
+harness=codex
+kind=scout
+tasktmp=/tmp/fm-codex-unsandboxed-live
+model=default
+effort=default
+spawn_gen=s1789334003.2929095.4677
+isolated_from_primary=yes
+
+## Runtime process proof
+2929290 2929290 2929714 -bash
+2929300 2929300 2929714 treehouse get
+2929337 2929337 2929714 /bin/bash
+2929714 2929714 2929714 codex --dangerously-bypass-approvals-and-sandbox -c notify=["bash","-c","touch '/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M2E7V8H2KCRHN0WA7CNAJFJQ/.nm-live-codex-spawn/home/state/codex-unsandboxed-live.turn-ended'"] ???FIRSTMATE_OP: v1 launch-brief: # Task ## Captain's intent This is a live launch probe. Do only these steps: 1. Run pwd -P and git rev-parse --show-toplevel. 2. From the disposable task worktree, write a report to /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M2E7V8H2KCRHN0WA7CNAJFJQ/.nm-live-codex-spawn/home/data/codex-unsandboxed-live/report.md with exactly these fields: token=codex-live-f8ddaad-20260913, worktree=<the pwd -P result>, external_state_write=ok. 3. Append exactly "done: codex-live-f8ddaad-20260913" to /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M2E7V8H2KCRHN0WA7CNAJFJQ/.nm-live-codex-spawn/home/state/codex-unsandboxed-live.status. Do not edit tracked project files, commit, push, or run a validation pipeline.  ## Firstmate spec Complete the three bounded probe steps immediately. The report and status paths are the only allowed writes outside the disposable task worktree.  # Current worker role contract When this task works on Firstmate itself, this section supersedes every earlier brief instruction about your role and identity. When this task works on Firstmate itself, the repository root `AGENTS.md` (also imported by `CLAUDE.md`) is the primary/secondmate supervisor's contract: follow this brief instead of that supervisor contract. For that Firstmate task, do the assigned work yourself and report to firstmate; do not adopt the supervisor identity, delegate the task, run fleet supervision, or address the captain. This exception preserves this brief's safety and authority boundaries and applicable contributor guidance, including `CONTRIBUTING.md` and `firstmate-coding-guidelines` for Firstmate changes. Other projects retain their own instructions unchanged.
+
+## Waiting for the real worker effect
+waiting elapsed=0s report=absent status=absent
+directory_trust_dialog=accepted-with-Enter
+waiting elapsed=15s report=absent status=absent
+worker_effect=observed after 18s
+
+## Report written by the live worker outside its worktree
+token=codex-live-f8ddaad-20260913
+worktree=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M2E7V8H2KCRHN0WA7CNAJFJQ/.nm-live-codex-spawn/pool/.treehouse/project-31eb8e/1/project
+external_state_write=ok
+
+## Status written by the live worker outside its worktree
+done: codex-live-f8ddaad-20260913
+
+## End-user pane view
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 24s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🌳 Setting up worktree...
+🌳 Entered worktree at /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M2E7V8
+H2KCRHN0WA7CNAJFJQ/.nm-live-codex-spawn/pool/.treehouse/project-31eb8e/1/project
+. Type 'exit' to return.
+To run a command as administrator (user "root"), use "sudo <command>".
+See "man sudo_root" for details.
+
+ubuntu@kwen1-vm:/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M2E7V8H2KCRHN
+0WA7CNAJFJQ/.nm-live-codex-spawn/pool/.treehouse/project-31eb8e/1/project$ expor
+t GOTMPDIR=/tmp/fm-codex-unsandboxed-live/gotmp
+ubuntu@kwen1-vm:/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M2E7V8H2KCRHN
+0WA7CNAJFJQ/.nm-live-codex-spawn/pool/.treehouse/project-31eb8e/1/project$ expor
+t FM_TASK_ID=codex-unsandboxed-live
+ubuntu@kwen1-vm:/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M2E7V8H2KCRHN
+0WA7CNAJFJQ/.nm-live-codex-spawn/pool/.treehouse/project-31eb8e/1/project$ env -
+u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI codex --dangerously-bypass-app
+rovals-and-sandbox -c "notify=[\"bash\",\"-c\",\"touch '/home/ubuntu/.no-mistake
+s/worktrees/9c45ef16ef2c/01M2E7V8H2KCRHN0WA7CNAJFJQ/.nm-live-codex-spawn/home/st
+ate/codex-unsandboxed-live.turn-ended'\"]" "$('/home/ubuntu/.no-mistakes/worktre
+es/9c45ef16ef2c/01M2E7V8H2KCRHN0WA7CNAJFJQ/bin/fm-operational-input.sh' encode l
+aunch-brief < '/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M2E7V8H2KCRHN0
+WA7CNAJFJQ/.nm-live-codex-spawn/home/data/codex-unsandboxed-live/launch-brief.md
+')"
+> You are in /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M2E7V8H2KCRHN0WA
+
+  Note: You’re in a subdirectory of a Git project. Trusting will apply to the
+  repository root:
+  /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M2E7V8H2KCRHN0WA7CNAJFJQ/.n
+  m-live-codex-spawn/project
+
+  Do you trust the contents of this directory? Working with untrusted contents
+  comes with higher risk of prompt injection. Trusting the directory allows
+  project-local config, hooks, and exec policies to load.
+
+› 1. Yes, continue
+  2. No, quit
+
+  Press enter to continue
+╭────────────────────────────────────────────────────╮
+│ >_ OpenAI Codex (v0.153.4)                         │
+│                                                    │
+│ model:       loading   /model to change            │
+│ directory:   /home/ubuntu/.no-mistakes/…/1/project │
+│ permissions: YOLO mode                             │
+╰────────────────────────────────────────────────────╯
+
+
+› Ask Codex to do anything
+
+  gpt-6-astra default · /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M2E7…
+
+╭────────────────────────────────────────────────────╮
+│ >_ OpenAI Codex (v0.153.4)                         │
+│                                                    │
+│ model:       gpt-6-astra   /model to change        │
+│ directory:   /home/ubuntu/.no-mistakes/…/1/project │
+│ permissions: YOLO mode                             │
+╰────────────────────────────────────────────────────╯
+
+  Tip: This is GPT-6, a new generation of intelligence. Astra is state-of-the-
+  art in coding, computer use, science, and professional work. Give it a hard
+  problem, a half-formed idea, or anything you've been meaning to build. See
+  where it takes you.
+
+
+› ⁣FIRSTMATE_OP: v1 launch-brief: # Task
+  ## Captain's intent
+  This is a live launch probe. Do only these steps:
+  1. Run pwd -P and git rev-parse --show-toplevel.
+  2. From the disposable task worktree, write a report to /home/ubuntu/.no-
+  mistakes/worktrees/9c45ef16ef2c/01M2E7V8H2KCRHN0WA7CNAJFJQ/.nm-live-codex-
+  spawn/home/data/codex-unsandboxed-live/report.md with exactly these fields:
+  token=codex-live-f8ddaad-20260913, worktree=<the pwd -P result>,
+  external_state_write=ok.
+  3. Append exactly "done: codex-live-f8ddaad-20260913" to /home/ubuntu/.no-
+  mistakes/worktrees/9c45ef16ef2c/01M2E7V8H2KCRHN0WA7CNAJFJQ/.nm-live-codex-
+  spawn/home/state/codex-unsandboxed-live.status.
+  Do not edit tracked project files, commit, push, or run a validation
+  pipeline.
+
+  ## Firstmate spec
+  Complete the three bounded probe steps immediately. The report and status
+  paths are the only allowed writes outside the disposable task worktree.
+
+  # Current worker role contract
+  When this task works on Firstmate itself, this section supersedes every
+  earlier brief instruction about your role and identity.
+  When this task works on Firstmate itself, the repository root `AGENTS.md`
+  (also imported by `CLAUDE.md`) is the primary/secondmate supervisor's
+  contract: follow this brief instead of that supervisor contract.
+  For that Firstmate task, do the assigned work yourself and report to
+  firstmate; do not adopt the supervisor identity, delegate the task, run fleet
+  supervision, or address the captain.
+  This exception preserves this brief's safety and authority boundaries and
+  applicable contributor guidance, including `CONTRIBUTING.md` and `firstmate-
+  coding-guidelines` for Firstmate changes.
+  Other projects retain their own instructions unchanged.
+
+
+• You have 3 usage limit resets available. Run /usage to use one.
+
+• I’ll run the two path commands, then write the report and append the status
+  line exactly as requested.
+
+• Ran pwd -P
+  │ git rev-parse --show-toplevel
+  └ /home/ubuntu/.no-mistakes/
+    worktrees/9c45ef16ef2c/01M2E7V8H2KCRHN0WA7CNAJFJQ/.nm-live-codex-spawn/
+    … +2 lines (ctrl + t to view transcript)
+    worktrees/9c45ef16ef2c/01M2E7V8H2KCRHN0WA7CNAJFJQ/.nm-live-codex-spawn/
+    pool/.treehouse/project-31eb8e/1/project
+
+• Ran printf '%s\n' 'token=[REDACTED_SECRET]' 'worktree=/home/
+  │ ubuntu/.no-mistakes/
+  │ worktrees/9c45ef16ef2c/01M2E7V8H2KCRHN0WA7CNAJFJQ/.nm-live-codex-spawn/
+  │ … +8 lines
+  └ (no output)
+
+• Working (18s • esc to interrupt)
+
+
+› Ask Codex to do anything
+
+  gpt-6-astra default · /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M2E7…
+
+## Controlled shutdown and product cleanup
+complete: codex-unsandboxed-live captain-call inventory reviewed
+stopped codex-unsandboxed-live harness=codex backend=tmux endpoint=livefm:fm-codex-unsandboxed-live worktree=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M2E7V8H2KCRHN0WA7CNAJFJQ/.nm-live-codex-spawn/pool/.treehouse/project-31eb8e/1/project
+WARNING: watcher still down (same stale episode; last beat: 30s ago, grace 300s) - full banner already printed this episode.
+teardown: reaping leaked worktree process(es) for codex-unsandboxed-live: 2929337
+teardown: force-killing leaked worktree process(es) for codex-unsandboxed-live: 2929337
+A new version of treehouse is available: v2.1.1 → v2.3.0
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown codex-unsandboxed-live complete (window livefm:fm-codex-unsandboxed-live, worktree /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M2E7V8H2KCRHN0WA7CNAJFJQ/.nm-live-codex-spawn/pool/.treehouse/project-31eb8e/1/project)
+Backlog: codex-unsandboxed-live just finished (this home keeps no markdown backlog at /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M2E7V8H2KCRHN0WA7CNAJFJQ/.nm-live-codex-spawn/home/data/backlog.md). Update /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M2E7V8H2KCRHN0WA7CNAJFJQ/.nm-live-codex-spawn/home/data/backlog.md - move codex-unsandboxed-live to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+scenario_result=PASS

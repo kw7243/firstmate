@@ -1,0 +1,49 @@
+# Live scenario: self-update preserves a running condition/action watch
+target_commit=f8ddaad38261c1ca3ae0f5c9da5f8e716ced3e82
+
+## Arm and prove the pre-update runner is live
+armed: when-parent-sync-live
+starts on the watcher's next cycle; or run: bin/fm-procevent.sh reconcile
+reminder: deterministic, safe, reversible actions only; judgment and destructive actions stay on the wake-and-decide path
+reconciled: published=0 started=1 stopped=0 uncertain=0 failed=0
+SOURCE                       ADAPTER      OWNER      PENDING
+when-parent-sync-live        when         live       0
+
+## Run the real updater against the isolated origin
+before=d413f30fba042e1ff9a9816d44ee010d3ac8b129
+expected=a07b6bfd151358f5f4fce83d3eafcee85f848970
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 process-event source(s) registered, but no live watcher process holds this home lock (last beat: 3s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision with a foreground checkpoint: bin/fm-watch-checkpoint.sh --seconds 180.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+firstmate: updated d413f30..a07b6bf (instructions changed: bin)
+rebound: when-parent-sync-live
+rebind-all: 1 rebound, 0 unchanged or out of scope, 0 failed
+reread-firstmate: yes
+restart-secondmates: none
+nudge-secondmates: none
+after=a07b6bfd151358f5f4fce83d3eafcee85f848970
+
+## Make the watched condition true after the update
+classification=fired
+
+## Durable watch result
+when: when-parent-sync-live
+status: fired
+detail: the condition held and the action exited 0
+condition_polls: 21
+action_exit: 0
+output:
+v2 action executed from updated bytes
+
+## Action side effect
+action_version=v2
+
+## Handle and retire the completed source
+handled: when-parent-sync-live 1
+retired: when-parent-sync-live
+retired: when-parent-sync-live
+scenario_result=PASS
