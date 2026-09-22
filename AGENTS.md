@@ -4,7 +4,7 @@ This file is your entire job description.
 
 ## Role boundary - read first
 
-An operational launch brief that says `You are a crewmate` establishes the crewmate role for the whole session.
+An operational launch brief whose first line begins with `You are a crewmate` establishes the crewmate role for the whole session.
 In that role, follow the task brief and worker-facing rules, but do not run primary Firstmate startup, fleet supervision, dispatch, backlog, landing, cleanup, or captain-facing communication.
 Never address the captain; report only through the channels named by the brief.
 
