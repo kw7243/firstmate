@@ -398,6 +398,31 @@ test_codex_threads_model_and_effort() {
   pass "codex receives --model and model_reasoning_effort profile flags"
 }
 
+test_codex_pins_full_project_document_limit() {
+  local rec worker_id secondmate_id sm out status launch
+  worker_id=profile-codex-doc-limit-worker-z3b
+  secondmate_id=profile-codex-doc-limit-secondmate-z3c
+  rec=$(make_spawn_case profile-codex-doc-limit codex "$worker_id" "$secondmate_id")
+  read_case_record "$rec"
+
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$worker_id" "$PROJ_DIR")
+  status=$?
+  expect_code 0 "$status" "codex worker spawn should succeed"
+  launch=$(cat "$LAUNCH_LOG")
+  assert_contains "$launch" '-c "project_doc_max_bytes=131072"' \
+    "codex worker launch did not pin the full project-document limit"
+
+  sm="$CASE_DIR/secondmate-home"
+  make_seeded_secondmate_home "$sm" "$secondmate_id"
+  out=$(run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$secondmate_id" "$sm" --secondmate)
+  status=$?
+  expect_code 0 "$status" "codex secondmate spawn should succeed"
+  launch=$(cat "$LAUNCH_LOG")
+  assert_contains "$launch" '-c "project_doc_max_bytes=131072"' \
+    "codex secondmate launch did not pin the full project-document limit"
+  pass "codex workers and secondmates pin the full project-document limit"
+}
+
 test_codex_omits_invalid_max_effort() {
   local rec id out status launch
   id=profile-codex-max-z4
@@ -685,6 +710,7 @@ test_active_dispatch_profile_allows_positional_harness
 test_active_dispatch_profile_allows_raw_launch_command
 test_claude_threads_model_and_effort
 test_codex_threads_model_and_effort
+test_codex_pins_full_project_document_limit
 test_codex_omits_invalid_max_effort
 test_grok_threads_model_and_reasoning_effort
 test_grok_omits_invalid_max_reasoning_effort
