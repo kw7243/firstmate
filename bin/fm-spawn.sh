@@ -22,6 +22,9 @@
 #   axes chosen by firstmate at intake. They are only threaded into harnesses whose
 #   installed CLIs were verified to support that axis; unsupported axes are omitted
 #   from that harness's launch rather than guessed.
+#   Codex ship, scout, and secondmate launches pin project_doc_max_bytes=131072
+#   so Codex can load Firstmate's complete AGENTS.md. Other adapters keep their
+#   own instruction-delivery limits and are unchanged by this setting.
 #   --backend <name> is the explicit runtime session-provider backend for this
 #   exact task only (docs/configuration.md "Runtime backend" owns when that flag
 #   is authorized). Without it, the script resolves FM_BACKEND, then
