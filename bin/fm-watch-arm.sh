@@ -396,7 +396,7 @@ if [ "$mode" = restart ]; then
       if healthy_watcher; then
         cycle_mark_predecessor_successor "attached:$HEALTHY_PID"
         report_attached
-        cycle_begin "$HEALTHY_PID" attached
+        cycle_begin "$HEALTHY_PID" attached "$HEALTHY_IDENTITY"
         attach_and_wait "$HEALTHY_PID"
         exit $?
       fi
