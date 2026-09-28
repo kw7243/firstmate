@@ -151,7 +151,14 @@ fm_supervision_host_outcomes_drained() {
 # and no conversation, latch, or dialog kept under an earlier key is reused.
 # Needs bin/fm-wake-lib.sh sourced first.
 fm_supervision_host_main_key() {
-  local pid identity
+  local pid identity lib_dir
+  lib_dir=${BASH_SOURCE[0]%/*}
+  # shellcheck source=bin/fm-session-lock-lib.sh
+  . "$lib_dir/fm-session-lock-lib.sh"
+  if fm_session_lock_codex_record_present "$1"; then
+    fm_session_lock_generation "$1"
+    return
+  fi
   pid=$(sed -n '1p' "$1/.lock" 2>/dev/null)
   identity=$(fm_pid_identity "$pid" 2>/dev/null) && [ -n "$identity" ] || return 1
   printf '%s:%s:%s\n' "$pid" "$(printf '%s\n' "$identity" | cksum | awk '{ print $1 }')" \
@@ -309,6 +316,7 @@ fm_supervision_engine_turn() {
         --model "$model" --output-format json)
       root_phys=$(cd "$FM_ROOT" 2>/dev/null && pwd -P) || root_phys=$FM_ROOT
       home_phys=$(cd "$FM_HOME" 2>/dev/null && pwd -P) || home_phys=$FM_HOME
+      # shellcheck disable=SC2153 # STATE is supplied by the sourcing command.
       state_phys=$(cd "$STATE" 2>/dev/null && pwd -P) || state_phys=$STATE
       # Claude path-checks direct file reads against its working directories,
       # so a home or state directory outside the code root is added.

@@ -12,6 +12,8 @@ FM_WAKE_QUEUE_LOCK="${FM_WAKE_QUEUE_LOCK:-$STATE/.wake-queue.lock}"
 FM_LOCK_STALE_AFTER="${FM_LOCK_STALE_AFTER:-2}"
 # shellcheck source=bin/fm-path-lib.sh
 . "$FM_WAKE_LIB_DIR/fm-path-lib.sh"
+# shellcheck source=bin/fm-process-identity-lib.sh
+. "$FM_WAKE_LIB_DIR/fm-process-identity-lib.sh"
 # Resolved once at source time: fm_pid_identity and fm_path_mtime run inside 0.2s
 # confirm and 0.5s attach polls, and forking uname per call is a measurable cost on
 # the platform (Git Bash/MSYS) that already pays the highest fork price.
@@ -159,6 +161,7 @@ fm_watcher_lock_matches_pid() {
   local state=$1 watch_path=$2 pid=$3 home=${4:-$FM_HOME} lockdir lock_home lock_path lock_identity current_identity
   FM_WATCHER_MATCHED_IDENTITY=
   lockdir="$state/.watch.lock"
+  fm_lock_same_namespace "$lockdir" || return 1
   lock_home=$(cat "$lockdir/fm-home" 2>/dev/null || true)
   lock_path=$(cat "$lockdir/watcher-path" 2>/dev/null || true)
   lock_identity=$(cat "$lockdir/pid-identity" 2>/dev/null || true)
@@ -451,10 +454,33 @@ fm_watcher_supervision_verdict() {
   return 0
 }
 
+# Transient lock ownership is namespace-local too. New Linux owners publish
+# their kernel coordinates before the atomic claim. A missing or foreign
+# coordinate is unknown, so neither recovery, self-reclaim nor release may
+# use its numeric PID. Existing non-Linux locks keep their native behavior.
+fm_lock_same_namespace() {  # <lockdir>
+  local recorded current
+  recorded=$(cat "$1/pid-namespace" 2>/dev/null || true)
+  if [ "$_FM_UNAME" = Linux ]; then
+    current=$(fm_process_namespace) || return 1
+    [ -n "$recorded" ] && [ "$recorded" = "$current" ]
+  else
+    [ -z "$recorded" ]
+  fi
+}
+
+fm_lock_write_namespace() {  # <ownerdir>
+  local namespace
+  [ "$_FM_UNAME" = Linux ] || return 0
+  namespace=$(fm_process_namespace) || return 1
+  printf '%s\n' "$namespace" > "$1/pid-namespace"
+}
+
 fm_lock_clean_known_files() {
   local lockdir=$1
   rm -f \
     "$lockdir/pid" \
+    "$lockdir/pid-namespace" \
     "$lockdir/fm-home" \
     "$lockdir/pid-identity" \
     "$lockdir/role" \
@@ -471,6 +497,7 @@ fm_lock_set_role() {
   fm_current_pid current || return 1
   pid=$(cat "$lockdir/pid" 2>/dev/null || true)
   [ "$pid" = "$current" ] || return 1
+  fm_lock_same_namespace "$lockdir" || return 1
   printf '%s\n' "$role" > "$lockdir/role" 2>/dev/null || return 1
   back=$(cat "$lockdir/role" 2>/dev/null || true)
   [ "$back" = "$role" ]
@@ -497,6 +524,7 @@ fm_lock_owner_dir() {
 fm_lock_prepare_owner() {
   local ownerdir=$1 mypid back
   fm_current_pid mypid || return 1
+  fm_lock_write_namespace "$ownerdir" || return 1
   printf '%s\n' "$mypid" > "$ownerdir/pid" 2>/dev/null || return 1
   back=$(cat "$ownerdir/pid" 2>/dev/null || true)
   [ "$back" = "$mypid" ]
@@ -628,6 +656,7 @@ fm_lock_recheck_stale_owner() {
   elif [ -e "$lockdir" ] || [ -L "$lockdir" ]; then
     [ -d "$lockdir" ] && [ ! -L "$lockdir" ] || return 1
   fi
+  fm_lock_same_namespace "$lockdir" || return 1
   actual_pid=$(cat "$lockdir/pid" 2>/dev/null || true)
   [ "$actual_pid" = "$expected_pid" ] || return 1
   if fm_pid_alive "$actual_pid"; then
@@ -1043,6 +1072,7 @@ fm_lock_reap_dead_link() {
     token=
     for tomb in "$owner".reaped.*; do
       [ -d "$tomb" ] || continue
+      fm_lock_same_namespace "$tomb" || return 1
       if [ "${tomb##*.reaped.}" != "$current" ]; then
         fm_pid_alive "${tomb##*.reaped.}" && return 1
       fi
@@ -1071,7 +1101,7 @@ fm_lock_try_acquire_steal_mutex() {  # <steal-lock>
   fm_lock_try_create "$lockdir" && return 0
   fm_current_pid current || return 1
   fm_lock_reap_dead_link "$lockdir.steal" || true
-  if [ "$(cat "$lockdir/pid" 2>/dev/null || true)" = "$current" ]; then
+  if [ "$(cat "$lockdir/pid" 2>/dev/null || true)" = "$current" ] && fm_lock_same_namespace "$lockdir"; then
     fm_lock_remove_path "$lockdir" || true
   elif [ -e "$lockdir" ] || [ -L "$lockdir" ]; then
     fm_lock_reap_dead_link "$lockdir" || return 1
@@ -1091,6 +1121,10 @@ fm_lock_try_acquire() {
 
   fm_current_pid current || return 1
   pid=$(cat "$lockdir/pid" 2>/dev/null || true)
+  if ! fm_lock_same_namespace "$lockdir"; then
+    FM_LOCK_HELD_PID=$pid
+    return 1
+  fi
   if [ -n "$pid" ] && [ "$pid" = "$current" ]; then
     # The recorded holder is THIS very process. Single-threaded bash can only
     # observe that when an interrupting trap abandoned the frame that held the
@@ -1125,7 +1159,7 @@ fm_lock_try_acquire() {
   steal_owner=${FM_LOCK_OWNER_DIR:-}
 
   cur=$(cat "$lockdir/pid" 2>/dev/null || true)
-  if fm_pid_alive "$cur"; then
+  if ! fm_lock_same_namespace "$lockdir" || fm_pid_alive "$cur"; then
     fm_lock_release "$steal"
     FM_LOCK_HELD_PID=$cur
     FM_LOCK_OWNER_DIR=
@@ -1219,7 +1253,7 @@ _fm_lock_acquire_wait_handoff() {  # <lockdir> <caller-pid>
   fi
   fm_current_pid current || { fm_lock_release "$lockdir"; return 1; }
   back=$(cat "$ownerdir/pid" 2>/dev/null || true)
-  if [ "$back" != "$current" ] \
+  if [ "$back" != "$current" ] || ! fm_lock_same_namespace "$lockdir" \
     || ! printf '%s\n' "$caller_pid" > "$ownerdir/pid" 2>/dev/null \
     || [ "$(cat "$ownerdir/pid" 2>/dev/null || true)" != "$caller_pid" ]; then
     fm_lock_release "$lockdir"
@@ -1260,7 +1294,7 @@ fm_lock_acquire_wait_bounded() {
   fi
 
   owner_pid=$(cat "$lockdir/pid" 2>/dev/null || true)
-  if [ "$owner_pid" = "$caller_pid" ]; then
+  if [ "$owner_pid" = "$caller_pid" ] && fm_lock_same_namespace "$lockdir"; then
     return 0
   fi
   [ "$rc" -ne 0 ] || rc=1
@@ -1291,6 +1325,7 @@ fm_lock_acquire_wait_bounded() {
 fm_lock_release() {
   local lockdir=$1 pid current ownerdir
   fm_current_pid current || return 1
+  fm_lock_same_namespace "$lockdir" || return 0
   if [ -L "$lockdir" ]; then
     ownerdir=$(fm_lock_link_owner "$lockdir" 2>/dev/null || true)
     [ -n "$ownerdir" ] || return 0

@@ -127,8 +127,12 @@ case "$CMD" in
       HOLDER_PID=$(head -n 1 "$STATE/.lock" 2>/dev/null | tr -cd '0-9' || true)
     fi
     [ -n "$HOLDER_PID" ] || HOLDER_PID=$$
+    GENERATION=
+    if fm_session_lock_codex_record_present "$STATE"; then
+      GENERATION=$(fm_session_lock_generation "$STATE") || exit "$FM_LEASE_REFUSE_EXIT"
+    fi
     TMP=$(mktemp "$STATE/.fm-lease-tmp.XXXXXX")
-    printf '%s\t%s\t%s\n' "$ACTOR" "$HOLDER_PID" "$(date +%s)" > "$TMP"
+    printf '%s\t%s\t%s%s\n' "$ACTOR" "$HOLDER_PID" "$(date +%s)" "${GENERATION:+$'\t'$GENERATION}" > "$TMP"
     if [ -e "$LEASE" ]; then
       # Same-actor refresh, or a stale/torn record: replace atomically.
       mv -f -- "$TMP" "$LEASE"
@@ -140,7 +144,7 @@ case "$CMD" in
         exit "$FM_LEASE_REFUSE_EXIT"
       fi
       TMP=$(mktemp "$STATE/.fm-lease-tmp.XXXXXX")
-      printf '%s\t%s\t%s\n' "$ACTOR" "$HOLDER_PID" "$(date +%s)" > "$TMP"
+      printf '%s\t%s\t%s%s\n' "$ACTOR" "$HOLDER_PID" "$(date +%s)" "${GENERATION:+$'\t'$GENERATION}" > "$TMP"
       mv -f -- "$TMP" "$LEASE"
     else
       rm -f -- "$TMP"

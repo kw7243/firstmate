@@ -39,6 +39,12 @@ grep -q 'refusing to arm from a disposable validation checkout' "$TMP_ROOT/lab-g
 [ ! -e "$foreign_state/.watch.lock" ] || fail "disposable watcher touched outside state"
 pass "disposable watcher refuses inherited state outside its marked lab"
 
+# Manually seeded mutexes model the current published record, including the
+# namespace proof needed before a dead PID can be reclaimed on Linux.
+seed_lock_namespace() {
+  FM_STATE_OVERRIDE="$TMP_ROOT" bash -c '. "$1"; fm_lock_write_namespace "$2"' _ "$LIB" "$1"
+}
+
 drain_and_ack() {  # <state>
   local state=$1 err sequence generation
   err="$state/.test-drain.err"
@@ -152,6 +158,7 @@ test_stale_watch_lock_reclaimed() {
   done
   mkdir "$state/.watch.lock"
   printf '%s\n' "$dead_pid" > "$state/.watch.lock/pid"
+  seed_lock_namespace "$state/.watch.lock"
   PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" &
   pid=$!
   i=0
@@ -181,6 +188,7 @@ test_live_stale_watch_lock_is_actionable() {
   err="$dir/watch.err"
   mkdir "$state/.watch.lock"
   printf '%s\n' "$$" > "$state/.watch.lock/pid"
+  seed_lock_namespace "$state/.watch.lock"
   touch -t 200001010000 "$state/.last-watcher-beat"
   status=0
   PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_GUARD_GRACE=1 FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" 2> "$err" || status=$?
@@ -205,6 +213,7 @@ test_live_stalled_watch_lock_is_replaced_past_hard_bound() {
   identity=$(FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_pid_identity "$2"' _ "$LIB" "$holder") || fail "could not identify the fake holder"
   mkdir -p "$state/.watch.lock"
   printf '%s\n' "$holder" > "$state/.watch.lock/pid"
+  seed_lock_namespace "$state/.watch.lock"
   printf '%s\n' "$dir" > "$state/.watch.lock/fm-home"
   printf '%s\n' "$WATCH" > "$state/.watch.lock/watcher-path"
   printf '%s\n' "$identity" > "$state/.watch.lock/pid-identity"
@@ -311,6 +320,7 @@ test_guard_warnings() {
   identity=$(FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_pid_identity "$2"' _ "$LIB" "$pid") || fail "could not identify fresh guard watcher"
   mkdir -p "$state/.watch.lock"
   printf '%s\n' "$pid" > "$state/.watch.lock/pid"
+  seed_lock_namespace "$state/.watch.lock"
   printf '%s\n' "$dir" > "$state/.watch.lock/fm-home"
   printf '%s\n' "$WATCH" > "$state/.watch.lock/watcher-path"
   printf '%s\n' "$identity" > "$state/.watch.lock/pid-identity"
@@ -362,6 +372,7 @@ test_lock_steals_dead_pid_lock() {
   dead=$(dead_pid)
   mkdir "$lockdir"
   printf '%s\n' "$dead" > "$lockdir/pid"
+  seed_lock_namespace "$lockdir"
   rc=0
   newpid=$(FM_STATE_OVERRIDE="$state" bash -c '
     . "$1"
@@ -405,6 +416,7 @@ test_lock_reclaims_dead_steal_owner_without_nested_markers() {
   lnlog="$dir/ln.log"
   mkdir "$lockdir"
   printf '%s\n' "$(dead_pid)" > "$lockdir/pid"
+  seed_lock_namespace "$lockdir"
   leave_dead_link_locks "$state" "$lockdir.steal"
   cat > "$fakebin/ln" <<'SH'
 #!/usr/bin/env bash
@@ -437,6 +449,7 @@ test_lock_recovers_dead_nested_steal_chain() {
   lockdir="$state/.contend.lock"
   mkdir "$lockdir"
   printf '%s\n' "$(dead_pid)" > "$lockdir/pid"
+  seed_lock_namespace "$lockdir"
   leave_dead_link_locks "$state" "$lockdir.steal" "$lockdir.steal.steal"
 
   rc=0
@@ -462,6 +475,7 @@ test_lock_reclaims_self_held_steal_mutex() {
   lockdir="$state/.contend.lock"
   mkdir "$lockdir"
   printf '%s\n' "$(dead_pid)" > "$lockdir/pid"
+  seed_lock_namespace "$lockdir"
 
   rc=0
   FM_STATE_OVERRIDE="$state" bash -c '
@@ -487,6 +501,7 @@ test_lock_resumes_own_interrupted_steal_reap() {
   lockdir="$state/.contend.lock"
   mkdir "$lockdir"
   printf '%s\n' "$(dead_pid)" > "$lockdir/pid"
+  seed_lock_namespace "$lockdir"
   leave_dead_link_locks "$state" "$lockdir.steal"
 
   rc=0
@@ -570,6 +585,7 @@ test_lock_stale_steal_single_winner_under_concurrency() {
   dead=$(dead_pid)
   mkdir "$lockdir"
   printf '%s\n' "$dead" > "$lockdir/pid"
+  seed_lock_namespace "$lockdir"
   : > "$marker"
   pids=
   i=1
@@ -601,6 +617,7 @@ test_lock_live_steal_mutex_is_not_reclaimed() {
   dead=$(dead_pid)
   mkdir "$lockdir"
   printf '%s\n' "$dead" > "$lockdir/pid"
+  seed_lock_namespace "$lockdir"
   FM_STATE_OVERRIDE="$state" bash -c '
     . "$1"
     fm_lock_try_acquire "$2.steal" || exit 7
@@ -641,6 +658,7 @@ test_lock_does_not_steal_live_lock() {
   live=$!
   mkdir "$lockdir"
   printf '%s\n' "$live" > "$lockdir/pid"
+  seed_lock_namespace "$lockdir"
   out=$(FM_STATE_OVERRIDE="$state" bash -c '
     . "$1"
     if fm_lock_try_acquire "$2"; then rc=0; else rc=1; fi
@@ -689,6 +707,8 @@ test_lock_late_claim_loses_after_recreate() {
   out=$(FM_LOCK_STALE_AFTER=0 FM_STATE_OVERRIDE="$state" bash -c '
     . "$1"
     owner1=$(fm_lock_owner_dir "$2") || exit 20
+    fm_lock_write_namespace "$owner1" || exit 23
+    bash -c '"'"'printf "%s\n" "$$"'"'"' > "$owner1/pid"
     ln -s "$owner1" "$2" || exit 21
     touch -h -t 200001010000 "$2" 2>/dev/null || sleep 2
     if ! fm_lock_try_acquire "$2"; then exit 22; fi
@@ -752,6 +772,7 @@ test_watch_restart_rejects_reused_pid() {
   live=$!
   mkdir "$state/.watch.lock"
   printf '%s\n' "$live" > "$state/.watch.lock/pid"
+  seed_lock_namespace "$state/.watch.lock"
   printf '%s\n' "$dir" > "$state/.watch.lock/fm-home"
   printf '%s\n' "$WATCH" > "$state/.watch.lock/watcher-path"
   printf '%s\n' "stale watcher identity" > "$state/.watch.lock/pid-identity"
@@ -795,6 +816,7 @@ test_watch_restart_attaches_to_healthy_peer() {
   identity=$(FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_pid_identity "$2"' _ "$LIB" "$peer") || fail "could not identify peer pid"
   mkdir "$state/.watch.lock"
   printf '%s\n' "$peer" > "$state/.watch.lock/pid"
+  seed_lock_namespace "$state/.watch.lock"
   printf '%s\n' "$dir" > "$state/.watch.lock/fm-home"
   printf '%s\n' "$WATCH" > "$state/.watch.lock/watcher-path"
   printf '%s\n' "$identity" > "$state/.watch.lock/pid-identity"
@@ -843,6 +865,7 @@ test_watcher_self_evicts_on_lock_takeover() {
   # Simulate a second watcher taking over the singleton lock. $$ (the test
   # runner) is a live pid that is not the watcher.
   printf '%s\n' "$$" > "$state/.watch.lock/pid"
+  seed_lock_namespace "$state/.watch.lock"
   wait_for_exit "$pid" 60 || fail "watcher did not self-evict after lock takeover"
   lock_pid=$(cat "$state/.watch.lock/pid" 2>/dev/null || true)
   [ "$lock_pid" = "$$" ] || fail "self-evicting watcher clobbered the new holder's lock (got '$lock_pid')"
@@ -877,6 +900,7 @@ test_arm_self_eviction_is_loud_without_successor() {
   # self-evict normally. With no verified successor, the arm must turn that
   # otherwise clean empty close into the typed nonzero failure.
   printf '%s\n' "$$" > "$state/.watch.lock/pid"
+  seed_lock_namespace "$state/.watch.lock"
   wait_for_exit "$armpid" "$ARM_FAIL_EXIT_POLLS"
   status=$?
   [ "$status" -ne 0 ] && [ "$status" -ne 124 ] || fail "self-evicted arm did not fail nonzero (status $status)"
@@ -972,6 +996,7 @@ test_arm_term_during_steal_waits_for_watcher_cleanup_trap() {
   mkdir "$state/.watch.lock"
   dead=$(dead_pid)
   printf '%s\n' "$dead" > "$state/.watch.lock/pid"
+  seed_lock_namespace "$state/.watch.lock"
   mkdir -p "$fakebin"
   cat > "$fakebin/ln" <<'SH'
 #!/usr/bin/env bash
@@ -1072,6 +1097,7 @@ test_arm_starts_and_self_heals() {
       while kill -0 "$dead_pid" 2>/dev/null; do dead_pid=$((dead_pid + 1)); done
       mkdir "$state/.watch.lock"
       printf '%s\n' "$dead_pid" > "$state/.watch.lock/pid"
+      seed_lock_namespace "$state/.watch.lock"
       printf '%s\n' "$dir" > "$state/.watch.lock/fm-home"
       printf '%s\n' "$WATCH" > "$state/.watch.lock/watcher-path"
       printf '%s\n' "dead watcher identity" > "$state/.watch.lock/pid-identity"
@@ -1182,6 +1208,7 @@ test_arm_waits_for_peer_beacon_after_child_stands_down() {
   identity=$(FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_pid_identity "$2"' _ "$LIB" "$peer") || fail "could not identify peer pid"
   mkdir "$state/.watch.lock"
   printf '%s\n' "$peer" > "$state/.watch.lock/pid"
+  seed_lock_namespace "$state/.watch.lock"
   printf '%s\n' "$dir" > "$state/.watch.lock/fm-home"
   printf '%s\n' "$WATCH" > "$state/.watch.lock/watcher-path"
   printf '%s\n' "$identity" > "$state/.watch.lock/pid-identity"
@@ -1235,6 +1262,7 @@ test_arm_fails_loud_when_no_fresh_watcher_confirmable() {
   # watcher can ever be confirmed - the honest answer is FAILED, not healthy.
   mkdir "$state/.watch.lock"
   printf '%s\n' "$live" > "$state/.watch.lock/pid"
+  seed_lock_namespace "$state/.watch.lock"
   touch -t 200001010000 "$state/.last-watcher-beat"
   PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=5 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_ARM_CONFIRM_TIMEOUT=3 "$WATCH_ARM" > "$armout" &
   armpid=$!
@@ -1490,6 +1518,7 @@ test_stale_watch_reclaim_publishes_before_clear() {
   lockdir="$state/.watch.lock"
   mkdir -p "$lockdir"
   printf '99999999\n' > "$lockdir/pid"
+  seed_lock_namespace "$lockdir"
 
   FM_STATE_OVERRIDE="$state" bash -c '
     . "$1"

@@ -265,7 +265,8 @@ current_session_still_ours() {
 if ! fm_session_lock_owned_by_self "$STATE"; then
   LOCK_PID=$(cat "$STATE/.lock" 2>/dev/null || true)
   case "$LOCK_PID" in ''|*[!0-9]*) exit 0 ;; esac
-  fm_harness_pid_alive "$LOCK_PID" && exit 0
+  fm_session_lock_inspect "$STATE"
+  [ "$FM_LOCK_INSPECT_STATE" = stale ] || exit 0
   "$SCRIPT_DIR/fm-lock.sh" >/dev/null 2>&1 || exit 0
   fm_session_lock_owned_by_self "$STATE" || exit 0
 fi

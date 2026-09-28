@@ -16,6 +16,11 @@
 #
 # CONTRACT.
 #   - Lease file: $STATE/.lease-<task>, one line "<actor>\t<pid>\t<epoch>".
+#     Codex leases append a fourth field, the stable session generation. Their
+#     anchors can be transient or namespace-local: a matching generation with
+#     unknown liveness remains protected; only proved death or a replacement
+#     generation makes it stale. Legacy leases under a Codex owner remain
+#     protected until the actor explicitly releases them.
 #     Written atomically (temp + ln for claim, temp + mv for a same-actor
 #     refresh), with inspection and mutation serialized by the home-local
 #     lease-command lock; leases never coordinate across firstmate homes.
@@ -103,6 +108,8 @@
 FM_LEASE_REFUSE_EXIT=6
 FM_LEASE_LIB_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)"
 FM_LEASE_GUARD_LOCK=
+# shellcheck source=bin/fm-session-lock-lib.sh
+. "$FM_LEASE_LIB_DIR/fm-session-lock-lib.sh"
 
 fm_lease_lock_helpers() {
   command -v fm_lock_acquire_wait >/dev/null 2>&1 && return 0
@@ -137,6 +144,7 @@ fm_lease_valid_id() {
 }
 
 fm_lease_path() {
+  # shellcheck disable=SC2153 # STATE is supplied by the sourcing command.
   printf '%s/.lease-%s\n' "$STATE" "$1"
 }
 
@@ -150,12 +158,14 @@ fm_lease_read() {
   FM_LEASE_ACTOR=
   FM_LEASE_PID=
   FM_LEASE_EPOCH=
+  FM_LEASE_GENERATION=
   [ -e "$file" ] || return 1
   IFS= read -r line < "$file" 2>/dev/null || line=
   FM_LEASE_ACTOR=$(printf '%s' "$line" | cut -f1)
   FM_LEASE_PID=$(printf '%s' "$line" | cut -f2)
   # shellcheck disable=SC2034 # Consumed by sourcing callers (bin/fm-lease.sh check).
   FM_LEASE_EPOCH=$(printf '%s' "$line" | cut -f3)
+  FM_LEASE_GENERATION=$(printf '%s' "$line" | cut -s -f4)
   case "$FM_LEASE_ACTOR" in
     main|branch) ;;
     *) FM_LEASE_ACTOR= ;;
@@ -170,10 +180,19 @@ fm_lease_read() {
 # alive, and that pid IS the current session-lock holder (the staleness
 # contract above). The calling context never enters the verdict.
 fm_lease_live() {
-  local lock_pid
+  local lock_pid generation
   fm_lease_read "$1" || return 1
   [ -n "$FM_LEASE_ACTOR" ] || return 1
   [ -n "$FM_LEASE_PID" ] || return 1
+  if [ -n "$FM_LEASE_GENERATION" ] || fm_session_lock_codex_record_present "$STATE"; then
+    generation=$(fm_session_lock_generation "$STATE") || return 0
+    # An older PID-only lease cannot be proven stale across namespace changes.
+    [ -n "$FM_LEASE_GENERATION" ] || return 0
+    [ "$FM_LEASE_GENERATION" = "$generation" ] || return 1
+    fm_session_lock_inspect "$STATE"
+    [ "$FM_LOCK_INSPECT_STATE" != stale ] && [ "$FM_LOCK_INSPECT_STATE" != free ]
+    return
+  fi
   kill -0 "$FM_LEASE_PID" 2>/dev/null || return 1
   lock_pid=$(head -n 1 "$STATE/.lock" 2>/dev/null || true)
   case "$lock_pid" in ''|0|1|*[!0-9]*) return 1 ;; esac

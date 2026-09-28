@@ -244,7 +244,7 @@ cmd_start() {  # <locked> <harvest-pid>
   # Captured HERE, at the moment the caller still holds the lock, and carried to
   # the worker: re-reading the lock later would only prove that SOME session
   # holds it, which is exactly the case this guard exists to reject.
-  lock_pid=$(cat "$STATE/.lock" 2>/dev/null || true)
+  lock_pid=$(fm_session_lock_generation "$STATE" 2>/dev/null || true)
   if [ "$locked" = 1 ] && ! fm_session_lock_owned_by_self "$STATE"; then
     return 1
   fi
@@ -326,20 +326,15 @@ EOF
 # session held the lock a moment ago" is not enough for a worker that outlives
 # the command which launched it.
 #
-# The question is deliberately "does the lock still name the session that asked
-# for this work?", not "is that session still alive". The hazard being closed is
-# a SECOND session sweeping concurrently. A different session can take the lock
-# only after the recorded holder is dead, when bin/fm-lock.sh rewrites that pid
-# with its own anchor. An unchanged value therefore proves no one else owns the sweeps, which is
-# the whole guarantee. Requiring liveness instead would refuse to finish work
-# nobody else has claimed, and the sweeps are idempotent, so finishing it is
-# strictly better than abandoning it. A missing, unreadable, or replaced lock all
-# fail closed to the read-only probe.
+# The stable generation names the session that requested the sweep, even
+# when a Codex call refreshes its ephemeral anchor. The shared claim lock
+# excludes takeover throughout mutation; a different generation downgrades
+# the worker to detection only. Liveness uncertainty never grants takeover.
 lock_unchanged() {  # <expected-pid>
   local expected=$1 current
-  case "$expected" in ''|*[!0-9]*) return 1 ;; esac
+  case "$expected" in ''|*[!A-Za-z0-9:._-]*) return 1 ;; esac
   [ -f "$STATE/.lock" ] && [ ! -L "$STATE/.lock" ] || return 1
-  current=$(cat "$STATE/.lock" 2>/dev/null) || return 1
+  current=$(fm_session_lock_generation "$STATE" 2>/dev/null) || return 1
   [ "$current" = "$expected" ]
 }
 
@@ -511,7 +506,7 @@ cmd_run() {  # <locked> <lock-pid> <generation>
     locked=0
   fi
   if [ "$locked" = 1 ]; then
-    [ "$internal" -eq 1 ] || lock_pid=$(cat "$STATE/.lock" 2>/dev/null || true)
+    [ "$internal" -eq 1 ] || lock_pid=$(fm_session_lock_generation "$STATE" 2>/dev/null || true)
     if lock_unchanged "$lock_pid"; then
       sweep_locked=1
       phases=probe,sweeps

@@ -1,24 +1,19 @@
 #!/usr/bin/env bash
 # Acquire or inspect the per-home firstmate session lock.
 #
-# Line 1 of state/.lock is the owning session's anchor pid, resolved by
-# fm_session_lock_anchor_pid in bin/fm-session-lock-lib.sh: the harness (agent)
-# process found by walking the shell's ancestry, which lives as long as the
-# firstmate session - unlike the transient subshell PID of any one tool call,
-# which is dead moments after it is written. For a Claude session that proves a
-# trusted session id the anchor is CLAUDE_PID, the model-loop process, so a
-# shared transient daemon or a front-end that outlives the session never keeps
-# a dead session's lock alive. Line 1 keeps its whole-line pid format because
-# every other reader takes the first line as the pid.
-#
-# The trusted id itself is recorded beside the lock in state/.lock-session, a
-# sidecar written only here and only under the claim lock: refreshed on every
-# confirmed-own acquisition, including the early already-mine exit that waits
-# for the claim lock, removed when the acquiring session proves no trusted id,
-# and left byte-identical when it already names that id. A same-session
-# confirmation never rewrites line 1 while the recorded pid is alive, because
-# bin/fm-startup-network.sh compares that pid across its deferred sweeps; a dead
-# recorded pid is reclaimed and rewritten to this session's anchor.
+# Line 1 of state/.lock remains the numeric anchor resolved by the shared
+# session-lock library. Claude retains its trusted model-loop identity.
+# Linux Codex records its verified tool-boundary thread id in line 1 of
+# state/.lock-session and one metadata line:
+#   codex-owner-v1 <pid> <boot/pid-namespace> <starttime> <process|transient>
+# Only this script writes that sidecar, serialized by state/.lock.acquire.
+# Codex refreshes its anchor on every entry; a sandbox init lives for one tool
+# call, not the session. The stable thread generation binds deferred work.
+# A foreign transient or unreadable owner stays unknown and cannot be reclaimed
+# on age, PID coincidence, or absence from another process namespace.
+# Non-Codex same-session confirmations keep their live numeric anchor unchanged.
+# Publication and rollback of the sidecar and numeric record remain one claimed
+# transaction. All ownership and liveness readers use fm-session-lock-lib.sh.
 #
 # Usage: fm-lock.sh           acquire; exit 1 unless ownership is verified
 #        fm-lock.sh status    print holder and liveness; always exits 0.
@@ -50,12 +45,17 @@ if [ "${1:-}" = "status" ]; then
     free) echo "lock: free" ;;
     unreadable) echo "lock: unreadable" ;;
     held) echo "lock: held by live harness pid $FM_LOCK_INSPECT_PID" ;;
-    *) echo "lock: stale (pid $FM_LOCK_INSPECT_PID dead or not a harness)" ;;
+    stale) echo "lock: stale (pid $FM_LOCK_INSPECT_PID ended in its recorded namespace)" ;;
+    *) echo "lock: unknown (pid $FM_LOCK_INSPECT_PID cannot be verified in this process view)" ;;
   esac
   exit 0
 fi
 
 me=$(fm_session_lock_anchor_pid) || { echo "error: cannot locate harness process in ancestry" >&2; exit 1; }
+if fm_session_lock_codex_ancestor_pid >/dev/null && ! fm_session_lock_trusted_codex_session_id >/dev/null; then
+  echo "error: cannot verify the Codex tool session identity; operate read-only until resolved" >&2
+  exit 1
+fi
 probe=$(mktemp "$STATE/.lock-write.XXXXXX" 2>/dev/null) || {
   echo "error: cannot write session lock; operate read-only until resolved" >&2
   exit 1
@@ -120,16 +120,27 @@ remember_lock_session() {
 
 # Record the trusted session id beside the lock, or remove a sidecar that no
 # trusted id backs. Called only while the claim lock is held. A sidecar already
-# naming this id is left untouched, so a same-session confirmation keeps it
-# byte-identical.
+# naming a non-Codex id is left byte-identical. Codex refreshes its process
+# coordinates on each acquisition while retaining its stable thread identity.
 publish_lock_session() {
-  local trusted recorded tmp
+  local trusted recorded tmp namespace start kind
   if trusted=$(fm_session_lock_trusted_session_id); then
-    if recorded=$(fm_session_lock_recorded_session_id "$STATE") && [ "$recorded" = "$trusted" ]; then
+    if recorded=$(fm_session_lock_recorded_session_id "$STATE") && [ "$recorded" = "$trusted" ] \
+      && ! fm_session_lock_codex_record_present "$STATE"; then
       return 0
     fi
     remember_lock_session || return 1
     tmp=$(mktemp "$STATE/.lock-session.XXXXXX" 2>/dev/null) || return 1
+    case "$trusted" in
+      codex:*)
+        namespace=$(fm_process_namespace) || { rm -f "$tmp"; return 1; }
+        start=$(fm_process_starttime "$me") || { rm -f "$tmp"; return 1; }
+        kind=process
+        [ "$me" != 1 ] || kind=transient
+        trusted="$trusted
+codex-owner-v1 $me $namespace $start $kind"
+        ;;
+    esac
     if ! { printf '%s\n' "$trusted" > "$tmp" && mv -f "$tmp" "$LOCK_SESSION"; } 2>/dev/null; then
       rm -f "$tmp" 2>/dev/null
       return 1
@@ -158,15 +169,15 @@ publish_lock_session_or_die() {
 # and the caller continues with the ordinary live-owner or reclaim path. The
 # prior-session-sweep-is-finishing refusal is a takeover rule and does not
 # apply here.
-confirm_own_lock() {  # <recorded-pid>
+confirm_own_lock() {
   local recorded waited=0
   if [ "$CLAIM_LOCK_HELD" -ne 1 ]; then
-    fm_lock_acquire_wait "$CLAIM_LOCK"
+    fm_lock_acquire_wait_max "$CLAIM_LOCK" 10 || refuse_uncertain_owner
     CLAIM_LOCK_HELD=1
     waited=1
   fi
   recorded=$(cat "$LOCK" 2>/dev/null || true)
-  if [ "$recorded" = "$me" ] || fm_session_lock_owned_by_self "$STATE"; then
+  if fm_session_lock_owned_by_self "$STATE"; then
     publish_lock_session_or_die
     commit_lock_session
     release_claim_lock
@@ -189,16 +200,27 @@ refuse_live_owner() {  # <recorded-pid>
   exit 1
 }
 
-if [ -f "$LOCK" ] && [ ! -L "$LOCK" ]; then
-  old=$(cat "$LOCK" 2>/dev/null || true)
-  if [ "$old" = "$me" ] || fm_session_lock_owned_by_self "$STATE"; then
-    confirm_own_lock "$old"
-    old=$(cat "$LOCK" 2>/dev/null || true)
+refuse_uncertain_owner() {
+  echo "error: session owner cannot be verified in this process view; preserve the lock and operate read-only until resolved" >&2
+  exit 1
+}
+
+check_previous_owner() {
+  if fm_session_lock_owned_by_self "$STATE"; then
+    # Refresh a Codex anchor on every verified entry: its previous tool init
+    # may have ended, or its previous host process may have been replaced.
+    fm_session_lock_codex_record_present "$STATE" && return 0
+    confirm_own_lock
   fi
-  if fm_harness_pid_alive "$old"; then
-    refuse_live_owner "$old"
-  fi
-fi
+  fm_session_lock_inspect "$STATE"
+  case "$FM_LOCK_INSPECT_STATE" in
+    free|stale) return 0 ;;
+    held) refuse_live_owner "$FM_LOCK_INSPECT_PID" ;;
+    *) refuse_uncertain_owner ;;
+  esac
+}
+
+check_previous_owner
 
 if ! fm_lock_try_acquire "$CLAIM_LOCK"; then
   sweep_pid=$(sed -n 's/^pid=//p' "$STATE/.startup-network.status" 2>/dev/null | tail -1)
@@ -206,27 +228,11 @@ if ! fm_lock_try_acquire "$CLAIM_LOCK"; then
     echo "error: the prior session's bounded startup sweep is finishing; operate read-only until it releases the fleet lock" >&2
     exit 1
   fi
-  fm_lock_acquire_wait "$CLAIM_LOCK"
+  fm_lock_acquire_wait_max "$CLAIM_LOCK" 10 || refuse_uncertain_owner
 fi
 CLAIM_LOCK_HELD=1
 
-if [ -e "$LOCK" ] || [ -L "$LOCK" ]; then
-  if [ ! -f "$LOCK" ] || [ -L "$LOCK" ]; then
-    echo "error: session lock is not a regular file; operate read-only until resolved" >&2
-    exit 1
-  fi
-  old=$(cat "$LOCK" 2>/dev/null) || {
-    echo "error: session lock is unreadable; operate read-only until resolved" >&2
-    exit 1
-  }
-  if [ "$old" != "$me" ] && fm_harness_pid_alive "$old"; then
-    fm_session_lock_owned_by_self "$STATE" && confirm_own_lock "$old"
-    old=$(cat "$LOCK" 2>/dev/null || true)
-    if [ "$old" != "$me" ] && fm_harness_pid_alive "$old"; then
-      refuse_live_owner "$old"
-    fi
-  fi
-fi
+check_previous_owner
 # The sidecar goes first: a fresh pid beside a previous session's id would let
 # that session's resume own this lock. If the sidecar changes before line 1 is
 # written, a failure restores the previous sidecar. If line 1 is written but
