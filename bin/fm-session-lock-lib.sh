@@ -229,10 +229,11 @@ EOF
 # so the long-lived host Codex environment is NOT the session identity.
 # This is a harness provenance check, not a boundary against another process
 # with permission to rewrite this user's home or impersonate the executable.
-fm_session_lock_codex_ancestor_pid() {
-  local pid executable comm
+fm_session_lock_codex_ancestor_pid() {  # [<ancestry-pids>]
+  local pid executable comm pids=${1:-}
   [ "$(uname)" = Linux ] || return 1
-  pid=$(fm_harness_ancestry_pid) || return 1
+  if [ -z "$pids" ]; then pids=$(fm_harness_ancestry_pids) || return 1; fi
+  pid=$(_fm_harness_outermost_pid "$pids") || return 1
   if ! executable=$(readlink "/proc/$pid/exe" 2>/dev/null); then
     comm=$(ps -o comm= -p "$pid" 2>/dev/null) || return 1
     [ "${comm##*/}" = codex ] || return 1
@@ -245,9 +246,9 @@ fm_session_lock_codex_ancestor_pid() {
   printf '%s\n' "$pid"
 }
 
-fm_session_lock_trusted_codex_session_id() {
+fm_session_lock_trusted_codex_session_id() {  # [<ancestry-pids>]
   local anchor
-  anchor=$(fm_session_lock_codex_ancestor_pid) || return 1
+  anchor=$(fm_session_lock_codex_ancestor_pid "${1:-}") || return 1
   python3 - "$$" "$anchor" <<'PYCODE'
 import os, pathlib, re, sys
 
@@ -296,7 +297,7 @@ PYCODE
 
 fm_session_lock_trusted_session_id() {  # [<ancestry-pids>]
   fm_session_lock_trusted_claude_session_id "${1:-}" && return 0
-  fm_session_lock_trusted_codex_session_id
+  fm_session_lock_trusted_codex_session_id "${1:-}"
 }
 
 # A Codex record has an explicit namespace and process birth. A transient
@@ -343,8 +344,8 @@ fm_session_lock_recorded_session_id() {  # <state>
 # sidecar, or a different recorded id is false.
 fm_session_lock_same_session() {  # <state> [<ancestry-pids>]
   local state=$1 trusted recorded
-  trusted=$(fm_session_lock_trusted_session_id "${2:-}") || return 1
   recorded=$(fm_session_lock_recorded_session_id "$state") || return 1
+  trusted=$(fm_session_lock_trusted_session_id "${2:-}") || return 1
   [ "$recorded" = "$trusted" ]
 }
 
@@ -387,17 +388,19 @@ fm_session_lock_owned_by_self() {
   case "$lock_pid" in
     ''|*[!0-9]*) return 1 ;;
   esac
+  # Reuse this predicate's one ancestry observation for both harness paths.
+  # Never cache it across calls: a parent can exit while a caller stays alive.
+  pids=$(fm_harness_ancestry_pids) || return 1
   if fm_session_lock_codex_record_present "$state"; then
     fm_session_lock_read_codex_record "$state" "$lock_pid" || return 1
-    fm_session_lock_same_session "$state"
+    fm_session_lock_same_session "$state" "$pids"
     return
   fi
   # A native Codex tool must not adopt a legacy numeric record as self-owned.
   # In particular, another namespace's PID 1 is never this session's proof.
-  if fm_session_lock_codex_ancestor_pid >/dev/null; then
+  if fm_session_lock_codex_ancestor_pid "$pids" >/dev/null; then
     return 1
   fi
-  pids=$(fm_harness_ancestry_pids) || return 1
   while IFS= read -r pid; do
     [ "$pid" = "$lock_pid" ] && return 0
   done <<EOF

@@ -250,6 +250,8 @@ record_watcher_lock() {
   bin_dir=$(cd "$dir/bin" && pwd)
   mkdir -p "$dir/state/.watch.lock"
   printf '%s\n' "$pid" > "$dir/state/.watch.lock/pid"
+  FM_STATE_OVERRIDE="$dir/state" bash -c '. "$1"; fm_lock_write_namespace "$2"' \
+    _ "$dir/bin/fm-wake-lib.sh" "$dir/state/.watch.lock"
   printf '%s\n' "$root" > "$dir/state/.watch.lock/fm-home"
   printf '%s\n' "$bin_dir/fm-watch.sh" > "$dir/state/.watch.lock/watcher-path"
   printf '%s\n' "$identity" > "$dir/state/.watch.lock/pid-identity"
@@ -683,6 +685,8 @@ test_positive_recovery_budget_contention_preserves_episode() {
   holder=$!
   mkdir -p "$dir/state/.turnend-claude-blocks.lock"
   printf '%s\n' "$holder" > "$dir/state/.turnend-claude-blocks.lock/pid"
+  FM_STATE_OVERRIDE="$dir/state" bash -c '. "$1"; fm_lock_write_namespace "$2"' \
+    _ "$dir/bin/fm-wake-lib.sh" "$dir/state/.turnend-claude-blocks.lock"
   out=$(run_autoarm "$dir" 2>/dev/null); status=$?
   expect_code 2 "$status" "a healthy auto-arm must continue when the episode reset lock is busy"
   [ -z "$out" ] || fail "recovery contention produced an operator notice: $out"

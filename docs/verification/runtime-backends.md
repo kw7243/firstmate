@@ -2364,3 +2364,32 @@ A throwaway scout was spawned through `bin/fm-spawn.sh --scout --harness omp --m
 6. `bin/fm-control.sh <id> exit` stopped the agent and `bin/fm-teardown.sh` returned the worktree and closed the item.
 
 `FM_OMP_LIVE_E2E=1 tests/fm-omp-primary-live-e2e.test.sh` refreshes the primary evidence; the worker path above is refreshed by repeating the scout dispatch after any omp upgrade.
+
+## Linux Codex session identity
+
+Verified on 2026-09-29 with codex-cli 0.153.4 on Linux in real restricted Codex App tool calls, a host tool call from the same thread, and a distinct host CLI worker.
+Run this token-free guard from each actual tool context after a Codex upgrade:
+
+```sh
+FM_CODEX_SESSION_IDENTITY_LIVE=1 bash tests/fm-codex-session-identity-live-e2e.test.sh
+```
+
+The restricted and host calls from one thread printed the same identity hash, followed by:
+
+```text
+ok - codex-cli 0.153.4: native Codex tool identity verified; repeat stable; caller override rejected
+```
+
+The restricted version command warned that its read-only filesystem prevented creating PATH aliases, but exited 0 and every guard assertion ran.
+The guard checks the real native tool boundary; running it outside Codex fails with an explicit context diagnostic rather than passing a mock.
+It changes no home or ownership record.
+`tests/fm-codex-session-lock.test.sh` supplies the portable Linux process regression for different threads sharing one process, dead and ambiguous owners, identity override, repeat entry, dependent records, and namespace-separated transient claims.
+Those renamed-process fixtures are logic tests, not vendor evidence.
+
+Real isolated-home probes acquired the same generation in restricted, host, and restricted calls, and a distinct real Codex worker was refused.
+A restricted caller held a transient claim while a host observer verified that it could neither acquire nor release it, that the owner bytes remained unchanged, and that host acquisition succeeded only after the holder released it.
+A fresh Bash/tmux 3.4 smoke through stock `fm-spawn.sh` automatically launched the configured gpt-6-astra worker, delivered the worker role and instruction tail, completed isolated startup, handled a separate durable steer, passed its completion gate, and exited through `fm-control.sh`.
+No manual shell submission was used in that smoke.
+These facts do not establish primary notification continuity or authorize production migration.
+Non-Linux Codex retains its native ancestry path; this Linux namespace proof does not claim a macOS result.
+Other harnesses retain their ancestry or trusted Claude identity behavior and do not consume Codex thread provenance.

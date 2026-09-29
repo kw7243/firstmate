@@ -198,13 +198,9 @@ The Ahoy skill's own step 0 helm check is the fallback that protects a nudge-tie
 
 ### Nudge wrapper lock check
 
-Before printing, the nudge wrapper reads `state/.lock` and walks at most eight parents from its own pid.
-It does this in its own separate, hard-coded loop, independent of two other ownership checks:
-
-- The shared sixteen-hop ancestry walk in `bin/fm-session-lock-lib.sh` that `bin/fm-lock.sh` uses for anchor selection and ownership.
-- Pi's `lockOwnership()`.
-
-If the lock names a live pid in that ancestry, session start already ran in this harness session and the wrapper stays silent.
+Before printing, the nudge wrapper asks `fm_session_lock_owned_by_self` in `bin/fm-session-lock-lib.sh` whether startup already ran in this verified session.
+A matching numeric PID alone cannot silence the nudge for a Codex session whose tool calls cross process namespaces.
+The shared library owns the identity validation; the wrapper has no separate ancestry loop.
 
 ### Exit codes
 

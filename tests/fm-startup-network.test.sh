@@ -21,6 +21,15 @@
 #     failed-rerun record instead of an unbounded wait
 set -u
 
+# The handoff fixture names this test's parent as its second harness. Keep
+# that parent a dedicated shell so an ambient real Codex process cannot leak
+# native thread provenance into the deliberately mocked process table.
+if [ "${FM_STARTUP_NETWORK_TEST_PARENT:-0}" != 1 ]; then
+  # shellcheck disable=SC2016 # Keep the parent alive until the test returns.
+  FM_STARTUP_NETWORK_TEST_PARENT=1 bash -c '"$@"; result=$?; :; exit "$result"' _ "$0" "$@"
+  exit $?
+fi
+
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 # shellcheck source=bin/fm-timeout-lib.sh
@@ -611,19 +620,29 @@ EOF
 }
 
 test_lock_takeover_stays_read_only_while_a_sweep_holds_the_lease() {
-  local rec home root log next_owner new_owner out rc started elapsed waited=0
+  local rec home root log next_owner new_owner old_owner out rc started elapsed
   rec=$(new_world sweep-lease)
   IFS='|' read -r home root log <<EOF
 $rec
 EOF
-  printf '%s\n' $$ > "$home/state/.lock"
-  FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_SLEEP=6 \
-    run_stage "$home" "$root" start --locked 1 --harvest-pid $$
-  while [ ! -s "$log" ] && [ "$waited" -lt 50 ]; do
-    sleep 0.1
-    waited=$((waited + 1))
-  done
+  # The previous harness must really exit. Merely removing its ps disguise
+  # leaves a live non-harness process, whose ownership is unknown, not stale.
+  # shellcheck disable=SC2016 # The separate owner publishes its own PID.
+  FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_SLEEP=10 \
+    bash -c '
+      home=$1 root=$2 log=$3
+      printf "%s\n" $$ > "$home/state/.lock"
+      PATH="$root/bin:$PATH" FM_FAKE_HARNESS_PID=$$ FM_HOME="$home" FM_ROOT_OVERRIDE="$root" \
+        "$root/bin/fm-startup-network.sh" start --locked 1 --harvest-pid $$
+      for ((i=0; i<100; i++)); do
+        [ ! -s "$log" ] || exit 0
+        sleep 0.1
+      done
+      exit 1
+    ' _ "$home" "$root" "$log" || fail "the previous owner never started its sweep"
   [ -s "$log" ] || fail "the mutating sweep never started"
+  old_owner=$(cat "$home/state/.lock")
+  if kill -0 "$old_owner" 2>/dev/null; then fail "the previous owner did not exit"; fi
 
   next_owner=$(/bin/ps -o ppid= -p $$ | tr -d ' ')
   started=$(date +%s)
@@ -635,7 +654,7 @@ EOF
   [ "$elapsed" -lt 4 ] || fail "lock takeover blocked ${elapsed}s behind deferred network work"
   assert_contains "$out" "operate read-only" \
     "a lease-blocked takeover did not fail closed to read-only: $out"
-  [ "$(cat "$home/state/.lock")" = "$$" ] \
+  [ "$(cat "$home/state/.lock")" = "$old_owner" ] \
     || fail "the lease-blocked takeover replaced the prior owner"
 
   run_stage "$home" "$root" wait 30 >/dev/null || fail "the leased sweep never settled"
@@ -645,7 +664,7 @@ EOF
   new_owner=$(cat "$home/state/.lock")
   assert_contains "$out" "lock acquired: harness pid $new_owner" \
     "the fleet lock did not record the harness owner reported by acquisition"
-  [ "$new_owner" != "$$" ] || fail "the prior harness still owned the lock after takeover"
+  [ "$new_owner" != "$old_owner" ] || fail "the prior harness still owned the lock after takeover"
   pass "fm-startup-network: fleet-lock takeover cannot overlap a mutating sweep"
 }
 

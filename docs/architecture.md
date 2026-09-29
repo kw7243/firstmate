@@ -163,6 +163,14 @@ The snapshot strips control sequences, retains only capture metadata and literal
 Live GitHub enrichment exists only behind the bearings `--include-prs` opt-in.
 Optional Relay integrates with the watcher only after explicit opt-in; [configuration.md](configuration.md#relay-env) owns its generated-artifact and dispatch mechanics.
 
+Session ownership and its derived generation are owned by `bin/fm-session-lock-lib.sh`; `bin/fm-lock.sh` owns serialized publication and its record format.
+Linux Codex tool calls can enter different PID namespaces while retaining one native thread identity, so a numeric PID cannot identify their session across calls.
+The native tool-boundary identity binds repeat entry and deferred work; process namespace and birth coordinates distinguish proved dead owners from owners whose liveness is unknown.
+Shared transient lock primitives in `bin/fm-wake-lib.sh` also require namespace agreement before interpreting a PID on Linux.
+Legacy Linux transient locks without those coordinates remain unknown and are preserved; migration must establish that their owners ended before retiring their records.
+These checks preserve ambiguous ownership rather than infer death from age or an absent PID in another namespace.
+Current empirical commands and platform limits are recorded in [runtime verification](verification/runtime-backends.md#linux-codex-session-identity).
+
 At session start, `bin/fm-session-start.sh` emits exactly one primary-harness supervision block rendered by `bin/fm-supervision-instructions.sh` from `docs/supervision-protocols/`.
 That block owns the live wait shape for the running primary harness: Claude's Stop `asyncRewake` hook owns tokenless re-arm cycles, Cursor's stop hook parks on the watcher, Grok uses background-notify cycles, Codex uses bounded foreground checkpoints, Pi and pi-signed use the same two tracked primary extensions, omp uses its own two tracked `.omp/extensions/` files, and OpenCode uses its TUI plugin.
 `bin/fm-watch-arm.sh` remains the verified arm wrapper for protocols that call it; it forks the watcher as a tracked child, verifies it is genuinely alive with a fresh liveness beacon, and prints an honest `started`, `attached`, or nonzero `FAILED` status.

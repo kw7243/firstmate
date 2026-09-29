@@ -2034,6 +2034,19 @@ async function assertLifecycleLockOwned() {
   }
   const pid = (await readFile(pidPath, "utf8")).trim();
   if (pid !== String(delegatedOwnerPid || process.pid)) fail("lifecycle-lock-lost", "retirement process does not own the lifecycle lock");
+  // This lock is published by fm-wake-lib.sh. Interpret its PID only in the
+  // kernel namespace that published it, including when ownership is delegated.
+  const namespacePath = path.join(ownerPath, "pid-namespace");
+  const namespaceInfo = await maybeLstat(namespacePath);
+  if (process.platform === "linux") {
+    if (!namespaceInfo?.isFile() || namespaceInfo.isSymbolicLink() || namespaceInfo.nlink !== 1 || namespaceInfo.uid !== currentUid()) {
+      fail("lifecycle-lock-invalid", "retirement lifecycle lock namespace is unsafe or missing");
+    }
+    const current = `${(await readFile("/proc/sys/kernel/random/boot_id", "utf8")).trim()}/${await readlink("/proc/self/ns/pid")}`;
+    if ((await readFile(namespacePath, "utf8")).trim() !== current) fail("lifecycle-lock-lost", "retirement lifecycle lock belongs to another process namespace");
+  } else if (namespaceInfo) {
+    fail("lifecycle-lock-lost", "retirement lifecycle lock belongs to another process namespace");
+  }
 }
 
 async function claimInheritedLifecycleLock(home) {
@@ -2059,6 +2072,7 @@ async function releaseLifecycleLock() {
   const { lockPath, ownerPath } = activeLifecycleLock;
   await unlink(lockPath);
   await unlink(path.join(ownerPath, "pid"));
+  if (process.platform === "linux") await unlink(path.join(ownerPath, "pid-namespace"));
   await rmdir(ownerPath);
   activeLifecycleLock = null;
 }

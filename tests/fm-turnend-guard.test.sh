@@ -294,6 +294,8 @@ record_watcher_lock() {
   bin_dir=$(cd "$dir/bin" && pwd)
   mkdir -p "$dir/state/.watch.lock"
   printf '%s\n' "$pid" > "$dir/state/.watch.lock/pid"
+  FM_STATE_OVERRIDE="$dir/state" bash -c '. "$1"; fm_lock_write_namespace "$2"' \
+    _ "$dir/bin/fm-wake-lib.sh" "$dir/state/.watch.lock"
   printf '%s\n' "$root" > "$dir/state/.watch.lock/fm-home"
   printf '%s\n' "$bin_dir/fm-watch.sh" > "$dir/state/.watch.lock/watcher-path"
   printf '%s\n' "$identity" > "$dir/state/.watch.lock/pid-identity"
@@ -385,6 +387,8 @@ test_hook_non_claude_health_ignores_claude_budget_contention() {
   holder=$!
   mkdir -p "$dir/state/.turnend-claude-blocks.lock"
   printf '%s\n' "$holder" > "$dir/state/.turnend-claude-blocks.lock/pid"
+  FM_STATE_OVERRIDE="$dir/state" bash -c '. "$1"; fm_lock_write_namespace "$2"' \
+    _ "$dir/bin/fm-wake-lib.sh" "$dir/state/.turnend-claude-blocks.lock"
   while IFS='|' read -r harness payload; do
     out=$(printf '%s' "$payload" | FM_HOME="$home" bash "$dir/bin/fm-turnend-guard.sh" 2>&1); status=$?
     expect_code 0 "$status" "$harness healthy path must ignore Claude budget-lock contention"
@@ -1749,6 +1753,8 @@ test_hook_claude_mode_recovery_contention_is_not_ordinary_allow() {
   holder=$!
   mkdir -p "$dir/state/.turnend-claude-blocks.lock"
   printf '%s\n' "$holder" > "$dir/state/.turnend-claude-blocks.lock/pid"
+  FM_STATE_OVERRIDE="$dir/state" bash -c '. "$1"; fm_lock_write_namespace "$2"' \
+    _ "$dir/bin/fm-wake-lib.sh" "$dir/state/.turnend-claude-blocks.lock"
   out=$(run_hook_claude "$dir" false); status=$?
   expect_code 2 "$status" "a healthy guard must continue when the episode reset lock is busy"
   [ -z "$out" ] || fail "guard recovery contention produced output: $out"
