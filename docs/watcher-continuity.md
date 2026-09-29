@@ -397,6 +397,8 @@ The watcher uses bash's native fatal handling for HUP and TERM, including during
 The EXIT cleanup bounds its wait for `state/.watcher-down.lock` while persisting recovery state with `FM_WATCHER_CLEANUP_LOCK_BOUND` (default 2 seconds).
 Only positive decimal integers are accepted, including leading-zero forms such as `08`; empty, non-numeric, and zero values (including `00`) fall back to 2 seconds.
 A live foreign holder therefore cannot strand a TERM'd watcher in this marker-lock wait: on timeout the recovery transition fails without releasing the singleton, leaving dead-pid stale evidence for the next arm to republish and clear.
+The shared stale-lock removal transition also governs restart cleanup: it requires namespace agreement and proof that the recorded owner ended or its PID was reused, then serializes recovery publication and removal against successor claims.
+Unknown ownership preserves the singleton and does not publish downtime.
 
 ## Regression coverage
 

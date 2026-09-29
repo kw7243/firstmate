@@ -762,6 +762,147 @@ test_lock_paused_mid_acquire_claim_fails_during_steal() {
   pass "paused mid-acquire claimant backs off to active stealer"
 }
 
+test_watch_restart_preserves_unproven_namespace() (
+  local mode dir state out live identity status
+  if [ "$(uname)" != Linux ]; then
+    pass "watch restart namespace preservation skipped on non-Linux host"
+    return
+  fi
+  sleep 300 &
+  live=$!
+  trap 'kill "$live" 2>/dev/null || true; wait "$live" 2>/dev/null || true' EXIT
+  for mode in foreign missing; do
+    dir=$(make_case "restart-$mode-namespace")
+    state="$dir/state"
+    out="$dir/restart.out"
+    identity=$(FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_pid_identity "$2"' _ "$LIB" "$live") \
+      || fail "could not identify namespace-colliding process"
+    mkdir "$state/.watch.lock"
+    printf '%s\n' "$live" > "$state/.watch.lock/pid"
+    printf '%s\n' "$dir" > "$state/.watch.lock/fm-home"
+    printf '%s\n' "$WATCH" > "$state/.watch.lock/watcher-path"
+    printf '%s\n' "$identity" > "$state/.watch.lock/pid-identity"
+    if [ "$mode" = foreign ]; then
+      printf '%s\n' 'other-boot/pid:[other-namespace]' > "$state/.watch.lock/pid-namespace"
+    fi
+    touch -t 200001010000 "$state/.last-watcher-beat"
+    cp -R "$state/.watch.lock" "$dir/expected-lock"
+    status=0
+    PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" \
+      FM_ARM_CONFIRM_TIMEOUT=1 "$WATCH_ARM" --restart > "$out" 2>&1 || status=$?
+    [ "$status" -ne 0 ] || fail "restart accepted a $mode-namespace watcher lock"
+    diff -r "$dir/expected-lock" "$state/.watch.lock" \
+      || fail "restart changed a $mode-namespace watcher lock"
+    [ ! -e "$state/.watcher-down" ] || fail "restart published unproven $mode-namespace downtime"
+    is_live_non_zombie "$live" || fail "restart signalled a $mode-namespace PID collision"
+  done
+  pass "watch restart preserves foreign and missing namespace locks despite a live local PID collision"
+)
+
+test_stale_watch_clear_requires_owner_proof() (
+  local mode dir state live identity status proc_root
+  sleep 300 &
+  live=$!
+  trap 'kill "$live" 2>/dev/null || true; wait "$live" 2>/dev/null || true' EXIT
+  for mode in matching-identity missing-identity unreadable-identity invalid-pid no-signal; do
+    dir=$(make_case "clear-stale-$mode")
+    state="$dir/state"
+    identity=$(FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_pid_identity "$2"' _ "$LIB" "$live") \
+      || fail "could not identify live lock holder"
+    mkdir "$state/.watch.lock"
+    printf '%s\n' "$live" > "$state/.watch.lock/pid"
+    seed_lock_namespace "$state/.watch.lock"
+    printf '%s\n' "$identity" > "$state/.watch.lock/pid-identity"
+    proc_root=/proc
+    case "$mode" in
+      missing-identity) rm "$state/.watch.lock/pid-identity" ;;
+      unreadable-identity)
+        proc_root="$dir/no-proc"
+        printf '#!/usr/bin/env bash\nexit 1\n' > "$dir/fakebin/ps"
+        chmod +x "$dir/fakebin/ps"
+        ;;
+      invalid-pid) printf '%s\n' invalid > "$state/.watch.lock/pid" ;;
+    esac
+    touch -t 200001010000 "$state/.watch.lock"
+    cp -R "$state/.watch.lock" "$dir/expected-lock"
+    status=0
+    PATH="$dir/fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_PROC_ROOT_OVERRIDE="$proc_root" bash -c '
+      . "$1"
+      denied_pid=$4
+      if [ "$3" = no-signal ]; then
+        kill() {
+          if [ "$1" = -0 ] && [ "${2:-}" = "$denied_pid" ]; then return 1; fi
+          builtin kill "$@"
+        }
+        ! kill -0 "$denied_pid" || exit 90
+        [ -n "$(ps -p "$denied_pid" -o pid=)" ] || exit 91
+      fi
+      fm_recovery_transition "$2/.watcher-down" clear-stale-lock "$2/.watch.lock" downtime
+    ' _ "$LIB" "$state" "$mode" "$live" || status=$?
+    [ "$status" -eq 1 ] || fail "stale clear accepted $mode or its fixture failed (status $status)"
+    diff -r "$dir/expected-lock" "$state/.watch.lock" || fail "stale clear changed $mode lock"
+    [ ! -e "$state/.watcher-down" ] || fail "stale clear published unproven $mode downtime"
+    is_live_non_zombie "$live" || fail "stale clear signalled a live holder"
+  done
+  pass "shared stale clear refuses matching, missing, unreadable and malformed owner proof"
+)
+
+test_stale_watch_clear_serializes_publication_and_removal() (
+  local dir state lockdir holder= clearer= i
+  trap 'for pid in "$holder" "$clearer"; do [ -z "$pid" ] || { kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; }; done' EXIT
+  dir=$(make_case clear-stale-serialized)
+  state="$dir/state"
+  lockdir="$state/.watch.lock"
+  mkdir "$lockdir"
+  printf '%s\n' "$(dead_pid)" > "$lockdir/pid"
+  seed_lock_namespace "$lockdir"
+  FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    fm_lock_try_acquire "$2/.watcher-down.lock" || exit 1
+    touch "$3/held"
+    for ((i=0; i<200; i++)); do
+      [ ! -e "$3/release" ] || break
+      sleep 0.05
+    done
+    fm_lock_release "$2/.watcher-down.lock"
+  ' _ "$LIB" "$state" "$dir" &
+  holder=$!
+  for ((i=0; i<100; i++)); do
+    [ ! -e "$dir/held" ] || break
+    sleep 0.05
+  done
+  [ -e "$dir/held" ] || fail "recovery-marker holder did not acquire"
+  FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    fm_recovery_transition "$2/.watcher-down" clear-stale-lock "$2/.watch.lock" downtime
+  ' _ "$LIB" "$state" &
+  clearer=$!
+  for ((i=0; i<100; i++)); do
+    [ "$(cat "$lockdir.steal/pid" 2>/dev/null || true)" != "$clearer" ] || break
+    sleep 0.05
+  done
+  [ "$(cat "$lockdir.steal/pid" 2>/dev/null || true)" = "$clearer" ] \
+    || fail "stale clear did not serialize against successor claims"
+  if FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_lock_try_acquire "$2"' _ "$LIB" "$lockdir"; then
+    fail "successor claimed the singleton during stale-clear publication"
+  fi
+  [ -e "$lockdir" ] || fail "stale clear removed the singleton before publishing recovery"
+  touch "$dir/release"
+  wait "$holder" || fail "recovery-marker holder failed"
+  holder=
+  wait "$clearer" || fail "stale clear failed after recovery publication unblocked"
+  clearer=
+  [ ! -e "$lockdir" ] || fail "proven dead owner survived stale clear"
+  FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    fm_recovery_marker_read "$2/.watcher-down" || exit 1
+    case "$FM_RECOVERY_MARKER_TOKEN" in pending:downtime:*) ;; *) exit 2 ;; esac
+    fm_lock_try_acquire "$2/.watch.lock" || exit 3
+    fm_lock_release "$2/.watch.lock"
+  ' _ "$LIB" "$state" || fail "cleared singleton lacks recovery evidence or rejects its successor"
+  pass "shared stale clear publishes under the steal mutex before removing a proven dead owner"
+)
+
 test_watch_restart_rejects_reused_pid() {
   local dir state fakebin out live pid i
   dir=$(make_case restart-reused-pid)
@@ -1599,6 +1740,9 @@ test_lock_does_not_steal_live_lock
 test_lock_empty_pid_uses_minimum_grace
 test_lock_late_claim_loses_after_recreate
 test_lock_paused_mid_acquire_claim_fails_during_steal
+test_watch_restart_preserves_unproven_namespace || exit 1
+test_stale_watch_clear_requires_owner_proof || exit 1
+test_stale_watch_clear_serializes_publication_and_removal || exit 1
 test_watch_restart_rejects_reused_pid
 test_watch_restart_attaches_to_healthy_peer
 test_watcher_self_evicts_on_lock_takeover

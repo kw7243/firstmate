@@ -135,6 +135,86 @@ FM_HOME="$TMP_ROOT/shared-home" "$TMP_ROOT/codex" -c '
   || fail "shared Codex PID confused competing threads: $(cat "$TMP_ROOT/shared.out")"
 pass "distinct threads sharing one Codex process cannot take each other's lock"
 
+mkdir -p "$TMP_ROOT/reemit-root/bin" "$TMP_ROOT/reemit-home/state"
+for script in "$ROOT"/bin/*.sh; do
+  ln -s "$script" "$TMP_ROOT/reemit-root/bin/${script##*/}"
+done
+ln -s "$ROOT/docs" "$TMP_ROOT/reemit-root/docs"
+rm "$TMP_ROOT/reemit-root/bin/fm-bootstrap.sh"
+cat > "$TMP_ROOT/reemit-root/bin/fm-bootstrap.sh" <<'BOOTSTRAP'
+#!/usr/bin/env bash
+set -eu
+[ "${FM_BOOTSTRAP_NETWORK:-}" = only ] || exit 0
+touch "$FM_HOME/sweeping"
+while [ ! -e "$FM_HOME/release" ]; do sleep 0.1; done
+BOOTSTRAP
+chmod +x "$TMP_ROOT/reemit-root/bin/fm-bootstrap.sh"
+cat > "$TMP_ROOT/start-sweep.sh" <<'TOOL'
+set -eu
+bash "$FM_ROOT_OVERRIDE/bin/fm-lock.sh"
+bash "$FM_ROOT_OVERRIDE/bin/fm-startup-network.sh" start --locked 1 --harvest-pid 0
+for ((i=0; i<100; i++)); do
+  [ ! -e "$FM_HOME/sweeping" ] || exit 0
+  sleep 0.1
+done
+exit 70
+TOOL
+cat > "$TMP_ROOT/reemit.sh" <<'TOOL'
+set -eu
+touch "$FM_HOME/reentering"
+bash "$FM_ROOT_OVERRIDE/bin/fm-session-start.sh" --reemit
+. "$ROOT/bin/fm-session-lock-lib.sh"
+fm_session_lock_owned_by_self "$FM_HOME/state"
+[ "$(fm_session_lock_generation "$FM_HOME/state")" = "codex:$CODEX_THREAD_ID" ]
+touch "$FM_HOME/reentered"
+TOOL
+cat > "$TMP_ROOT/refuse-sweep.sh" <<'TOOL'
+set -eu
+if bash "$ROOT/bin/fm-lock.sh"; then exit 71; fi
+TOOL
+(
+  export FM_HOME="$TMP_ROOT/reemit-home" FM_ROOT_OVERRIDE="$TMP_ROOT/reemit-root"
+  reentry=
+  trap 'touch "$FM_HOME/release"; [ -z "$reentry" ] || wait "$reentry" 2>/dev/null || true' EXIT
+  run_tool "$first" "$TMP_ROOT/start-sweep.sh" > "$TMP_ROOT/start-sweep.out" 2>&1 \
+    || fail "could not start an owned sweep: $(cat "$TMP_ROOT/start-sweep.out")"
+  cp "$FM_HOME/state/.lock" "$TMP_ROOT/sweep-pid-before"
+  cp "$FM_HOME/state/.lock-session" "$TMP_ROOT/sweep-session-before"
+  [ -s "$FM_HOME/state/.lock.acquire/pid" ] || fail 'sweep did not hold the acquisition claim'
+  run_tool "$first" "$TMP_ROOT/reemit.sh" > "$TMP_ROOT/reemit.out" 2>&1 &
+  reentry=$!
+  for ((i=0; i<100; i++)); do
+    [ ! -e "$FM_HOME/reentering" ] || break
+    sleep 0.1
+  done
+  [ -e "$FM_HOME/reentering" ] || fail 'repeat entry never started'
+  for ((i=0; i<100; i++)); do
+    if grep -qx LOCK "$TMP_ROOT/reemit.out"; then break; fi
+    sleep 0.1
+  done
+  grep -qx LOCK "$TMP_ROOT/reemit.out" \
+    || fail "reemit did not reach lock acquisition: $(cat "$TMP_ROOT/reemit.out")"
+  sleep 1
+  run_tool "$second" "$TMP_ROOT/refuse-sweep.sh" > "$TMP_ROOT/refuse-sweep.out" 2>&1 \
+    || fail "competing session entered during the sweep: $(cat "$TMP_ROOT/refuse-sweep.out")"
+  for ((i=0; i<100; i++)); do
+    if grep -q 'READ-ONLY SESSION' "$TMP_ROOT/reemit.out" || [ -e "$FM_HOME/reentered" ]; then break; fi
+    sleep 0.1
+  done
+  kill -0 "$reentry" 2>/dev/null || fail "repeat entry exited during the sweep: $(cat "$TMP_ROOT/reemit.out")"
+  cmp -s "$TMP_ROOT/sweep-pid-before" "$FM_HOME/state/.lock" || fail 'repeat entry rewrote a leased anchor'
+  cmp -s "$TMP_ROOT/sweep-session-before" "$FM_HOME/state/.lock-session" || fail 'repeat entry rewrote leased coordinates'
+  touch "$FM_HOME/release"
+  wait "$reentry" || fail "repeat entry failed: $(cat "$TMP_ROOT/reemit.out")"
+  reentry=
+  [ -e "$FM_HOME/reentered" ] || fail 'repeat entry did not retain ownership'
+  assert_not_contains "$(cat "$TMP_ROOT/reemit.out")" 'READ-ONLY SESSION' 'owned reemit became read-only'
+  assert_not_contains "$(cat "$TMP_ROOT/reemit.out")" '●  STARTUP TRUNCATED' 'owned reemit did not finish'
+  if cmp -s "$TMP_ROOT/sweep-pid-before" "$FM_HOME/state/.lock"; then fail 'Codex anchor was not refreshed'; fi
+  bash "$FM_ROOT_OVERRIDE/bin/fm-startup-network.sh" wait 10 >/dev/null || fail 'sweep did not publish'
+)
+pass 'Codex reemit waits for its own sweep, refreshes coordinates, and refuses a competing session'
+
 # An unannotated PID 1 is never ownership evidence for a native Codex call.
 printf '1\n' > "$FM_HOME/state/.lock"
 rm "$FM_HOME/state/.lock-session"

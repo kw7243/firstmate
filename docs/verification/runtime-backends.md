@@ -2384,12 +2384,16 @@ The restricted version command warned that its read-only filesystem prevented cr
 The guard checks the real native tool boundary; running it outside Codex fails with an explicit context diagnostic rather than passing a mock.
 It changes no home or ownership record.
 `tests/fm-codex-session-lock.test.sh` supplies the portable Linux process regression for different threads sharing one process, dead and ambiguous owners, identity override, repeat entry, dependent records, and namespace-separated transient claims.
+Its context re-emit case checks same-session entry while a deferred sweep holds the acquisition claim, including serialized coordinate refresh and competing-session refusal.
+`tests/fm-startup-network.test.sh` covers non-Codex repeat entry during a sweep and deferred-worker liveness with foreign, missing, or mismatched process coordinates.
+`tests/fm-watcher-lock.test.sh` covers restart and shared stale-lock removal with foreign or uncertain ownership, including contention during recovery publication.
 Those renamed-process fixtures are logic tests, not vendor evidence.
 
 Real isolated-home probes acquired the same generation in restricted, host, and restricted calls, and a distinct real Codex worker was refused.
 A restricted caller held a transient claim while a host observer verified that it could neither acquire nor release it, that the owner bytes remained unchanged, and that host acquisition succeeded only after the holder released it.
 A fresh Bash/tmux 3.4 smoke through stock `fm-spawn.sh` automatically launched the configured gpt-6-astra worker, delivered the worker role and instruction tail, completed isolated startup, handled a separate durable steer, passed its completion gate, and exited through `fm-control.sh`.
 No manual shell submission was used in that smoke.
+The live smoke did not exercise repeat entry during a running sweep, foreign watcher restart, or cross-namespace worker reports.
 These facts do not establish primary notification continuity or authorize production migration.
 Non-Linux Codex retains its native ancestry path; this Linux namespace proof does not claim a macOS result.
 Other harnesses retain their ancestry or trusted Claude identity behavior and do not consume Codex thread provenance.

@@ -13,8 +13,8 @@
 #   - mutating sweeps are refused when the fleet lock no longer names the session
 #     that requested them, and the refusal is reported rather than silent
 #   - the aggregate bound turns a wedged sweep into an actionable line
-#   - an abandoned `running` record is reported as needing a rerun rather than
-#     staying "in progress" forever
+#   - confirmed dead workers need a rerun; uncertain worker liveness preserves
+#     the generation without claiming the checks stopped
 #   - phase-aware single-flight: a covering worker is reused, while a later
 #     locked request supersedes an in-flight probe-only worker
 #   - a publish lock a live process holds past the budget ends the worker with a
@@ -34,6 +34,8 @@ fi
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 # shellcheck source=bin/fm-timeout-lib.sh
 . "$ROOT/bin/fm-timeout-lib.sh"
+# shellcheck source=bin/fm-process-identity-lib.sh
+. "$ROOT/bin/fm-process-identity-lib.sh"
 
 TMP_ROOT=$(fm_test_tmproot fm-startup-network-tests)
 DRAIN="$ROOT/bin/fm-wake-drain.sh"
@@ -479,41 +481,182 @@ EOF
   pass "fm-startup-network: an aggregate bound turns a wedged sweep into an actionable line"
 }
 
-# A worker killed before publication leaves a `running` record behind.
-# That record must read as work to redo, not as work still in flight.
-test_an_abandoned_run_reads_as_needing_a_rerun() {
-  local rec home root log report
-  rec=$(new_world abandoned)
+test_worker_liveness_uses_process_coordinates() {
+  local rec home root log report namespace= start=1
+  rec=$(new_world worker-coordinates)
   IFS='|' read -r home root log <<EOF
 $rec
 EOF
+  if [ "$(uname)" = Linux ]; then namespace=$(fm_process_namespace); fi
   cat > "$home/state/.startup-network.status" <<EOF
 state=running
 pid=999999999
+pid_namespace=$namespace
+pid_starttime=1
 started=$(date +%s)
 locked=1
 phases=probe,sweeps
 EOF
-
   report=$(run_stage "$home" "$root" report)
   assert_contains "$report" "NETWORK_CHECKS: the deferred check worker stopped before publishing" \
-    "an abandoned run still read as in progress: $report"
+    "a confirmed dead worker still read as in progress: $report"
   assert_contains "$report" "dead-secondmate relaunch" \
     "the abandoned run did not name the checks that never completed"
 
-  # A record older than the whole aggregate bound is abandoned even when its pid
-  # happens to be alive again, so "in progress" can never become permanent.
+  if [ "$(uname)" = Linux ]; then start=$(fm_process_starttime "$$"); fi
   cat > "$home/state/.startup-network.status" <<EOF
 state=running
 pid=$$
+pid_namespace=$namespace
+pid_starttime=$start
 started=$(( $(date +%s) - 400 ))
 locked=1
 phases=probe,sweeps
 EOF
   assert_contains "$(FM_STARTUP_NETWORK_TIMEOUT=10 run_stage "$home" "$root" report)" \
-    "NETWORK_CHECKS: the deferred check worker stopped before publishing" \
-    "a record that outlived the stage bound still read as in progress"
-  pass "fm-startup-network: an abandoned run reports as needing a rerun, never as in progress forever"
+    "IN PROGRESS" "age alone marked a matching live process as stopped"
+
+  if [ "$(uname)" = Linux ]; then
+    printf 'pid_starttime=%s\n' "$((start + 1))" >> "$home/state/.startup-network.status"
+    assert_contains "$(run_stage "$home" "$root" report)" \
+      "NETWORK_CHECKS: the deferred check worker stopped before publishing" \
+      "a reused live PID was mistaken for the recorded worker"
+    FM_FAKE_BOOTSTRAP_LOG="$log" run_stage "$home" "$root" run --locked 0 \
+      || fail "a confirmed reused PID prevented a new worker"
+    assert_grep 'network=only' "$log" "a confirmed stale worker was not replaced"
+  fi
+  pass "fm-startup-network: process identity distinguishes live, dead and reused worker PIDs"
+}
+
+test_exited_worker_waiting_to_be_reaped_is_dead() {
+  local rec home root log
+  [ "$(uname)" = Linux ] || { printf 'skip: zombie worker coordinates require Linux\n'; return; }
+  rec=$(new_world zombie-worker)
+  IFS='|' read -r home root log <<EOF
+$rec
+EOF
+  python3 - "$home" "$root" "$log" <<'PYTHON' || fail "an exited worker awaiting reaping prevented recovery"
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+home, root, log = sys.argv[1:]
+pid = os.fork()
+if pid == 0:
+    os._exit(0)
+try:
+    os.waitid(os.P_PID, pid, os.WEXITED | os.WNOWAIT)
+    stat = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
+    assert stat[0] == "Z", "the child was not a zombie"
+    boot = Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+    namespace = boot + "/" + os.readlink("/proc/self/ns/pid")
+    Path(home, "state/.startup-network.status").write_text(
+        f"state=running\npid={pid}\npid_namespace={namespace}\npid_starttime={stat[19]}\n"
+        "started=1\nlocked=0\nphases=probe\ngeneration=zombie\n"
+    )
+    env = dict(os.environ, FM_HOME=home, FM_ROOT_OVERRIDE=root, FM_FAKE_BOOTSTRAP_LOG=log)
+    command = [str(Path(root, "bin/fm-startup-network.sh"))]
+    report = subprocess.check_output(command + ["report"], env=env, text=True)
+    assert "worker stopped before publishing" in report, report
+    subprocess.run(command + ["run", "--locked", "0"], env=env, check=True)
+    assert "network=only" in Path(log).read_text(), "the exited worker was not replaced"
+finally:
+    os.waitpid(pid, 0)
+PYTHON
+  pass "fm-startup-network: an exited worker awaiting reaping permits recovery"
+}
+
+test_unknown_worker_liveness_preserves_the_generation() {
+  local rec home root log variant pid namespace start report holder rc status
+  [ "$(uname)" = Linux ] || { printf 'skip: worker namespace uncertainty requires Linux\n'; return; }
+  namespace=$(fm_process_namespace)
+  start=$(fm_process_starttime "$$")
+  for variant in foreign-dead foreign-live missing-namespace missing-start; do
+    rec=$(new_world "unknown-$variant")
+    IFS='|' read -r home root log <<EOF
+$rec
+EOF
+    pid=$$
+    [ "$variant" != foreign-dead ] || pid=999999999
+    status="$home/state/.startup-network.status"
+    cat > "$status" <<EOF
+state=running
+pid=$pid
+started=$(( $(date +%s) - 400 ))
+locked=0
+phases=probe
+generation=preserved-$variant
+lock_pid=
+EOF
+    case "$variant" in
+      foreign-*) printf 'pid_namespace=foreign-namespace\npid_starttime=%s\n' "$start" >> "$status" ;;
+      missing-namespace) printf 'pid_starttime=%s\n' "$start" >> "$status" ;;
+      missing-start) printf 'pid_namespace=%s\n' "$namespace" >> "$status" ;;
+    esac
+    cp "$status" "$home/before.status"
+    printf 'previous published output\n' > "$home/state/.startup-network.report"
+    report=$(FM_STARTUP_NETWORK_TIMEOUT=1 run_stage "$home" "$root" report)
+    assert_contains "$report" 'worker liveness is unknown' "uncertain worker $variant was classified: $report"
+    assert_not_contains "$report" 'stopped before publishing' "uncertain worker $variant was called stopped"
+    assert_not_contains "$report" 'rerun ' "uncertain worker $variant prompted a replacement"
+    FM_FAKE_BOOTSTRAP_LOG="$log" run_stage "$home" "$root" start --locked 0 --harvest-pid $$ \
+      || fail "an unknown covering worker could not be reused"
+    cmp -s "$status" "$home/before.status" || fail "start replaced an unknown covering worker ($variant)"
+    printf '%s\n' $$ > "$home/state/.lock"
+    FM_FAKE_BOOTSTRAP_LOG="$log" run_stage "$home" "$root" start --locked 1 --harvest-pid $$
+    cmp -s "$status" "$home/before.status" || fail "start superseded an unknown probe worker ($variant)"
+    [ ! -f "$log" ] || fail "start ran bootstrap beside an unknown worker ($variant)"
+    if FM_FAKE_BOOTSTRAP_LOG="$log" run_stage "$home" "$root" run --locked 0; then
+      fail "manual run superseded an unknown worker ($variant)"
+    fi
+    cmp -s "$status" "$home/before.status" || fail "a replacement changed unknown worker state ($variant)"
+    [ ! -f "$log" ] || fail "an unknown worker allowed new bootstrap work ($variant)"
+  done
+
+  holder=$(hold_publish_lock "$home")
+  rc=0
+  FM_STARTUP_NETWORK_TIMEOUT=1 FM_SESSION_START_TIMEOUT=1 FM_FAKE_BOOTSTRAP_LOG="$log" \
+    run_stage "$home" "$root" run --locked 0 || rc=$?
+  kill "$holder" 2>/dev/null || true
+  [ "$rc" -ne 0 ] || fail "manual run passed while another publication was locked"
+  cmp -s "$status" "$home/before.status" || fail "failed publication replaced an unknown worker"
+  [ "$(cat "$home/state/.startup-network.report")" = 'previous published output' ] \
+    || fail "failed publication erased the prior report"
+  [ ! -f "$home/state/.wake-queue" ] || fail "preserving an unknown worker emitted a false failure wake"
+  pass "fm-startup-network: unknown worker coordinates preserve status, output and generation"
+}
+
+test_unknown_worker_can_still_publish_its_generation() {
+  local rec home root log generation report waited=0 status
+  [ "$(uname)" = Linux ] || { printf 'skip: worker namespace uncertainty requires Linux\n'; return; }
+  rec=$(new_world unknown-publication)
+  IFS='|' read -r home root log <<EOF
+$rec
+EOF
+  FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_SLEEP=5 FM_FAKE_BOOTSTRAP_OUT='ORIGINAL_RESULT' \
+    run_stage "$home" "$root" start --locked 0 --harvest-pid 999999999
+  status="$home/state/.startup-network.status"
+  while [ ! -s "$log" ] && [ "$waited" -lt 50 ]; do
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  [ -s "$log" ] || fail "the original worker never started"
+  generation=$(sed -n 's/^generation=//p' "$status")
+  grep -q '^pid_namespace=.' "$status" || fail "the launched worker omitted its namespace coordinate"
+  grep -q '^pid_starttime=[0-9]' "$status" || fail "the launched worker omitted its process birth"
+  printf 'pid_namespace=foreign-namespace\n' >> "$status"
+  report=$(run_stage "$home" "$root" report)
+  assert_contains "$report" 'worker liveness is unknown' "a foreign worker was not reported as uncertain"
+  FM_FAKE_BOOTSTRAP_LOG="$log" run_stage "$home" "$root" start --locked 0 --harvest-pid 999999999 \
+    || fail "the original generation was not retained"
+  run_stage "$home" "$root" wait 15 || fail "wait abandoned the original unknown worker before publication"
+  [ "$(sed -n 's/^generation=//p' "$status")" = "$generation" ] || fail "the original generation was replaced"
+  report=$(run_stage "$home" "$root" report)
+  assert_contains "$report" ORIGINAL_RESULT "the original worker lost its completed report"
+  [ "$(grep -c 'network=only' "$log")" = 1 ] || fail "an unknown worker caused duplicate work"
+  wait_for_startup_network_wake "$home" || fail "the original actionable result did not settle delivery"
+  pass "fm-startup-network: namespace uncertainty preserves the original worker's publication"
 }
 
 test_locked_start_is_not_satisfied_by_an_inflight_probe() {
@@ -666,6 +809,32 @@ EOF
     "the fleet lock did not record the harness owner reported by acquisition"
   [ "$new_owner" != "$old_owner" ] || fail "the prior harness still owned the lock after takeover"
   pass "fm-startup-network: fleet-lock takeover cannot overlap a mutating sweep"
+}
+
+test_same_session_reentry_preserves_a_running_sweep() {
+  local rec home root log waited=0 out started elapsed
+  rec=$(new_world same-owner-sweep)
+  IFS='|' read -r home root log <<EOF
+$rec
+EOF
+  printf '%s\n' $$ > "$home/state/.lock"
+  cp "$home/state/.lock" "$home/owner.before"
+  FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_SLEEP=14 \
+    run_stage "$home" "$root" start --locked 1 --harvest-pid 999999999
+  while [ ! -s "$log" ] && [ "$waited" -lt 50 ]; do
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  [ -s "$log" ] || fail "the same-owner sweep never started"
+  [ -d "$home/state/.lock.acquire" ] || fail "the running sweep did not hold the session lease"
+  started=$(date +%s)
+  out=$(PATH="$root/bin:$PATH" FM_FAKE_HARNESS_PID=$$ FM_HOME="$home" FM_ROOT_OVERRIDE="$root" \
+    "$root/bin/fm-lock.sh" 2>&1) || fail "same-session entry failed during its own sweep: $out"
+  elapsed=$(( $(date +%s) - started ))
+  [ "$elapsed" -le 25 ] || fail "same-session entry exceeded its bounded sweep (${elapsed}s)"
+  cmp -s "$home/state/.lock" "$home/owner.before" || fail "same-session entry replaced the sweep's owner"
+  run_stage "$home" "$root" wait 25 || fail "the same-owner sweep never settled"
+  pass "fm-startup-network: same-session entry succeeds without changing an active sweep's owner"
 }
 
 # Every record carries a start offset from ONE origin, so the artifact reads as a
@@ -888,12 +1057,16 @@ test_an_actionable_successful_result_still_queues_a_wake
 test_deferred_invalid_secondmate_markers_queue_durable_findings
 test_mutating_sweeps_are_refused_when_the_lock_changed_hands
 test_the_stage_bound_is_reported_not_swallowed
-test_an_abandoned_run_reads_as_needing_a_rerun
+test_worker_liveness_uses_process_coordinates
+test_exited_worker_waiting_to_be_reaped_is_dead
+test_unknown_worker_liveness_preserves_the_generation
+test_unknown_worker_can_still_publish_its_generation
 test_locked_start_is_not_satisfied_by_an_inflight_probe
 test_start_is_single_flight
 test_start_reserves_its_generation_before_returning
 test_new_lock_owner_does_not_reuse_the_previous_owners_worker
 test_lock_takeover_stays_read_only_while_a_sweep_holds_the_lease
+test_same_session_reentry_preserves_a_running_sweep
 test_records_share_one_origin_so_offsets_form_a_timeline
 test_timings_are_published_and_only_the_on_demand_report_prints_them
 test_a_bounded_run_still_publishes_the_timings_it_managed_to_record

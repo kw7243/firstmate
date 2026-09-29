@@ -160,9 +160,8 @@ publish_lock_session_or_die() {
   exit 1
 }
 
-# This session already holds the lock, recorded as pid $1. Line 1 stays exactly
-# as recorded while that pid is alive; only the sidecar is refreshed, under the
-# claim lock, so a /clear re-key inside the same process replaces the old id.
+# This session already holds the lock. Non-Codex line 1 stays as recorded;
+# Codex continues to the serialized publication of both process coordinates.
 # A same-session confirmation waits for the claim lock so the sidecar refresh
 # completes. After the wait, the lock is re-read and the sidecar is refreshed
 # only when this session still owns it; otherwise the claim lock is released
@@ -172,12 +171,13 @@ publish_lock_session_or_die() {
 confirm_own_lock() {
   local recorded waited=0
   if [ "$CLAIM_LOCK_HELD" -ne 1 ]; then
-    fm_lock_acquire_wait_max "$CLAIM_LOCK" 10 || refuse_uncertain_owner
+    fm_lock_acquire_wait "$CLAIM_LOCK" || refuse_uncertain_owner
     CLAIM_LOCK_HELD=1
     waited=1
   fi
   recorded=$(cat "$LOCK" 2>/dev/null || true)
   if fm_session_lock_owned_by_self "$STATE"; then
+    fm_session_lock_codex_record_present "$STATE" && return 0
     publish_lock_session_or_die
     commit_lock_session
     release_claim_lock
@@ -207,10 +207,7 @@ refuse_uncertain_owner() {
 
 check_previous_owner() {
   if fm_session_lock_owned_by_self "$STATE"; then
-    # Refresh a Codex anchor on every verified entry: its previous tool init
-    # may have ended, or its previous host process may have been replaced.
-    fm_session_lock_codex_record_present "$STATE" && return 0
-    confirm_own_lock
+    confirm_own_lock && return 0
   fi
   fm_session_lock_inspect "$STATE"
   case "$FM_LOCK_INSPECT_STATE" in
@@ -222,7 +219,7 @@ check_previous_owner() {
 
 check_previous_owner
 
-if ! fm_lock_try_acquire "$CLAIM_LOCK"; then
+if [ "$CLAIM_LOCK_HELD" -ne 1 ] && ! fm_lock_try_acquire "$CLAIM_LOCK"; then
   sweep_pid=$(sed -n 's/^pid=//p' "$STATE/.startup-network.status" 2>/dev/null | tail -1)
   if [ -n "${FM_LOCK_HELD_PID:-}" ] && [ "$FM_LOCK_HELD_PID" = "$sweep_pid" ]; then
     echo "error: the prior session's bounded startup sweep is finishing; operate read-only until it releases the fleet lock" >&2

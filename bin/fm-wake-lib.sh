@@ -650,7 +650,7 @@ fm_lock_mid_acquire_is_fresh() {
 }
 
 fm_lock_recheck_stale_owner() {
-  local lockdir=$1 expected_owner=$2 expected_pid=$3 actual_pid
+  local lockdir=$1 expected_owner=$2 expected_pid=$3 expected_identity=${4:-} actual_pid current_identity
   if [ -n "$expected_owner" ]; then
     fm_lock_points_to_owner "$lockdir" "$expected_owner" || return 1
   elif [ -e "$lockdir" ] || [ -L "$lockdir" ]; then
@@ -659,8 +659,15 @@ fm_lock_recheck_stale_owner() {
   fm_lock_same_namespace "$lockdir" || return 1
   actual_pid=$(cat "$lockdir/pid" 2>/dev/null || true)
   [ "$actual_pid" = "$expected_pid" ] || return 1
-  if fm_pid_alive "$actual_pid"; then
-    return 1
+  if [ -n "$expected_identity" ]; then
+    [ "$(cat "$lockdir/pid-identity" 2>/dev/null || true)" = "$expected_identity" ] || return 1
+  fi
+  if fm_pid_alive "$actual_pid" \
+    || { [ "$#" -gt 3 ] && [ -n "$(ps -p "$actual_pid" -o pid= 2>/dev/null)" ]; }; then
+    [ -n "$expected_identity" ] || return 1
+    current_identity=$(fm_pid_identity "$actual_pid") || return 1
+    [ -n "$current_identity" ] && [ "$current_identity" != "$expected_identity" ]
+    return
   fi
   if fm_lock_mid_acquire_is_fresh "$lockdir" "$actual_pid"; then
     return 1
@@ -1025,8 +1032,21 @@ fm_recovery_transition() {
       ;;
     clear-stale-lock)
       [ -n "$target" ] || return 1
-      _fm_recovery_marker_publish "$marker" "${value:-downtime}" "$bound" || return 1
-      fm_lock_remove_path "$target"
+      fm_lock_same_namespace "$target" || return 1
+      local stale_pid stale_owner stale_identity stale_steal stale_rc=1
+      stale_pid=$(cat "$target/pid" 2>/dev/null || true)
+      case "$stale_pid" in ''|*[!0-9]*|0) return 1 ;; esac
+      stale_owner=$(fm_lock_link_owner "$target" 2>/dev/null || true)
+      stale_identity=$(cat "$target/pid-identity" 2>/dev/null || true)
+      stale_steal="$target.steal"
+      fm_lock_try_acquire_steal_mutex "$stale_steal" || return 1
+      if fm_lock_recheck_stale_owner "$target" "$stale_owner" "$stale_pid" "$stale_identity" \
+        && _fm_recovery_marker_publish "$marker" "${value:-downtime}" "$bound" \
+        && fm_lock_recheck_stale_owner "$target" "$stale_owner" "$stale_pid" "$stale_identity"; then
+        fm_lock_remove_path "$target" && stale_rc=0
+      fi
+      fm_lock_release "$stale_steal"
+      return "$stale_rc"
       ;;
     *) return 2 ;;
   esac

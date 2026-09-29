@@ -51,7 +51,8 @@
 #          for locked work, it belongs to the same lock owner. A probe-only
 #          worker therefore cannot satisfy a later locked request; the later
 #          request gets a distinct generation and runs the locked phases. A new
-#          owner also gets a distinct generation. --locked 1 asks
+#          owner also gets a distinct generation when worker liveness is known.
+#          Unknown liveness preserves the current generation. --locked 1 asks
 #          for the inactive-outcome scan and mutating sweeps as well as the
 #          read-only probe; --locked 0 asks for the probe only. --harvest-pid
 #          names the session-start process
@@ -78,8 +79,12 @@
 #
 # STATE, all under this home's state/ and gitignored with it:
 #   .startup-network.status   key=value record - generation, lock_pid, state,
-#                             pid, started, finished, rc, locked, phases, and
-#                             whether the report was published. The single
+#                             pid, pid_namespace, pid_starttime, started,
+#                             finished, rc, locked, phases, and whether the
+#                             report was published. Linux liveness requires
+#                             matching namespace and process birth; missing or
+#                             foreign coordinates are unknown. Age does not
+#                             prove the worker stopped. The single
 #                             source of truth for what ran and how it ended.
 #   .startup-network.report   the sweep output, byte for byte as
 #                             bin/fm-bootstrap.sh produced it, plus a
@@ -201,22 +206,47 @@ held_by() {  # human-readable holder of the lock the last take_lock refused
   printf 'pid %s' "${FM_LOCK_HELD_PID:-unknown}"
 }
 
-# Is a `running` record a stage that is genuinely still in flight? Two
-# independent proofs are required, because either one alone can lie: a recorded
-# pid can be reused by an unrelated process, and a worker killed with its process
-# group (which is what a truncated digest does) leaves the record behind
-# untouched. A record that outlives the stage's own aggregate bound is therefore
-# treated as abandoned no matter what its pid says, which keeps "in progress"
-# from becoming a permanent state.
-worker_alive() {
-  local pid started age
+worker_state() {
+  local pid namespace current_namespace recorded_start current_start
   pid=$(status_get pid)
-  case "$pid" in ''|*[!0-9]*) return 1 ;; esac
-  kill -0 "$pid" 2>/dev/null || return 1
-  started=$(status_get started)
-  age=$(age_of "$started")
-  case "$age" in ''|*[!0-9]*) return 0 ;; esac
-  [ "$age" -le "$(( $(stage_budget) + 30 ))" ]
+  case "$pid" in ''|*[!0-9]*|0) printf unknown; return ;; esac
+  namespace=$(status_get pid_namespace)
+  if [ "$_FM_UNAME" = Linux ]; then
+    current_namespace=$(fm_process_namespace) || { printf unknown; return; }
+    if [ -z "$namespace" ] || [ "$namespace" != "$current_namespace" ]; then
+      printf unknown
+      return
+    fi
+    recorded_start=$(status_get pid_starttime)
+    case "$recorded_start" in ''|*[!0-9]*) printf unknown; return ;; esac
+    if current_start=$(fm_process_starttime "$pid"); then
+      if [ "$current_start" = "$recorded_start" ]; then
+        case "$(ps -o stat= -p "$pid" 2>/dev/null)" in
+          *Z*) printf dead ;;
+          *) printf alive ;;
+        esac
+      else
+        printf dead
+      fi
+      return
+    fi
+  elif [ -n "$namespace" ]; then
+    printf unknown
+    return
+  fi
+  if kill -0 "$pid" 2>/dev/null; then
+    if [ "$_FM_UNAME" = Linux ]; then printf unknown; else printf alive; fi
+  elif ps -o comm= -p "$pid" >/dev/null 2>&1; then
+    printf unknown
+  else
+    printf dead
+  fi
+}
+
+worker_coordinates() {  # <pid>
+  [ "$_FM_UNAME" = Linux ] || return 0
+  printf 'pid_namespace=%s\npid_starttime=%s\n' \
+    "$(fm_process_namespace)" "$(fm_process_starttime "$1")"
 }
 
 # The exact phase names the digest and the report use, so "what has not been
@@ -239,7 +269,7 @@ worker_covers_request() {  # <locked> <lock-pid>
 }
 
 cmd_start() {  # <locked> <harvest-pid>
-  local locked=$1 harvest_pid=$2 lock_pid generation worker_pid phases started
+  local locked=$1 harvest_pid=$2 lock_pid generation worker_pid phases started liveness
   mkdir -p "$STATE" 2>/dev/null || return 1
   # Captured HERE, at the moment the caller still holds the lock, and carried to
   # the worker: re-reading the lock later would only prove that SOME session
@@ -250,15 +280,18 @@ cmd_start() {  # <locked> <harvest-pid>
   fi
 
   take_lock "$PUBLISH_LOCK" "$(delivery_budget)" || return 1
-  if [ "$(status_get state)" = running ] && worker_alive \
-    && worker_covers_request "$locked" "$lock_pid"; then
-    # A worker whose phases cover this request is still going. Starting another
-    # would duplicate its work and, for a locked request, race the same mutating
-    # sweeps, so leave it alone and let harvest report its real state.
-    generation=$(status_get generation)
-    printf '%s\t%s\n' "$generation" "$harvest_pid" > "$CLAIM_FILE" 2>/dev/null || true
-    fm_lock_release "$PUBLISH_LOCK"
-    return 0
+  if [ "$(status_get state)" = running ]; then
+    liveness=$(worker_state)
+    if [ "$liveness" != dead ] && worker_covers_request "$locked" "$lock_pid"; then
+      generation=$(status_get generation)
+      printf '%s\t%s\n' "$generation" "$harvest_pid" > "$CLAIM_FILE" 2>/dev/null || true
+      fm_lock_release "$PUBLISH_LOCK"
+      return 0
+    fi
+    if [ "$liveness" = unknown ]; then
+      fm_lock_release "$PUBLISH_LOCK"
+      return 1
+    fi
   fi
 
   generation="$(now).$$.$harvest_pid"
@@ -302,6 +335,7 @@ EOF
   if ! write_atomic "$STATUS_FILE" <<EOF
 state=running
 pid=$worker_pid
+$(worker_coordinates "$worker_pid")
 started=$started
 locked=$locked
 phases=$phases
@@ -423,6 +457,7 @@ record_result() {  # <generation> <state> <phases> <locked> <started> <rc> <outp
   write_atomic "$STATUS_FILE" <<EOF || true
 state=$state
 pid=$$
+$(worker_coordinates "$$")
 started=$started
 finished=$(now)
 rc=$rc
@@ -456,7 +491,7 @@ publish() {  # <generation> <state> <phases> <locked> <started> <rc> <output-fil
 # record is written WITHOUT the publish lock: a holder that outlived the whole
 # budget is wedged, not mid-write, and a record `report` reads as failed-rerun
 # beats a worker burning CPU with its output discarded. The write is refused
-# only when the record now belongs to another live worker, the same test the
+# only when the record now belongs to another live or uncertain worker, the test the
 # locked path applies. A wake is queued unconditionally because the claim
 # cannot be judged without the lock; a duplicate of an inline print is cheaper
 # than a failure nobody is woken for.
@@ -465,7 +500,7 @@ publish_lock_held() {  # <generation> <phases> <locked> <started> <lockdir> <out
   printf 'NETWORK_CHECKS: the deferred check worker gave up because %s was still held by %s at its deadline, so %s may be incomplete; rerun %s/bin/fm-startup-network.sh run --locked %s once that lock is released\n' \
     "$lockdir" "$(held_by)" "$(phase_label "$phases")" "$FM_ROOT" "$locked" >> "$out"
   if [ "$(status_get generation)" != "$generation" ] \
-    && [ "$(status_get state)" = running ] && worker_alive; then
+    && [ "$(status_get state)" = running ] && [ "$(worker_state)" != dead ]; then
     return 1
   fi
   record_result "$generation" failed "$phases" "$locked" "$started" 124 "$out" "$timings" >/dev/null
@@ -522,7 +557,7 @@ cmd_run() {  # <locked> <lock-pid> <generation>
       run_cleanup "$out" "$timings"
       return 1
     fi
-    if [ "$(status_get state)" = running ] && worker_alive; then
+    if [ "$(status_get state)" = running ] && [ "$(worker_state)" != dead ]; then
       fm_lock_release "$PUBLISH_LOCK"
       run_cleanup "$out" "$timings"
       return 1
@@ -530,6 +565,7 @@ cmd_run() {  # <locked> <lock-pid> <generation>
     write_atomic "$STATUS_FILE" <<EOF || true
 state=running
 pid=$$
+$(worker_coordinates "$$")
 started=$started
 locked=$sweep_locked
 phases=$phases
@@ -661,12 +697,18 @@ print_state() {
   case "$(status_get state)" in
     done|timeout|failed) print_finished "$(status_get state)" ;;
     running)
-      if worker_alive; then
-        print_pending
-      else
-        printf 'NETWORK_CHECKS: the deferred check worker stopped before publishing, so %s did not complete; rerun %s/bin/fm-startup-network.sh run --locked %s\n' \
-          "$(phase_label "$(status_get phases)")" "$FM_ROOT" "$(status_get locked)"
-      fi
+      case "$(worker_state)" in
+        alive) print_pending ;;
+        unknown)
+          printf 'NETWORK_CHECKS: deferred worker liveness is unknown from this process namespace; %s are not yet confirmed.\n' \
+            "$(phase_label "$(status_get phases)")"
+          printf 'The current generation is preserved; read %s/bin/fm-startup-network.sh report from the originating context to check its result.\n' "$FM_ROOT"
+          ;;
+        dead)
+          printf 'NETWORK_CHECKS: the deferred check worker stopped before publishing, so %s did not complete; rerun %s/bin/fm-startup-network.sh run --locked %s\n' \
+            "$(phase_label "$(status_get phases)")" "$FM_ROOT" "$(status_get locked)"
+          ;;
+      esac
       ;;
     *) printf 'not started - no deferred network checks have run for this home yet.\n' ;;
   esac
@@ -708,7 +750,7 @@ cmd_wait() {  # <seconds>
   while [ "$waited" -lt "$limit" ]; do
     case "$(status_get state)" in
       done|timeout|failed) return 0 ;;
-      running) worker_alive || return 1 ;;
+      running) [ "$(worker_state)" != dead ] || return 1 ;;
     esac
     sleep 1
     waited=$((waited + 1))
