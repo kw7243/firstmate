@@ -227,6 +227,118 @@ hold_source_lock_then_handle() {  # <home> <source-id> <sequence> <ready-file> <
   HOLDER_PID=$!
 }
 
+qualify_fixture_claim() {
+  local claim=$1 namespace=''
+  if [ "$(uname)" = Linux ]; then
+    namespace=$(bash -c '. "$1/bin/fm-process-identity-lib.sh"; fm_process_namespace' _ "$ROOT") \
+      || fail "cannot read fixture process namespace"
+  fi
+  awk -v namespace="$namespace" '
+    { lines[NR]=$0 }
+    END {
+      for (i=1; i<=12; i++) print i == 7 && lines[i] == "" ? "active" : lines[i]
+      print namespace
+    }
+  ' "$claim" > "$claim.tmp" && mv "$claim.tmp" "$claim"
+}
+
+test_claim_namespaces() {
+  [ "$(uname)" = Linux ] || { printf 'skip - Linux process-event claim namespace fixtures\n'; return 0; }
+  local home="$TMP_ROOT/namespace-home" id=namespace-src claim saved token stage reservation
+  local mode out namespace result
+  new_home "$home"
+  trap '
+    if [ -f "$TMP_ROOT/namespace-home/original.claim" ] && [ -f "$FM_PROCEVENT_CLAIM_ROOT/namespace-src.claim" ]; then
+      cp "$TMP_ROOT/namespace-home/original.claim" "$FM_PROCEVENT_CLAIM_ROOT/namespace-src.claim"
+    fi
+    touch "$TMP_ROOT/namespace-home/release"
+    fm_test_cleanup
+  ' EXIT
+  cat > "$home/source.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'feedback before checkpoint\n'
+while [ ! -e "$1" ]; do
+  [ "$SECONDS" -lt 120 ] || exit 75
+  sleep 0.05
+done
+printf 'feedback after checkpoint\n'
+SH
+  chmod +x "$home/source.sh"
+  pe_register "$home" lavish "$id" -- "$home/source.sh" "$home/release" >/dev/null
+  pe "$home" reconcile >/dev/null || fail "namespace fixture did not start"
+  claim="$FM_PROCEVENT_CLAIM_ROOT/$id.claim"
+  wait_for "$claim" || fail "namespace fixture did not claim its source"
+  saved="$home/original.claim"
+  cp "$claim" "$saved"
+  token=$(sed -n '3p' "$saved")
+  namespace=$(bash -c '. "$1/bin/fm-process-identity-lib.sh"; fm_process_namespace' _ "$ROOT")
+  stage="$home/state/procevent/.$id.$token.output"
+  wait_for "$stage" || fail "namespace fixture never streamed its captured feedback"
+  cp "$stage" "$home/expected.output"
+  cp "$home/state/procevent/$id.source" "$home/expected.source"
+  mkdir -p -m 700 "$home/state/procevent-capture-reservations"
+  reservation="$home/state/procevent-capture-reservations/.extension-capture-$token.pending.json"
+  printf '{"pending":"captured feedback"}\n' > "$reservation"
+  chmod 0600 "$reservation"
+  cp "$reservation" "$home/expected.reservation"
+  assert_contains "$(pe "$home" list)" live "local runner is live before namespace divergence"
+  assert_contains "$(pe "$home" start "$id")" 'already owned' "same-namespace runner prevents duplicate polling"
+  for mode in legacy-absent foreign-collision foreign-absent foreign-terminal; do
+    awk -v mode="$mode" '
+      NR == 2 && (mode == "foreign-absent" || mode == "legacy-absent") { print "999999"; next }
+      NR == 7 && mode == "foreign-terminal" { print "terminal"; next }
+      NR == 13 { if (mode != "legacy-absent") print "foreign-namespace"; next }
+      { print }
+    ' "$saved" > "$claim"
+    chmod 0600 "$claim"
+    cp "$claim" "$home/expected.claim"
+    out=$(pe "$home" list)
+    assert_contains "$out" uncertain "$mode owner liveness is unknown"
+    out=$(pe "$home" reconcile) || fail "$mode reconciliation failed unexpectedly: $out"
+    assert_contains "$out" 'started=0' "$mode reconciliation cannot replace the owner"
+    assert_contains "$out" 'uncertain=1' "$mode reconciliation reports uncertainty"
+    assert_contains "$(pe "$home" start "$id")" 'already owned' "$mode direct start preserves the owner"
+    if pe "$home" retire "$id" > "$home/retire.out" 2>&1; then
+      fail "$mode retirement accepted unavailable ownership proof"
+    fi
+    if pe "$home" sweep-home --preflight > "$home/sweep.out" 2>&1; then
+      fail "$mode sweep preflight accepted unavailable ownership proof"
+    fi
+    cmp -s "$claim" "$home/expected.claim" || fail "$mode changed the durable claim"
+    cmp -s "$stage" "$home/expected.output" || fail "$mode lost captured staging output"
+    cmp -s "$reservation" "$home/expected.reservation" || fail "$mode lost a capture reservation"
+    cmp -s "$home/state/procevent/$id.source" "$home/expected.source" || fail "$mode changed source registration"
+  done
+  [ "$(sed -n '13p' "$saved")" = "$namespace" ] \
+    || fail "runner claim omitted its originating process namespace"
+  rm "$home/state/procevent/$id.source"
+  out=$(pe "$home" reconcile)
+  assert_contains "$out" 'uncertain=1' 'unregistered foreign owner cannot be stopped'
+  cmp -s "$claim" "$home/expected.claim" || fail "unregistered reconcile changed the foreign claim"
+  cmp -s "$stage" "$home/expected.output" || fail "unregistered reconcile lost captured feedback"
+  cp "$home/expected.source" "$home/state/procevent/$id.source"
+  cp "$saved" "$claim"
+  touch "$home/release"
+  wait_capture "$home" "$id" || fail "preserved owner did not deliver its captured feedback"
+  result=$(first_result "$home" "$id")
+  assert_contains "$(cat "$result")" 'feedback before checkpoint' 'early feedback survives restricted reconciliation'
+  assert_contains "$(cat "$result")" 'feedback after checkpoint' 'original runner completes after namespace proof is restored'
+  awk 'NR == 2 { print "999999"; next } { print }' "$saved" > "$claim"
+  printf 'abandoned staging output\n' > "$stage"
+  out=$(pe "$home" start "$id") || fail "same-namespace dead generation could not be reclaimed: $out"
+  assert_contains "$out" captured: 'same-namespace dead generation remains reclaimable'
+  assert_absent "$stage" 'proved-dead staging output is removed'
+  assert_absent "$claim" 'replacement releases its namespace-qualified claim'
+  pe "$home" retire "$id" >/dev/null
+  trap fm_test_cleanup EXIT
+  pass 'namespace-qualified claims preserve unknown owners and captured feedback'
+}
+
+test_claim_namespaces
+if [ "${1-}" = --namespace-only ]; then
+  exit 0
+fi
+
 # --- inert with nothing configured ------------------------------------------
 IDLE="$TMP_ROOT/idle"; mkdir -p "$IDLE"
 out=$(pe "$IDLE" list)
@@ -1852,6 +1964,7 @@ CLAIM="$FM_PROCEVENT_CLAIM_ROOT/stale-src.claim"
 mkdir -p "$FM_PROCEVENT_CLAIM_ROOT"
 HC="$TMP_ROOT/hc"; new_home "$HC"
 printf '%s\n%s\nstale-token\nstale-identity\n' "$HC" "999999" > "$CLAIM"
+qualify_fixture_claim "$CLAIM"
 chmod 0600 "$CLAIM"
 pe_register "$HC" lavish stale-src -- /bin/echo recovered >/dev/null
 printf 'partial sensitive output\n' > "$HC/state/procevent/.stale-src.stale-token.output"
@@ -1868,6 +1981,7 @@ HC_OLD_STATE="$TMP_ROOT/hc-old-state"
 mkdir -p "$HC_OLD_STATE/procevent"
 printf '%s\n%s\ncross-home-token\ncross-home-identity\n%s\n' \
   "$HC_OLD" "999999" "$HC_OLD_STATE/procevent" > "$FM_PROCEVENT_CLAIM_ROOT/cross-home-src.claim"
+qualify_fixture_claim "$FM_PROCEVENT_CLAIM_ROOT/cross-home-src.claim"
 chmod 0600 "$FM_PROCEVENT_CLAIM_ROOT/cross-home-src.claim"
 printf 'partial cross-home output\n' > "$HC_OLD_STATE/procevent/.cross-home-src.cross-home-token.output"
 chmod 0600 "$HC_OLD_STATE/procevent/.cross-home-src.cross-home-token.output"
@@ -1890,6 +2004,7 @@ SH
 chmod +x "$RACE_BLOCKER"
 pe_register "$HR" lavish race-src -- "$RACE_BLOCKER" "$RACE_LOG" "$RACE_TRIGGER" >/dev/null
 printf '%s\n%s\nold-token\nold-identity\n' "$TMP_ROOT/gone-home" 999999 > "$FM_PROCEVENT_CLAIM_ROOT/race-src.claim"
+qualify_fixture_claim "$FM_PROCEVENT_CLAIM_ROOT/race-src.claim"
 chmod 0600 "$FM_PROCEVENT_CLAIM_ROOT/race-src.claim"
 race_pids=()
 for _ in $(seq 1 24); do
@@ -2003,6 +2118,7 @@ DEAD_LOG="$TMP_ROOT/dead-gen-executions"
 pe_register "$HG2" lavish dead-gen-src -- "$RACE_BLOCKER" "$DEAD_LOG" "$DEAD_TRIGGER" >/dev/null
 printf '%s\n%s\ndead-token\ndead-identity\n%s\n' "$HG2" 999999 "$HG2/state/procevent" \
   > "$FM_PROCEVENT_CLAIM_ROOT/dead-gen-src.claim"
+qualify_fixture_claim "$FM_PROCEVENT_CLAIM_ROOT/dead-gen-src.claim"
 chmod 0600 "$FM_PROCEVENT_CLAIM_ROOT/dead-gen-src.claim"
 dead_out=$(pe "$HG2" reconcile)
 assert_contains "$dead_out" "started=1" "a generation with no leader and no group is still reclaimable"
@@ -2074,6 +2190,7 @@ sr2_identity=$(bash -c '. "$1/bin/fm-pr-lib.sh"; fm_pr_file_identity "$2"' _ \
   # exactly what a claim recorded before its home was re-created looks like.
   printf '%s\n%s\n%s\n%s\n%s\n' "$HSR2/state" 1 1 "$(id -u)" 755
 } > "$FM_PROCEVENT_CLAIM_ROOT/wedged-src.claim"
+qualify_fixture_claim "$FM_PROCEVENT_CLAIM_ROOT/wedged-src.claim"
 chmod 0600 "$FM_PROCEVENT_CLAIM_ROOT/wedged-src.claim"
 wedged_out=$(pe "$HSR2" retire wedged-src 2>&1) \
   || fail "retire refused to release a claim whose whole generation is gone: $wedged_out"
@@ -2530,6 +2647,7 @@ UW_CLAIM="$FM_PROCEVENT_CLAIM_ROOT/untidyable-src.claim"
     "$(bash -c '. "$1/bin/fm-pr-lib.sh"; fm_pr_file_inode "$2"' _ "$ROOT" "$HUW/state")" \
     "$(id -u)" 755
 } > "$UW_CLAIM"
+qualify_fixture_claim "$UW_CLAIM"
 chmod 0600 "$UW_CLAIM"
 kill -0 999999 2>/dev/null && fail "fixture invalid: the untidyable claim names a live pid"
 kill -0 -999999 2>/dev/null && fail "fixture invalid: the untidyable claim's process group is alive"
@@ -2607,6 +2725,7 @@ sleep 60 &
 innocent_pid=$!
 printf '%s\n%s\nreused-token\nnot-the-live-process-identity\n' \
   "$HI" "$innocent_pid" > "$FM_PROCEVENT_CLAIM_ROOT/reused-src.claim"
+qualify_fixture_claim "$FM_PROCEVENT_CLAIM_ROOT/reused-src.claim"
 chmod 0600 "$FM_PROCEVENT_CLAIM_ROOT/reused-src.claim"
 pe "$HI" retire reused-src >/dev/null
 kill -0 "$innocent_pid" 2>/dev/null || fail "retirement signaled a PID whose identity did not match the claim"

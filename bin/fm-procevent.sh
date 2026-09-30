@@ -1661,7 +1661,7 @@ stranded_leaderless_detail() {  # <source-id>
 }
 
 cmd_reconcile() {
-  local rec id published started=0 stopped=0 uncertain=0 failed=0 claim owner pid token identity claim_state stop_state task_pending
+  local rec id published started=0 stopped=0 uncertain=0 failed=0 claim owner pid token claim_state stop_state task_pending
   local launch_identity launch_stamp launch_mark unconfirmed entry
   local -a launched=()
   # Rejected before anything is launched, and by name. A window this command
@@ -1692,12 +1692,11 @@ cmd_reconcile() {
     owner=$FM_PROCEVENT_CLAIM_HOME
     pid=$FM_PROCEVENT_CLAIM_PID
     token=$FM_PROCEVENT_CLAIM_TOKEN
-    identity=$FM_PROCEVENT_CLAIM_IDENTITY
     if ! fm_procevent_claim_owned_by_state "$STATE" "$FM_HOME"; then
       fm_procevent_source_lock_release "$id"
       continue
     fi
-    stop_runner_pid "$pid" "$identity"
+    stop_claim_runner
     stop_state=$?
     case "$stop_state" in
       0|1)
@@ -2004,6 +2003,11 @@ runner_group_signal() {  # <signal> <pid> <identity> [proved]
   kill -"$signal" -"$pid" 2>/dev/null || return 2
 }
 
+stop_claim_runner() {
+  fm_procevent_claim_same_namespace || return 2
+  stop_runner_pid "$FM_PROCEVENT_CLAIM_PID" "$FM_PROCEVENT_CLAIM_IDENTITY"
+}
+
 stop_runner_pid() {  # <pid> <identity>
   local pid=${1-} identity=${2-} signal_state i=0
   case "$pid" in ''|*[!0-9]*) return 2 ;; esac
@@ -2105,7 +2109,7 @@ cmd_handled() {
 }
 
 cmd_retire() {
-  local id=${1-} condition=${2-} adapter='' sep='' expected_owner='' owner='' pid='' token='' identity='' stop_state owner_state
+  local id=${1-} condition=${2-} adapter='' sep='' expected_owner='' owner='' pid='' token='' stop_state owner_state
   local extension_binding_digest='' round_owner=''
   fm_procevent_source_id_valid "$id" || die "source id must be path-safe: $id"
   case "$condition" in
@@ -2184,8 +2188,7 @@ cmd_retire() {
       owner=$FM_PROCEVENT_CLAIM_HOME
       pid=$FM_PROCEVENT_CLAIM_PID
       token=$FM_PROCEVENT_CLAIM_TOKEN
-      identity=$FM_PROCEVENT_CLAIM_IDENTITY
-      stop_runner_pid "$pid" "$identity"
+      stop_claim_runner
       stop_state=$?
       if [ "$stop_state" -eq 2 ]; then
         fm_procevent_source_lock_release "$id"
@@ -2265,7 +2268,7 @@ sweep_source_preflight() {
       return 1
     fi
     if fm_procevent_claim_owned_by_state "$STATE" "$FM_HOME"; then
-      fm_procevent_pid_state "$FM_PROCEVENT_CLAIM_PID" "$FM_PROCEVENT_CLAIM_IDENTITY"
+      fm_procevent_claim_pid_state
       state=$?
       if [ "$state" -eq 2 ]; then
         fm_procevent_source_lock_release "$id"

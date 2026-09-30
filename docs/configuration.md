@@ -2015,9 +2015,11 @@ Some built-in sources carry the captain's answer to a captain-held task, and wha
 Ownership is machine-wide per canonical source, because separate homes can share one underlying source store.
 
 - Claims live under `$XDG_STATE_HOME/firstmate/procevent-claims` (override with `FM_PROCEVENT_CLAIM_ROOT`).
-- Each claim binds its caller-reported home and runner PID to a process identity, unique claim generation, exact registration-file generation, and resolved state-root identity.
+- Each claim binds its caller-reported home and runner PID to a process identity and namespace, unique claim generation, exact registration-file generation, and resolved state-root identity.
 - Registration, acquisition, replacement, retirement, and generation-bound release are serialized at one machine-wide boundary per source.
 - A live identity-matched owner is never displaced, and release removes only the exact generation the caller acquired.
+- On Linux, PID and process-group checks require the recorded namespace to match the caller's namespace; foreign or missing namespace coordinates leave ownership unknown and preserve the claim, registration, staging output, and capture reservation.
+- Legacy Linux claims require ownership to be resolved from their originating process context before migration or retirement; local PID absence and claim age cannot prove their owners ended.
 
 **Prove ownership before stopping a runner**
 

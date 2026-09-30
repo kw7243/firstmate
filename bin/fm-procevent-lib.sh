@@ -553,7 +553,7 @@ fm_procevent_registration_matches_locked() {  # <state> <adapter> <source-id> <a
 }
 
 fm_procevent_claim_load_locked() {  # <source-id>
-  local claim home pid token identity reg_dir reg_identity terminal state_root state_device state_inode state_owner state_mode extra
+  local claim home pid token identity reg_dir reg_identity terminal state_root state_device state_inode state_owner state_mode namespace='' extra
   claim=$(fm_procevent_claim_path "$1")
   [ -f "$claim" ] && [ ! -L "$claim" ] || return 1
   {
@@ -569,6 +569,7 @@ fm_procevent_claim_load_locked() {  # <source-id>
         && IFS= read -r state_inode \
         && IFS= read -r state_owner \
         && IFS= read -r state_mode \
+        && { IFS= read -r namespace || namespace=; } \
         && ! IFS= read -r extra
     else
       state_root=
@@ -608,6 +609,23 @@ fm_procevent_claim_load_locked() {  # <source-id>
   FM_PROCEVENT_CLAIM_STATE_INODE=$state_inode
   FM_PROCEVENT_CLAIM_STATE_OWNER=$state_owner
   FM_PROCEVENT_CLAIM_STATE_MODE=$state_mode
+  FM_PROCEVENT_CLAIM_NAMESPACE=$namespace
+}
+
+fm_procevent_claim_same_namespace() {
+  local current
+  if [ "$_FM_UNAME" = Linux ]; then
+    current=$(fm_process_namespace) || return 1
+    [ -n "${FM_PROCEVENT_CLAIM_NAMESPACE:-}" ] \
+      && [ "$FM_PROCEVENT_CLAIM_NAMESPACE" = "$current" ]
+  else
+    [ -z "${FM_PROCEVENT_CLAIM_NAMESPACE:-}" ]
+  fi
+}
+
+fm_procevent_claim_pid_state() {
+  fm_procevent_claim_same_namespace || return 2
+  fm_procevent_pid_state "$FM_PROCEVENT_CLAIM_PID" "$FM_PROCEVENT_CLAIM_IDENTITY"
 }
 
 fm_procevent_claim_state_root_field_valid() {  # <canonical-state-root>
@@ -649,6 +667,7 @@ fm_procevent_claim_recorded_state_root_valid() {
 }
 
 fm_procevent_claim_capture_reservation_remove_locked() {
+  fm_procevent_claim_same_namespace || return 1
   [ -n "${FM_PROCEVENT_CLAIM_STATE_ROOT:-}" ] || return 0
   fm_procevent_claim_recorded_state_root_valid || return 1
   fm_procevent_capture_reservation_remove_claim "$FM_PROCEVENT_CLAIM_STATE_ROOT" "$FM_PROCEVENT_CLAIM_TOKEN"
@@ -662,7 +681,7 @@ fm_procevent_claim_capture_reservation_remove_locked() {
 # crashed leader with a still-live ambiguous group (state 3) all return false.
 fm_procevent_claim_generation_gone_locked() {
   local state=0
-  fm_procevent_pid_state "${FM_PROCEVENT_CLAIM_PID:-}" "${FM_PROCEVENT_CLAIM_IDENTITY:-}" || state=$?
+  fm_procevent_claim_pid_state || state=$?
   [ "$state" -eq 1 ] \
     && ! fm_procevent_group_alive "${FM_PROCEVENT_CLAIM_PID:-}"
 }
@@ -741,6 +760,7 @@ fm_procevent_claim_state_locked() {
   claim=$(fm_procevent_claim_path "$1")
   [ -e "$claim" ] || return 1
   fm_procevent_claim_load_locked "$1" || return 2
+  fm_procevent_claim_same_namespace || return 2
   if [ "$FM_PROCEVENT_CLAIM_TERMINAL" = terminal ] && [ -n "$FM_PROCEVENT_CLAIM_REG_IDENTITY" ]; then
     registration="$FM_PROCEVENT_CLAIM_REG_DIR/$1.source"
     current_identity=$(fm_pr_file_identity "$registration" 2>/dev/null || true)
@@ -752,13 +772,16 @@ fm_procevent_claim_state_locked() {
 # fm_procevent_claim_acquire_locked <source-id> <home> <pid> <registration> <state-root>
 # 0 acquired, 1 error, 2 held by a live owner (possibly another home).
 fm_procevent_claim_acquire_locked() {
-  local id=$1 home=$2 pid=$3 registration=$4 state=$5 root claim tmp identity token status claim_state old_home old_token old_reg_dir reg_dir reg_identity stage state_root state_device state_inode state_owner state_mode
+  local id=$1 home=$2 pid=$3 registration=$4 state=$5 root claim tmp identity token status claim_state old_home old_token old_reg_dir reg_dir reg_identity stage state_root state_device state_inode state_owner state_mode namespace=''
   fm_procevent_source_id_valid "$id" || return 1
   [ -f "$registration" ] && [ ! -L "$registration" ] || return 1
   reg_dir=${registration%/*}
   case "$reg_dir" in /*) ;; *) return 1 ;; esac
   reg_identity=$(fm_pr_file_identity "$registration" 2>/dev/null) || return 1
   identity=$(fm_pid_identity "$pid" 2>/dev/null) || return 1
+  if [ "$_FM_UNAME" = Linux ]; then
+    namespace=$(fm_process_namespace) || return 1
+  fi
   root=$(fm_procevent_claim_root)
   claim=$(fm_procevent_claim_path "$id")
   status=0
@@ -830,9 +853,9 @@ fm_procevent_claim_acquire_locked() {
   fi
   if [ "$status" -eq 0 ]; then
     token=${tmp##*/}-$pid
-    printf '%s\n%s\n%s\n%s\n%s\n%s\nactive\n%s\n%s\n%s\n%s\n%s\n' \
+    printf '%s\n%s\n%s\n%s\n%s\n%s\nactive\n%s\n%s\n%s\n%s\n%s\n%s\n' \
       "$home" "$pid" "$token" "$identity" "$reg_dir" "$reg_identity" \
-      "$state_root" "$state_device" "$state_inode" "$state_owner" "$state_mode" > "$tmp" || status=1
+      "$state_root" "$state_device" "$state_inode" "$state_owner" "$state_mode" "$namespace" > "$tmp" || status=1
     [ "$status" -ne 0 ] || chmod 0600 "$tmp" || status=1
     [ "$status" -ne 0 ] || mv -f -- "$tmp" "$claim" || status=1
     if [ "$status" -eq 0 ]; then
@@ -843,6 +866,7 @@ fm_procevent_claim_acquire_locked() {
       FM_PROCEVENT_CLAIM_STATE_INODE=$state_inode
       FM_PROCEVENT_CLAIM_STATE_OWNER=$state_owner
       FM_PROCEVENT_CLAIM_STATE_MODE=$state_mode
+      FM_PROCEVENT_CLAIM_NAMESPACE=$namespace
     fi
   fi
   [ "$status" -eq 0 ] || { [ -z "${tmp:-}" ] || rm -f -- "$tmp"; }
@@ -853,6 +877,7 @@ fm_procevent_claim_mark_terminal_locked() {
   local id=$1 home=$2 pid=$3 token=$4 claim root tmp
   claim=$(fm_procevent_claim_path "$id")
   fm_procevent_claim_load_locked "$id" \
+    && fm_procevent_claim_same_namespace \
     && [ "$FM_PROCEVENT_CLAIM_HOME" = "$home" ] \
     && [ "$FM_PROCEVENT_CLAIM_PID" = "$pid" ] \
     && [ "$FM_PROCEVENT_CLAIM_TOKEN" = "$token" ] \
@@ -860,12 +885,12 @@ fm_procevent_claim_mark_terminal_locked() {
   root=$(fm_procevent_claim_root)
   tmp=$(umask 077; mktemp "$root/.claim.XXXXXX") || return 1
   if [ -n "$FM_PROCEVENT_CLAIM_STATE_ROOT" ]; then
-    if printf '%s\n%s\n%s\n%s\n%s\n%s\nterminal\n%s\n%s\n%s\n%s\n%s\n' \
+    if printf '%s\n%s\n%s\n%s\n%s\n%s\nterminal\n%s\n%s\n%s\n%s\n%s\n%s\n' \
       "$FM_PROCEVENT_CLAIM_HOME" "$FM_PROCEVENT_CLAIM_PID" "$FM_PROCEVENT_CLAIM_TOKEN" \
       "$FM_PROCEVENT_CLAIM_IDENTITY" "$FM_PROCEVENT_CLAIM_REG_DIR" \
       "$FM_PROCEVENT_CLAIM_REG_IDENTITY" "$FM_PROCEVENT_CLAIM_STATE_ROOT" \
       "$FM_PROCEVENT_CLAIM_STATE_DEVICE" "$FM_PROCEVENT_CLAIM_STATE_INODE" \
-      "$FM_PROCEVENT_CLAIM_STATE_OWNER" "$FM_PROCEVENT_CLAIM_STATE_MODE" > "$tmp" \
+      "$FM_PROCEVENT_CLAIM_STATE_OWNER" "$FM_PROCEVENT_CLAIM_STATE_MODE" "$FM_PROCEVENT_CLAIM_NAMESPACE" > "$tmp" \
       && chmod 0600 "$tmp" \
       && mv -f -- "$tmp" "$claim"; then
       return 0
@@ -874,10 +899,10 @@ fm_procevent_claim_mark_terminal_locked() {
       return 1
     fi
   fi
-  if printf '%s\n%s\n%s\n%s\n%s\n%s\nterminal\n' \
+  if printf '%s\n%s\n%s\n%s\n%s\n%s\nterminal\n\n\n\n\n\n%s\n' \
     "$FM_PROCEVENT_CLAIM_HOME" "$FM_PROCEVENT_CLAIM_PID" "$FM_PROCEVENT_CLAIM_TOKEN" \
     "$FM_PROCEVENT_CLAIM_IDENTITY" "$FM_PROCEVENT_CLAIM_REG_DIR" \
-    "$FM_PROCEVENT_CLAIM_REG_IDENTITY" > "$tmp" \
+    "$FM_PROCEVENT_CLAIM_REG_IDENTITY" "$FM_PROCEVENT_CLAIM_NAMESPACE" > "$tmp" \
     && chmod 0600 "$tmp" \
     && mv -f -- "$tmp" "$claim"; then
     return 0
@@ -896,6 +921,7 @@ fm_procevent_claim_adopt_registration_locked() {  # <source-id> <home> <pid> <to
   case "$reg_identity" in *:*) ;; *) return 1 ;; esac
   claim=$(fm_procevent_claim_path "$id")
   fm_procevent_claim_load_locked "$id" \
+    && fm_procevent_claim_same_namespace \
     && [ "$FM_PROCEVENT_CLAIM_HOME" = "$home" ] \
     && [ "$FM_PROCEVENT_CLAIM_PID" = "$pid" ] \
     && [ "$FM_PROCEVENT_CLAIM_TOKEN" = "$token" ] \
@@ -903,12 +929,12 @@ fm_procevent_claim_adopt_registration_locked() {  # <source-id> <home> <pid> <to
   root=$(fm_procevent_claim_root)
   tmp=$(umask 077; mktemp "$root/.claim.XXXXXX") || return 1
   if [ -n "$FM_PROCEVENT_CLAIM_STATE_ROOT" ]; then
-    if printf '%s\n%s\n%s\n%s\n%s\n%s\nactive\n%s\n%s\n%s\n%s\n%s\n' \
+    if printf '%s\n%s\n%s\n%s\n%s\n%s\nactive\n%s\n%s\n%s\n%s\n%s\n%s\n' \
       "$FM_PROCEVENT_CLAIM_HOME" "$FM_PROCEVENT_CLAIM_PID" "$FM_PROCEVENT_CLAIM_TOKEN" \
       "$FM_PROCEVENT_CLAIM_IDENTITY" "$FM_PROCEVENT_CLAIM_REG_DIR" "$reg_identity" \
       "$FM_PROCEVENT_CLAIM_STATE_ROOT" "$FM_PROCEVENT_CLAIM_STATE_DEVICE" \
       "$FM_PROCEVENT_CLAIM_STATE_INODE" "$FM_PROCEVENT_CLAIM_STATE_OWNER" \
-      "$FM_PROCEVENT_CLAIM_STATE_MODE" > "$tmp" \
+      "$FM_PROCEVENT_CLAIM_STATE_MODE" "$FM_PROCEVENT_CLAIM_NAMESPACE" > "$tmp" \
       && chmod 0600 "$tmp" \
       && mv -f -- "$tmp" "$claim"; then
       FM_PROCEVENT_CLAIM_REG_IDENTITY=$reg_identity
@@ -917,9 +943,9 @@ fm_procevent_claim_adopt_registration_locked() {  # <source-id> <home> <pid> <to
     rm -f -- "$tmp"
     return 1
   fi
-  if printf '%s\n%s\n%s\n%s\n%s\n%s\nactive\n' \
+  if printf '%s\n%s\n%s\n%s\n%s\n%s\nactive\n\n\n\n\n\n%s\n' \
     "$FM_PROCEVENT_CLAIM_HOME" "$FM_PROCEVENT_CLAIM_PID" "$FM_PROCEVENT_CLAIM_TOKEN" \
-    "$FM_PROCEVENT_CLAIM_IDENTITY" "$FM_PROCEVENT_CLAIM_REG_DIR" "$reg_identity" > "$tmp" \
+    "$FM_PROCEVENT_CLAIM_IDENTITY" "$FM_PROCEVENT_CLAIM_REG_DIR" "$reg_identity" "$FM_PROCEVENT_CLAIM_NAMESPACE" > "$tmp" \
     && chmod 0600 "$tmp" \
     && mv -f -- "$tmp" "$claim"; then
     FM_PROCEVENT_CLAIM_REG_IDENTITY=$reg_identity
@@ -956,6 +982,7 @@ fm_procevent_claim_release_mode_locked() {
   claim=$(fm_procevent_claim_path "$id")
   [ -e "$claim" ] || return 0
   if fm_procevent_claim_load_locked "$id" \
+    && fm_procevent_claim_same_namespace \
     && [ "$FM_PROCEVENT_CLAIM_HOME" = "$home" ] \
     && [ "$FM_PROCEVENT_CLAIM_PID" = "$pid" ] \
     && [ "$FM_PROCEVENT_CLAIM_TOKEN" = "$token" ]; then

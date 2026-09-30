@@ -1596,17 +1596,23 @@ async function inheritedCaptureCapability(home) {
   let claimText;
   try { claimText = decoder.decode(claimBytes); } catch { fail("json-invalid", "capture claim descriptor is not valid UTF-8"); }
   const claimLines = claimText.split("\n");
-  if (claimLines.pop() !== "" || (claimLines.length !== 7 && claimLines.length !== 12)) fail("path-unsafe", "capture claim descriptor is malformed");
+  if (claimLines.pop() !== "" || ![7, 12, 13].includes(claimLines.length)) fail("path-unsafe", "capture claim descriptor is malformed");
   const [claimHome, claimPid, claimToken, claimIdentity, claimRegistry, claimRegistryIdentity, claimState,
-    claimStateRoot, claimStateDevice, claimStateInode, claimStateOwner, claimStateMode] = claimLines;
+    claimStateRoot, claimStateDevice, claimStateInode, claimStateOwner, claimStateMode, claimNamespace = ""] = claimLines;
   if (claimHome !== home || !/^[0-9]+$/.test(claimPid) || !/^[A-Za-z0-9._-]{1,256}$/.test(claimToken)
       || !claimIdentity || !claimRegistry.startsWith("/") || !claimRegistryIdentity.includes(":") || claimState !== "active") {
     fail("path-unsafe", "capture claim descriptor is invalid");
   }
-  if (claimLines.length === 12 && (!claimStateRoot.startsWith("/") || /[\u0000-\u001f\u007f]/.test(claimStateRoot) || !/^[0-9]+$/.test(claimStateDevice)
+  if (claimLines.length >= 12 && (!claimStateRoot.startsWith("/") || /[\u0000-\u001f\u007f]/.test(claimStateRoot) || !/^[0-9]+$/.test(claimStateDevice)
       || !/^[0-9]+$/.test(claimStateInode) || !/^[0-9]+$/.test(claimStateOwner)
       || !/^[0-7]+$/.test(claimStateMode) || (Number.parseInt(claimStateMode, 8) & 0o22) !== 0)) {
     fail("path-unsafe", "capture claim state root is invalid");
+  }
+  if (process.platform === "linux") {
+    const current = `${(await readFile("/proc/sys/kernel/random/boot_id", "utf8")).trim()}/${await readlink("/proc/self/ns/pid")}`;
+    if (claimNamespace !== current) fail("process-identity-uncertain", "capture claim belongs to an unknown process namespace");
+  } else if (claimNamespace) {
+    fail("process-identity-uncertain", "capture claim belongs to an unknown process namespace");
   }
   const capability = parseStrictJson(capabilityBytes, "capture capability");
   exactKeys(capability, ["schema", "token", "operation", "source_id", "sequence", "binding_digest", "claim_home", "claim_pid", "claim_identity", "claim_token", "claim_device", "claim_inode", "inbox_device", "inbox_inode", "result_device", "result_inode"], "capture capability");

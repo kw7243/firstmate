@@ -701,6 +701,8 @@ fi
 REBUILDING_SESSION_PID=$(fm_harness_ancestry_pid 2>/dev/null || true)
 print_agents_refresh_if_required "$REBUILDING_SESSION_PID"
 
+NETWORK_STAGE_RC=0
+NETWORK_STAGE_OUT=
 if [ "$READ_ONLY" -eq 0 ]; then
   if [ "$REEMIT" -eq 0 ]; then
     rm -f "$COMPLETION_FILE" 2>/dev/null || true
@@ -723,8 +725,8 @@ if [ "$READ_ONLY" -eq 0 ]; then
   # steer, or merge anyway, so it has no action left for an auth verdict to gate.
   NETWORK_STAGE_LOCKED=1
   [ "$REEMIT" -eq 0 ] || NETWORK_STAGE_LOCKED=0
-  "$SCRIPT_DIR/fm-startup-network.sh" start \
-    --locked "$NETWORK_STAGE_LOCKED" --harvest-pid $$ >/dev/null 2>&1 || true
+  NETWORK_STAGE_OUT=$("$SCRIPT_DIR/fm-startup-network.sh" start \
+    --locked "$NETWORK_STAGE_LOCKED" --harvest-pid $$ 2>&1) || NETWORK_STAGE_RC=$?
 fi
 
 # --- 2. bootstrap --------------------------------------------------------
@@ -1000,6 +1002,10 @@ if [ "$READ_ONLY" -eq 1 ]; then
   printf 'They need the fleet lock, and this session must not spawn, steer, or merge, so it\n'
   printf 'has no action they would gate. The session holding the lock runs them.\n'
 else
+  if [ "$NETWORK_STAGE_RC" -ne 0 ]; then
+    printf '%s\n' "$NETWORK_STAGE_OUT"
+    printf 'SESSION_START_COMPLETION: startup remains incomplete because the requested deferred checks could not be scheduled.\n'
+  fi
   "$SCRIPT_DIR/fm-startup-network.sh" harvest --pid $$ 2>&1 || true
 fi
 
@@ -1055,12 +1061,16 @@ This script never starts supervision itself.
 
 EOF
 fi
-cat <<'EOF'
+if [ "$NETWORK_STAGE_RC" -ne 0 ]; then
+  printf 'Startup remains incomplete. Resolve the NETWORK CHECKS diagnostic before retrying full session start.\n'
+else
+  cat <<'EOF'
 The digest above is complete for this session start. The READ-ONCE CONTRACT
 section near the top of it governs what may still be read from disk.
 EOF
+fi
 
-if [ "$READ_ONLY" -eq 0 ] && [ "$REEMIT" -eq 0 ]; then
+if [ "$READ_ONLY" -eq 0 ] && [ "$REEMIT" -eq 0 ] && [ "$NETWORK_STAGE_RC" -eq 0 ]; then
   COMPLETION_RECORDED=0
   COMPLETION_PID=$(fm_session_lock_generation "$STATE" 2>/dev/null || true)
   case "$COMPLETION_PID" in

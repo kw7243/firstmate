@@ -76,6 +76,9 @@ if [ -n "${FM_TIMING_LOG:-}" ]; then
     "$(( $(fm_timing_now_ms) - 1500 ))" "${FM_FAKE_TIMING_DETAIL:-}"
 fi
 [ -z "${FM_FAKE_BOOTSTRAP_SLEEP:-}" ] || sleep "$FM_FAKE_BOOTSTRAP_SLEEP"
+if [ "${FM_BOOTSTRAP_NETWORK:-}" = only ] && [ -n "${FM_FAKE_BOOTSTRAP_RELEASE_FILE:-}" ]; then
+  while [ ! -f "$FM_FAKE_BOOTSTRAP_RELEASE_FILE" ]; do sleep 0.1; done
+fi
 [ -z "${FM_FAKE_BOOTSTRAP_OUT:-}" ] || printf '%s\n' "$FM_FAKE_BOOTSTRAP_OUT"
 exit "${FM_FAKE_BOOTSTRAP_RC:-0}"
 SH
@@ -604,7 +607,11 @@ EOF
       || fail "an unknown covering worker could not be reused"
     cmp -s "$status" "$home/before.status" || fail "start replaced an unknown covering worker ($variant)"
     printf '%s\n' $$ > "$home/state/.lock"
-    FM_FAKE_BOOTSTRAP_LOG="$log" run_stage "$home" "$root" start --locked 1 --harvest-pid $$
+    if report=$(FM_FAKE_BOOTSTRAP_LOG="$log" run_stage "$home" "$root" start --locked 1 --harvest-pid $$ 2>&1); then
+      fail "start accepted a full startup without scheduling its sweeps ($variant)"
+    fi
+    assert_contains "$report" 'requested checks were not scheduled' "start hid its unsatisfied request ($variant)"
+    assert_contains "$report" 'dead-secondmate relaunch' "start omitted the skipped sweeps ($variant)"
     cmp -s "$status" "$home/before.status" || fail "start superseded an unknown probe worker ($variant)"
     [ ! -f "$log" ] || fail "start ran bootstrap beside an unknown worker ($variant)"
     if FM_FAKE_BOOTSTRAP_LOG="$log" run_stage "$home" "$root" run --locked 0; then
@@ -657,6 +664,73 @@ EOF
   [ "$(grep -c 'network=only' "$log")" = 1 ] || fail "an unknown worker caused duplicate work"
   wait_for_startup_network_wake "$home" || fail "the original actionable result did not settle delivery"
   pass "fm-startup-network: namespace uncertainty preserves the original worker's publication"
+}
+
+test_full_startup_reports_an_unknown_probe_and_stays_incomplete() {
+  local rec home root log status output generation waited=0 phase
+  [ "$(uname)" = Linux ] || { printf 'skip: worker namespace uncertainty requires Linux\n'; return; }
+  rec=$(new_world incomplete-full-startup)
+  IFS='|' read -r home root log <<EOF
+$rec
+EOF
+  trap '
+    touch "$TMP_ROOT/incomplete-full-startup/home/release-probe"
+    run_stage "$TMP_ROOT/incomplete-full-startup/home" "$TMP_ROOT/incomplete-full-startup/root" wait 15 >/dev/null 2>&1 || true
+    fm_test_cleanup
+  ' EXIT
+  mkdir -p "$home/config" "$home/data"
+  printf 'manual\n' > "$home/config/backlog-mode"
+  printf 'Fixture startup instructions\n' > "$root/AGENTS.md"
+  ln -s "$ROOT/docs" "$root/docs"
+  printf '%s\n' $$ > "$home/state/.lock"
+  printf 'previous completion\n' > "$home/state/.session-start-complete"
+  FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_RELEASE_FILE="$home/release-probe" \
+    FM_FAKE_BOOTSTRAP_OUT=ORIGINAL_PROBE_RESULT \
+    run_stage "$home" "$root" start --locked 0 --harvest-pid 999999999 \
+    || fail "the original probe failed to start"
+  while [ ! -s "$log" ] && [ "$waited" -lt 50 ]; do
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  assert_grep 'network=only detect_only=1' "$log" "the original probe was not running"
+  status="$home/state/.startup-network.status"
+  generation=$(sed -n 's/^generation=//p' "$status")
+  printf 'pid_namespace=foreign-namespace\n' >> "$status"
+  cp "$status" "$home/before.status"
+  printf 'previous report\n' > "$home/state/.startup-network.report"
+
+  output=$(PATH="$root/bin:/usr/bin:/bin" FM_FAKE_HARNESS_PID=$$ FM_FAKE_BOOTSTRAP_LOG="$log" \
+    FM_HOME="$home" FM_ROOT_OVERRIDE="$root" "$root/bin/fm-session-start.sh" --source startup)
+  assert_not_contains "$output" 'READ-ONLY SESSION' "full startup lost its own fleet lock"
+  assert_not_contains "$output" '●  STARTUP TRUNCATED' "full startup failed before testing deferred checks"
+  assert_contains "$output" 'worker whose liveness is unknown' "the digest hid the preserved probe"
+  assert_contains "$output" 'requested checks were not scheduled' "the digest hid the refused full request"
+  for phase in 'dead-secondmate relaunch' 'secondmate convergence' 'pending handoff delivery' \
+    'project clone refresh' 'inactive terminal-outcome reconciliation'; do
+    assert_contains "$output" "$phase" "the digest omitted a skipped phase: $phase"
+  done
+  assert_contains "$output" 'SESSION_START_COMPLETION: startup remains incomplete' "the digest claimed full completion"
+  assert_not_contains "$output" 'The digest above is complete' "the closing reminder contradicted the refusal"
+  [ ! -e "$home/state/.session-start-complete" ] || fail "an unsatisfied startup retained its completion marker"
+  [ ! -e "$home/state/.session-start-agents-baseline" ] || fail "an unsatisfied startup recorded an instruction baseline"
+  cmp -s "$status" "$home/before.status" || fail "full startup replaced the unknown probe's generation"
+  [ "$(cat "$home/state/.startup-network.report")" = 'previous report' ] || fail "full startup erased the prior report"
+  [ "$(grep -c 'network=only' "$log")" = 1 ] || fail "full startup launched a competing worker"
+
+  touch "$home/release-probe"
+  run_stage "$home" "$root" wait 15 || fail "the original probe could not publish"
+  [ "$(sed -n 's/^generation=//p' "$status")" = "$generation" ] || fail "the original probe lost its generation"
+  assert_contains "$(run_stage "$home" "$root" report)" ORIGINAL_PROBE_RESULT "the original probe lost its output"
+  [ ! -e "$home/state/.session-start-complete" ] || fail "probe completion incorrectly completed full startup"
+  output=$(PATH="$root/bin:/usr/bin:/bin" FM_FAKE_HARNESS_PID=$$ FM_FAKE_BOOTSTRAP_LOG="$log" \
+    FM_HOME="$home" FM_ROOT_OVERRIDE="$root" "$root/bin/fm-session-start.sh" --source startup)
+  assert_not_contains "$output" 'startup remains incomplete' "full startup did not recover after the probe finished"
+  [ -s "$home/state/.session-start-complete" ] || fail "the retry did not record completed startup"
+  [ -s "$home/state/.session-start-agents-baseline" ] || fail "the retry did not record its instruction baseline"
+  run_stage "$home" "$root" wait 15 || fail "the retry did not publish its sweeps"
+  assert_grep 'network=only detect_only=0' "$log" "the retry did not run its required sweeps"
+  trap fm_test_cleanup EXIT
+  pass "fm-startup-network: an unknown probe leaves full startup incomplete until a successful retry"
 }
 
 test_locked_start_is_not_satisfied_by_an_inflight_probe() {
@@ -1061,6 +1135,7 @@ test_worker_liveness_uses_process_coordinates
 test_exited_worker_waiting_to_be_reaped_is_dead
 test_unknown_worker_liveness_preserves_the_generation
 test_unknown_worker_can_still_publish_its_generation
+test_full_startup_reports_an_unknown_probe_and_stays_incomplete
 test_locked_start_is_not_satisfied_by_an_inflight_probe
 test_start_is_single_flight
 test_start_reserves_its_generation_before_returning

@@ -171,6 +171,7 @@ Shared transient lock primitives in `bin/fm-wake-lib.sh` also require namespace 
 Legacy Linux transient locks without those coordinates remain unknown and are preserved; migration must establish that their owners ended before retiring their records.
 These checks preserve ambiguous ownership rather than infer death from age or an absent PID in another namespace.
 Deferred-worker status and reuse follow the process-coordinate contract in `bin/fm-startup-network.sh`; an unknown worker remains reserved until its original process view can establish its state.
+A worker that does not cover the requested startup phases cannot satisfy that startup: the deferred entrypoint returns nonzero, the digest names the unscheduled checks, and no startup completion or instruction baseline is recorded.
 Current empirical commands and platform limits are recorded in [runtime verification](verification/runtime-backends.md#linux-codex-session-identity).
 
 At session start, `bin/fm-session-start.sh` emits exactly one primary-harness supervision block rendered by `bin/fm-supervision-instructions.sh` from `docs/supervision-protocols/`.

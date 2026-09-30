@@ -290,6 +290,8 @@ cmd_start() {  # <locked> <harvest-pid>
     fi
     if [ "$liveness" = unknown ]; then
       fm_lock_release "$PUBLISH_LOCK"
+      printf 'NETWORK_CHECKS: preserving the existing %s worker whose liveness is unknown; inspect %s/bin/fm-startup-network.sh report from its originating process context before retrying full session start\n' \
+        "$(phase_label "$(status_get phases)")" "$FM_ROOT" >&2
       return 1
     fi
   fi
@@ -779,7 +781,15 @@ done
 case "$LOCKED" in 0|1) ;; *) LOCKED=0 ;; esac
 
 case "$MODE" in
-  start) cmd_start "$LOCKED" "${HARVEST_PID:-0}" ;;
+  start)
+    cmd_start "$LOCKED" "${HARVEST_PID:-0}" || {
+      rc=$?
+      phases=probe
+      [ "$LOCKED" != 1 ] || phases=probe,sweeps
+      printf 'NETWORK_CHECKS: requested checks were not scheduled: %s\n' "$(phase_label "$phases")" >&2
+      exit "$rc"
+    }
+    ;;
   run) cmd_run "$LOCKED" "$LOCK_PID" "$GENERATION" || exit $? ;;
   harvest) cmd_harvest "${HARVEST_PID:-}" ;;
   report) print_state; print_timings ;;
