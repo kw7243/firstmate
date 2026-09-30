@@ -1,15 +1,25 @@
 #!/usr/bin/env bash
 # Acquire or inspect the per-home firstmate session lock.
-# Writes the harness (agent) process PID found by walking the shell's ancestry,
-# which lives as long as the firstmate session - unlike the transient subshell
-# PID of any one tool call, which is dead moments after it is written.
-# Codex tool sandboxes may hide the real parent process behind a bwrap pid
-# namespace; in that case a CODEX_THREAD_ID-backed opaque owner is used instead.
-# Foreign opaque owners fail closed because their liveness cannot be proved from
-# inside the sandbox until the marker is old enough to prove it is not a
-# concurrent acquisition.
+#
+# Line 1 of state/.lock remains the numeric anchor resolved by the shared
+# session-lock library. Claude retains its trusted model-loop identity.
+# Linux Codex records its verified tool-boundary thread id in line 1 of
+# state/.lock-session and one metadata line:
+#   codex-owner-v1 <pid> <boot/pid-namespace> <starttime> <process|transient>
+# Only this script writes that sidecar, serialized by state/.lock.acquire.
+# Codex refreshes its anchor on every entry; a sandbox init lives for one tool
+# call, not the session. The stable thread generation binds deferred work.
+# A foreign transient or unreadable owner stays unknown and cannot be reclaimed
+# on age, PID coincidence, or absence from another process namespace.
+# Non-Codex same-session confirmations keep their live numeric anchor unchanged.
+# Publication and rollback of the sidecar and numeric record remain one claimed
+# transaction. All ownership and liveness readers use fm-session-lock-lib.sh.
+#
 # Usage: fm-lock.sh           acquire; exit 1 unless ownership is verified
-#        fm-lock.sh status    print holder and liveness; always exits 0
+#        fm-lock.sh status    print holder and liveness; always exits 0.
+#                             A held lock is not proof the holder is consuming
+#                             wakes. Machine-readable lock fields live on
+#                             fm-inbox.sh ready, from the same inspect helper.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -17,91 +27,35 @@ FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
 STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 LOCK="$STATE/.lock"
+LOCK_SESSION="$STATE/.lock-session"
 mkdir -p "$STATE" 2>/dev/null || {
   echo "error: cannot create session-lock state directory $STATE; operate read-only until resolved" >&2
   exit 1
 }
 
-# shellcheck source=bin/fm-lock-lib.sh
-. "$SCRIPT_DIR/fm-lock-lib.sh"
-
-LOCK_STALE_AFTER=${FM_LOCK_STALE_AFTER:-2}
-case "$LOCK_STALE_AFTER" in
-  ''|*[!0-9]*) LOCK_STALE_AFTER=2 ;;
-esac
-
-# Harness identity (FM_HARNESS_RE, ancestry walk, holder liveness) is owned by
-# the shared session-lock lib so the Claude Stop auto-arm applies the exact
-# same identity contract.
+# Harness identity (FM_HARNESS_RE, ancestry walk, holder liveness, trusted
+# session id, anchor pid) is owned by the shared session-lock lib so the Claude
+# Stop auto-arm applies the exact same identity contract.
 # shellcheck source=bin/fm-session-lock-lib.sh
 . "$SCRIPT_DIR/fm-session-lock-lib.sh"
 
-codex_sandbox_owner() {
-  local thread=${CODEX_THREAD_ID:-}
-  [ -n "$thread" ] || return 1
-  case "$thread" in
-    *[!A-Za-z0-9._:-]*|*/*) return 1 ;;
-  esac
-  [ "${CODEX_SANDBOX_NETWORK_DISABLED:-}" = 1 ] || [ -n "${CODEX_SQLITE_HOME:-}" ] || return 1
-  printf 'codex-thread:%s\n' "$thread"
-}
-
-current_owner() {
-  local pid
-  if pid=$(fm_harness_ancestry_pid); then
-    printf '%s\n' "$pid"
-    return 0
-  fi
-  codex_sandbox_owner
-}
-
-owner_is_opaque() {
-  case "$1" in
-    codex-thread:*) return 0 ;;
-  esac
-  return 1
-}
-
-opaque_owner_stale() {
-  local old=$1 age
-  owner_is_opaque "$old" || return 1
-  age=$(fm_lock_age "$LOCK") || return 1
-  [ "$age" -ge "$LOCK_STALE_AFTER" ]
-}
-
-owner_blocks_acquire() {
-  local old=$1 current=${2:-}
-  [ "$old" = "$current" ] && return 1
-  if owner_is_opaque "$old"; then
-    opaque_owner_stale "$old" && return 1
-    return 0
-  fi
-  fm_harness_pid_alive "$old"
-}
-
 if [ "${1:-}" = "status" ]; then
-  if [ ! -f "$LOCK" ]; then echo "lock: free"; exit 0; fi
-  old=$(cat "$LOCK" 2>/dev/null) || {
-    echo "lock: unreadable"
-    exit 0
-  }
-  if owner_is_opaque "$old"; then
-    if [ "$(codex_sandbox_owner 2>/dev/null || true)" = "$old" ]; then
-      echo "lock: held by this sandboxed codex session"
-    elif opaque_owner_stale "$old"; then
-      echo "lock: stale (opaque sandbox owner older than ${LOCK_STALE_AFTER}s)"
-    else
-      echo "lock: held by opaque sandbox owner (liveness unavailable)"
-    fi
-  elif fm_harness_pid_alive "$old"; then
-    echo "lock: held by live harness pid $old"
-  else
-    echo "lock: stale (pid $old dead or not a harness)"
-  fi
+  fm_session_lock_inspect "$STATE"
+  case "$FM_LOCK_INSPECT_STATE" in
+    free) echo "lock: free" ;;
+    unreadable) echo "lock: unreadable" ;;
+    held) echo "lock: held by live harness pid $FM_LOCK_INSPECT_PID" ;;
+    stale) echo "lock: stale (pid $FM_LOCK_INSPECT_PID ended in its recorded namespace)" ;;
+    *) echo "lock: unknown (pid $FM_LOCK_INSPECT_PID cannot be verified in this process view)" ;;
+  esac
   exit 0
 fi
 
-me=$(current_owner) || { echo "error: cannot locate harness process in ancestry or sandbox session identity" >&2; exit 1; }
+me=$(fm_session_lock_anchor_pid) || { echo "error: cannot locate harness process in ancestry" >&2; exit 1; }
+if fm_session_lock_codex_ancestor_pid >/dev/null && ! fm_session_lock_trusted_codex_session_id >/dev/null; then
+  echo "error: cannot verify the Codex tool session identity; operate read-only until resolved" >&2
+  exit 1
+fi
 probe=$(mktemp "$STATE/.lock-write.XXXXXX" 2>/dev/null) || {
   echo "error: cannot write session lock; operate read-only until resolved" >&2
   exit 1
@@ -114,32 +68,200 @@ rm -f "$probe" 2>/dev/null || {
 . "$SCRIPT_DIR/fm-wake-lib.sh"
 CLAIM_LOCK="$STATE/.lock.acquire"
 CLAIM_LOCK_HELD=0
+# PHASE 0: committed/none. 1: sidecar mutated, line 1 not written. 2: line 1 written, not verified.
+# KIND 0: no backup. 1: restore $LOCK_SESSION_PREV. 2: sidecar was absent.
+LOCK_SESSION_PHASE=0
+LOCK_SESSION_KIND=0
+LOCK_SESSION_PREV="$STATE/.lock-session.prev"
+LOCK_LINE_PRE=
 release_claim_lock() {
   if [ "$CLAIM_LOCK_HELD" -eq 1 ]; then
     fm_lock_release "$CLAIM_LOCK"
     CLAIM_LOCK_HELD=0
   fi
 }
-trap release_claim_lock EXIT
+restore_uncommitted_lock_session() {
+  case "$LOCK_SESSION_PHASE" in
+    1)
+      case "$LOCK_SESSION_KIND" in
+        1) mv -f "$LOCK_SESSION_PREV" "$LOCK_SESSION" 2>/dev/null || true ;;
+        2) rm -f "$LOCK_SESSION" "$LOCK_SESSION_PREV" 2>/dev/null || true ;;
+      esac
+      ;;
+    2) rm -f "$LOCK_SESSION" "$LOCK_SESSION_PREV" 2>/dev/null || true ;;
+  esac
+  LOCK_SESSION_PHASE=0
+  LOCK_SESSION_KIND=0
+}
+commit_lock_session() {
+  LOCK_SESSION_PHASE=0
+  LOCK_SESSION_KIND=0
+  rm -f "$LOCK_SESSION_PREV" 2>/dev/null || true
+}
+on_lock_exit() {
+  restore_uncommitted_lock_session
+  [ -n "$LOCK_LINE_PRE" ] && rm -f "$LOCK_LINE_PRE"
+  release_claim_lock
+}
+trap on_lock_exit EXIT
 trap 'exit 1' HUP INT TERM
-fm_lock_acquire_wait "$CLAIM_LOCK"
-CLAIM_LOCK_HELD=1
 
-if [ -e "$LOCK" ] || [ -L "$LOCK" ]; then
-  if [ ! -f "$LOCK" ] || [ -L "$LOCK" ]; then
-    echo "error: session lock is not a regular file; operate read-only until resolved" >&2
+remember_lock_session() {
+  [ "$LOCK_SESSION_PHASE" -eq 0 ] || return 0
+  if [ -e "$LOCK_SESSION" ] || [ -L "$LOCK_SESSION" ]; then
+    rm -f "$LOCK_SESSION_PREV" 2>/dev/null || true
+    cp -P "$LOCK_SESSION" "$LOCK_SESSION_PREV" 2>/dev/null || return 1
+    LOCK_SESSION_KIND=1
+  else
+    LOCK_SESSION_KIND=2
+  fi
+  LOCK_SESSION_PHASE=1
+}
+
+# Record the trusted session id beside the lock, or remove a sidecar that no
+# trusted id backs. Called only while the claim lock is held. A sidecar already
+# naming a non-Codex id is left byte-identical. Codex refreshes its process
+# coordinates on each acquisition while retaining its stable thread identity.
+publish_lock_session() {
+  local trusted recorded tmp namespace start kind
+  if trusted=$(fm_session_lock_trusted_session_id); then
+    if recorded=$(fm_session_lock_recorded_session_id "$STATE") && [ "$recorded" = "$trusted" ] \
+      && ! fm_session_lock_codex_record_present "$STATE"; then
+      return 0
+    fi
+    remember_lock_session || return 1
+    tmp=$(mktemp "$STATE/.lock-session.XXXXXX" 2>/dev/null) || return 1
+    case "$trusted" in
+      codex:*)
+        namespace=$(fm_process_namespace) || { rm -f "$tmp"; return 1; }
+        start=$(fm_process_starttime "$me") || { rm -f "$tmp"; return 1; }
+        kind=process
+        [ "$me" != 1 ] || kind=transient
+        trusted="$trusted
+codex-owner-v1 $me $namespace $start $kind"
+        ;;
+    esac
+    if ! { printf '%s\n' "$trusted" > "$tmp" && mv -f "$tmp" "$LOCK_SESSION"; } 2>/dev/null; then
+      rm -f "$tmp" 2>/dev/null
+      return 1
+    fi
+    return 0
+  fi
+  if [ -e "$LOCK_SESSION" ] || [ -L "$LOCK_SESSION" ]; then
+    remember_lock_session || return 1
+    rm -f "$LOCK_SESSION" 2>/dev/null || return 1
+  fi
+  return 0
+}
+
+publish_lock_session_or_die() {
+  publish_lock_session && return 0
+  echo "error: cannot record the session identity beside the lock; operate read-only until resolved" >&2
+  exit 1
+}
+
+# This session already holds the lock. Non-Codex line 1 stays as recorded;
+# Codex continues to the serialized publication of both process coordinates.
+# A same-session confirmation waits for the claim lock so the sidecar refresh
+# completes. After the wait, the lock is re-read and the sidecar is refreshed
+# only when this session still owns it; otherwise the claim lock is released
+# and the caller continues with the ordinary live-owner or reclaim path. The
+# prior-session-sweep-is-finishing refusal is a takeover rule and does not
+# apply here.
+confirm_own_lock() {
+  local recorded waited=0
+  if [ "$CLAIM_LOCK_HELD" -ne 1 ]; then
+    fm_lock_acquire_wait "$CLAIM_LOCK" || refuse_uncertain_owner
+    CLAIM_LOCK_HELD=1
+    waited=1
+  fi
+  recorded=$(cat "$LOCK" 2>/dev/null || true)
+  if fm_session_lock_owned_by_self "$STATE"; then
+    fm_session_lock_codex_record_present "$STATE" && return 0
+    publish_lock_session_or_die
+    commit_lock_session
+    release_claim_lock
+    echo "lock acquired: harness pid $recorded"
+    exit 0
+  fi
+  if [ "$waited" -eq 1 ]; then
+    release_claim_lock
+  fi
+  return 1
+}
+
+refuse_live_owner() {  # <recorded-pid>
+  local recorded
+  if recorded=$(fm_session_lock_recorded_session_id "$STATE"); then
+    echo "error: another live firstmate session holds the lock (pid $1, session $recorded); operate read-only until resolved" >&2
+  else
+    echo "error: another live firstmate session holds the lock (pid $1); operate read-only until resolved" >&2
+  fi
+  exit 1
+}
+
+refuse_uncertain_owner() {
+  echo "error: session owner cannot be verified in this process view; preserve the lock and operate read-only until resolved" >&2
+  exit 1
+}
+
+check_previous_owner() {
+  if fm_session_lock_owned_by_self "$STATE"; then
+    confirm_own_lock && return 0
+  fi
+  fm_session_lock_inspect "$STATE"
+  case "$FM_LOCK_INSPECT_STATE" in
+    free|stale) return 0 ;;
+    held) refuse_live_owner "$FM_LOCK_INSPECT_PID" ;;
+    *) refuse_uncertain_owner ;;
+  esac
+}
+
+check_previous_owner
+
+if [ "$CLAIM_LOCK_HELD" -ne 1 ] && ! fm_lock_try_acquire "$CLAIM_LOCK"; then
+  sweep_pid=$(sed -n 's/^pid=//p' "$STATE/.startup-network.status" 2>/dev/null | tail -1)
+  if [ -n "${FM_LOCK_HELD_PID:-}" ] && [ "$FM_LOCK_HELD_PID" = "$sweep_pid" ]; then
+    echo "error: the prior session's bounded startup sweep is finishing; operate read-only until it releases the fleet lock" >&2
     exit 1
   fi
-  old=$(cat "$LOCK" 2>/dev/null) || {
-    echo "error: session lock is unreadable; operate read-only until resolved" >&2
+  fm_lock_acquire_wait_max "$CLAIM_LOCK" 10 || refuse_uncertain_owner
+fi
+CLAIM_LOCK_HELD=1
+
+check_previous_owner
+# The sidecar goes first: a fresh pid beside a previous session's id would let
+# that session's resume own this lock. If the sidecar changes before line 1 is
+# written, a failure restores the previous sidecar. If line 1 is written but
+# not yet verified, a failure removes the sidecar and leaves the lock
+# ancestry-only. After line 1 verifies as this session's anchor, a later
+# signal leaves the published pair in place.
+publish_lock_session_or_die
+if [ -f "$LOCK" ]; then
+  LOCK_LINE_PRE=$(mktemp "$STATE/.lock.pre.XXXXXX") || {
+    echo "error: cannot write session lock; operate read-only until resolved" >&2
     exit 1
   }
-  if owner_blocks_acquire "$old" "$me"; then
-    echo "error: another live or unverifiable firstmate session holds the lock ($old); operate read-only until resolved" >&2
+  if ! cp "$LOCK" "$LOCK_LINE_PRE" 2>/dev/null; then
+    echo "error: cannot write session lock; operate read-only until resolved" >&2
     exit 1
   fi
 fi
+LOCK_SESSION_PHASE=2
 if ! { printf '%s\n' "$me" > "$LOCK"; } 2>/dev/null; then
+  lock_unchanged=0
+  if [ -n "$LOCK_LINE_PRE" ] && cmp -s "$LOCK_LINE_PRE" "$LOCK"; then
+    lock_unchanged=1
+  elif [ -z "$LOCK_LINE_PRE" ] && [ ! -e "$LOCK" ] && [ ! -L "$LOCK" ]; then
+    lock_unchanged=1
+  fi
+  if [ "$lock_unchanged" -eq 1 ]; then
+    if [ "$LOCK_SESSION_KIND" -ne 0 ]; then
+      LOCK_SESSION_PHASE=1
+    else
+      LOCK_SESSION_PHASE=0
+    fi
+  fi
   echo "error: cannot write session lock; operate read-only until resolved" >&2
   exit 1
 fi
@@ -151,9 +273,6 @@ if [ ! -f "$LOCK" ] || [ -L "$LOCK" ] || [ "$written" != "$me" ]; then
   echo "error: session lock ownership verification failed; operate read-only until resolved" >&2
   exit 1
 fi
+commit_lock_session
 release_claim_lock
-if owner_is_opaque "$me"; then
-  echo "lock acquired: sandbox codex session"
-else
-  echo "lock acquired: harness pid $me"
-fi
+echo "lock acquired: harness pid $me"

@@ -137,23 +137,19 @@ fm_trace_context_enabled() {  # <config-dir>
   [ -f "$config_dir/trace-context" ]
 }
 
-# Echo the lock pid that owns the effective-state file's home, or fail when the
-# adjacent session lock is absent or malformed. Binding the decision to this
+# Echo the shared session generation for the effective-state file's home, or
+# fail when the adjacent session lock is absent or malformed. Binding it to this
 # token makes a prior session's record inactive even if publication cannot
 # replace or remove that stale file.
 fm_trace_context_session_lock() {  # <effective-state-file>
-  local effective_file=$1 state_dir lock_pid
-  state_dir=${effective_file%/*}
-  [ "$state_dir" = "$effective_file" ] && state_dir=.
-  # Grouped so the stderr redirect is in place BEFORE the input redirect is
-  # attempted: an absent lock is an ordinary silent "not locked" answer, and a
-  # trailing 2>/dev/null on the bare read would still leak the open failure.
-  { IFS= read -r lock_pid < "$state_dir/.lock"; } 2>/dev/null || return 1
-  case "$lock_pid" in
-    '' | *[!0-9]*) return 1 ;;
-  esac
-  [ "$lock_pid" -gt 1 ] || return 1
-  printf '%s' "$lock_pid"
+  local state_dir=${1%/*} lib_dir generation
+  [ "$state_dir" != "$1" ] || state_dir=.
+  lib_dir=${BASH_SOURCE[0]%/*}
+  # shellcheck source=bin/fm-session-lock-lib.sh
+  . "$lib_dir/fm-session-lock-lib.sh"
+  generation=$(fm_session_lock_generation "$state_dir") || return 1
+  case "$generation" in 0|1) return 1 ;; esac
+  printf '%s\n' "$generation"
 }
 
 fm_trace_context_session_start() {  # <config-dir> <effective-state-file>
