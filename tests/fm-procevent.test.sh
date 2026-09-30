@@ -233,11 +233,11 @@ qualify_fixture_claim() {
     namespace=$(bash -c '. "$1/bin/fm-process-identity-lib.sh"; fm_process_namespace' _ "$ROOT") \
       || fail "cannot read fixture process namespace"
   fi
-  awk -v namespace="$namespace" '
+  awk -v fixture_namespace="$namespace" '
     { lines[NR]=$0 }
     END {
       for (i=1; i<=12; i++) print i == 7 && lines[i] == "" ? "active" : lines[i]
-      print namespace
+      print fixture_namespace
     }
   ' "$claim" > "$claim.tmp" && mv "$claim.tmp" "$claim"
 }

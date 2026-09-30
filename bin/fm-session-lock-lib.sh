@@ -313,12 +313,12 @@ fm_session_lock_codex_record_present() {
 # to the numeric lock and is exactly one record, never shell input.
 fm_session_lock_read_codex_record() {  # <state> <lock-pid>
   local tag extra
-  local -a lines
-  lines=()
-  while IFS= read -r tag; do lines+=("$tag"); done < "$1/.lock-session"
-  [ "${#lines[@]}" -eq 2 ] || return 1
-  [[ "${lines[0]}" =~ ^codex:[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}$ ]] || return 1
-  IFS=' ' read -r tag FM_CODEX_OWNER_PID FM_CODEX_OWNER_NAMESPACE FM_CODEX_OWNER_START FM_CODEX_OWNER_KIND extra <<< "${lines[1]}"
+  local -a codex_record_lines
+  codex_record_lines=()
+  while IFS= read -r tag; do codex_record_lines+=("$tag"); done < "$1/.lock-session"
+  [ "${#codex_record_lines[@]}" -eq 2 ] || return 1
+  [[ "${codex_record_lines[0]}" =~ ^codex:[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}$ ]] || return 1
+  IFS=' ' read -r tag FM_CODEX_OWNER_PID FM_CODEX_OWNER_NAMESPACE FM_CODEX_OWNER_START FM_CODEX_OWNER_KIND extra <<< "${codex_record_lines[1]}"
   [ "$tag" = codex-owner-v1 ] && [ -z "$extra" ] || return 1
   [ "$FM_CODEX_OWNER_PID" = "$2" ] || return 1
   case "$FM_CODEX_OWNER_PID:$FM_CODEX_OWNER_START" in *[!0-9:]*|:|*:|:*) return 1 ;; esac
