@@ -216,6 +216,7 @@ TOOL
 pass 'Codex reemit waits for its own sweep, refreshes coordinates, and refuses a competing session'
 
 # An unannotated PID 1 is never ownership evidence for a native Codex call.
+FM_HOME="$TMP_ROOT/home"
 printf '1\n' > "$FM_HOME/state/.lock"
 rm "$FM_HOME/state/.lock-session"
 cat > "$TMP_ROOT/legacy.sh" <<'TOOL'

@@ -848,7 +848,7 @@ test_stale_watch_clear_requires_owner_proof() (
 )
 
 test_stale_watch_clear_serializes_publication_and_removal() (
-  local dir state lockdir holder= clearer= i
+  local dir state lockdir holder='' clearer='' i
   trap 'for pid in "$holder" "$clearer"; do [ -z "$pid" ] || { kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; }; done' EXIT
   dir=$(make_case clear-stale-serialized)
   state="$dir/state"

@@ -485,7 +485,7 @@ EOF
 }
 
 test_worker_liveness_uses_process_coordinates() {
-  local rec home root log report namespace= start=1
+  local rec home root log report namespace='' start=1
   rec=$(new_world worker-coordinates)
   IFS='|' read -r home root log <<EOF
 $rec

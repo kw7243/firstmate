@@ -276,7 +276,7 @@ SH
   wait_for "$stage" || fail "namespace fixture never streamed its captured feedback"
   cp "$stage" "$home/expected.output"
   cp "$home/state/procevent/$id.source" "$home/expected.source"
-  mkdir -p -m 700 "$home/state/procevent-capture-reservations"
+  mkdir -m 700 "$home/state/procevent-capture-reservations"
   reservation="$home/state/procevent-capture-reservations/.extension-capture-$token.pending.json"
   printf '{"pending":"captured feedback"}\n' > "$reservation"
   chmod 0600 "$reservation"
