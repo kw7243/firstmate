@@ -49,10 +49,11 @@
 #          Launch the detached worker and return immediately. Single-flight: a
 #          running worker is reused only when its phases cover this request and,
 #          for locked work, it belongs to the same lock owner. A probe-only
-#          worker therefore cannot satisfy a later locked request; the later
-#          request gets a distinct generation and runs the locked phases. A new
-#          owner also gets a distinct generation when worker liveness is known.
-#          Unknown liveness preserves the current generation. --locked 1 asks
+#          worker therefore cannot satisfy a later locked request. When worker
+#          liveness is known, an uncovered request gets a distinct generation
+#          and runs its requested phases. Unknown liveness preserves the current
+#          generation; an uncovered request then exits nonzero and names the
+#          checks it could not schedule. --locked 1 asks
 #          for the inactive-outcome scan and mutating sweeps as well as the
 #          read-only probe; --locked 0 asks for the probe only. --harvest-pid
 #          names the session-start process
@@ -81,7 +82,10 @@
 #   .startup-network.status   key=value record - generation, lock_pid, state,
 #                             pid, pid_namespace, pid_starttime, started,
 #                             finished, rc, locked, phases, and whether the
-#                             report was published. Linux liveness requires
+#                             report was published. Despite its legacy name,
+#                             lock_pid stores fm_session_lock_generation's
+#                             token, not necessarily a numeric PID.
+#                             Linux liveness requires
 #                             matching namespace and process birth; missing or
 #                             foreign coordinates are unknown. Age does not
 #                             prove the worker stopped. The single
@@ -261,7 +265,7 @@ phase_label() {  # <phases>
 
 # --- start -------------------------------------------------------------------
 
-worker_covers_request() {  # <locked> <lock-pid>
+worker_covers_request() {  # <locked> <session-generation>
   local locked=$1 lock_pid=$2
   [ "$locked" != 1 ] && return 0
   [ "$(status_get lock_pid)" = "$lock_pid" ] \
@@ -366,7 +370,7 @@ EOF
 # when a Codex call refreshes its ephemeral anchor. The shared claim lock
 # excludes takeover throughout mutation; a different generation downgrades
 # the worker to detection only. Liveness uncertainty never grants takeover.
-lock_unchanged() {  # <expected-pid>
+lock_unchanged() {  # <expected-session-generation>
   local expected=$1 current
   case "$expected" in ''|*[!A-Za-z0-9:._-]*) return 1 ;; esac
   [ -f "$STATE/.lock" ] && [ ! -L "$STATE/.lock" ] || return 1
@@ -509,7 +513,7 @@ publish_lock_held() {  # <generation> <phases> <locked> <started> <lockdir> <out
   queue_result_wake failed
 }
 
-cmd_run() {  # <locked> <lock-pid> <generation>
+cmd_run() {  # <locked> <session-generation> <worker-generation>
   local locked=$1 lock_pid=$2 generation=$3 phases started budget out rc sweep_locked=0 downgraded=0 internal=0 lease_held=0 timings stage_started stage_deadline
   mkdir -p "$STATE" 2>/dev/null || return 1
   started=$(now)

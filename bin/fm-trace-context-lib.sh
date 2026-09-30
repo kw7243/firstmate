@@ -137,8 +137,8 @@ fm_trace_context_enabled() {  # <config-dir>
   [ -f "$config_dir/trace-context" ]
 }
 
-# Echo the lock pid that owns the effective-state file's home, or fail when the
-# adjacent session lock is absent or malformed. Binding the decision to this
+# Echo the shared session generation for the effective-state file's home, or
+# fail when the adjacent session lock is absent or malformed. Binding it to this
 # token makes a prior session's record inactive even if publication cannot
 # replace or remove that stale file.
 fm_trace_context_session_lock() {  # <effective-state-file>

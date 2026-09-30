@@ -90,14 +90,13 @@ The full digest updates the completion record in this order:
 
 1. It acquires the lock.
 2. It clears the completion record.
-3. It republishes the lock owner's pid only after every stage completes.
+3. It republishes the session generation only after every digest stage completes and the deferred checks are successfully scheduled or covered by an existing worker.
 
-So `clear` or `compact` cannot skip startup sweeps after a truncated run.
+So `clear` or `compact` cannot skip startup sweeps after a truncated run or a refused deferred-stage request.
+Scheduling does not mean the checks passed; their result still arrives through the deferred report.
+When the request cannot be scheduled, the digest names the unscheduled checks and leaves startup incomplete without recording a completion or instruction baseline.
 
-`bin/fm-lock.sh` treats a lock as this session's own when it is owned through either of these:
-
-- The shared ancestry verdict.
-- A trusted same-session Claude id.
+[`bin/fm-session-lock-lib.sh`](../bin/fm-session-lock-lib.sh) owns session verification and generation, including Linux Codex identity across process namespaces.
 
 So a proven `clear` or `compact` re-emit re-verifies ownership and proceeds.
 A lock another live session took meanwhile still produces the ordinary read-only digest.
@@ -105,10 +104,7 @@ A lock another live session took meanwhile still produces the ordinary read-only
 ### Nudge wrapper on a run-tier harness
 
 On a run-tier harness, only `resume`, `reload`, and `fork` are routed to the nudge wrapper.
-The nudge wrapper has its own separate ancestry-only check, which normally stays silent when this process already holds the lock.
-A background Claude helper-chain recycle can break that ancestry.
-The wrapper may then emit a redundant nudge even though the shared same-session verdict still owns the lock.
-The requested session start remains idempotent.
+Its [shared ownership check](#nudge-wrapper-lock-check) decides whether to stay silent.
 
 ### Re-emit mechanics
 

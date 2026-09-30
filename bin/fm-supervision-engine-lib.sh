@@ -141,12 +141,14 @@ fm_supervision_host_outcomes_drained() {
 }
 
 # fm_supervision_host_main_key <state-dir>: print the key of the current main
-# session, which changes at every main session start: the session-lock holder,
-# a checksum of its process identity (bin/fm-wake-lib.sh fm_pid_identity), and
-# a checksum of its session sidecar, so a later session given a recycled lock
-# pid never shares it. The host keys its engine conversation and broken-session
-# latch to it; the dialog mirror (bin/fm-host-mirror.sh) keys each entry and
-# feed to it. When the holder's identity cannot be read, it prints nothing and
+# session. A Codex record uses fm_session_lock_generation so repeated tool
+# calls retain the key when their process coordinates change. Other records
+# combine the session-lock holder with checksums of its process identity
+# (bin/fm-wake-lib.sh fm_pid_identity) and session sidecar, so a later session
+# given a recycled lock pid never shares it. The host keys its engine
+# conversation and broken-session latch to it; the dialog mirror
+# (bin/fm-host-mirror.sh) keys each entry and feed to it. When the required
+# identity cannot be read, it prints nothing and
 # fails, so an attended wake reaches main, a mirror writer records nothing,
 # and no conversation, latch, or dialog kept under an earlier key is reused.
 # Needs bin/fm-wake-lib.sh sourced first.

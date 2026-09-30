@@ -16,11 +16,7 @@
 #
 # CONTRACT.
 #   - Lease file: $STATE/.lease-<task>, one line "<actor>\t<pid>\t<epoch>".
-#     Codex leases append a fourth field, the stable session generation. Their
-#     anchors can be transient or namespace-local: a matching generation with
-#     unknown liveness remains protected; only proved death or a replacement
-#     generation makes it stale. Legacy leases under a Codex owner remain
-#     protected until the actor explicitly releases them.
+#     Codex leases append a fourth field, the stable session generation.
 #     Written atomically (temp + ln for claim, temp + mv for a same-actor
 #     refresh), with inspection and mutation serialized by the home-local
 #     lease-command lock; leases never coordinate across firstmate homes.
@@ -31,20 +27,21 @@
 #     supervision host's engine environment), not by agent memory. Any other
 #     value is refused loudly - an unknown actor is a wiring bug, not a third
 #     role.
-#   - Staleness: the recorded pid is the long-lived supervising process (the
-#     session-lock holder, or FM_LEASE_HOLDER_PID - see bin/fm-lease.sh), so a
-#     dead recorded pid means the supervising session died; the lease is
-#     cleared at the next claim, guard, or sweep. Liveness is the pure record
-#     test, identical in every calling context: the recorded pid is alive and
-#     IS the current state/.lock holder. So a lease left by an exited session
-#     goes stale for every reader, whichever harness now owns the home, and an
-#     unmarked main honors a live branch lease exactly as a Pi main does. The
-#     one residual is a recorded pid recycled onto the next session-lock holder
-#     itself; the host that owns a branch conversation releases that actor's
-#     leases when it activates a new one (the Pi branch extension's
-#     generation-activation cleanup; the supervision host also releases them
-#     after every engine turn), which also recovers a lease held by the live
-#     session but an abandoned branch conversation.
+#   - Staleness: Codex anchors can be transient or namespace-local. A matching
+#     generation remains protected unless shared session-lock inspection proves
+#     it stale or free; a replacement generation makes the lease stale. An
+#     unreadable generation, or a legacy PID-only lease under a Codex owner,
+#     remains protected rather than inferring death from the caller's PID view.
+#     Other leases retain their native PID test: the recorded supervising pid
+#     (the session-lock holder, or FM_LEASE_HOLDER_PID - see bin/fm-lease.sh)
+#     must be alive and IS the current state/.lock holder. A provably stale
+#     lease is cleared at the next claim, guard, or sweep. An unmarked main
+#     honors a protected branch lease just as a Pi main does. The native PID
+#     path can retain a lease if its pid is recycled onto the next session-lock
+#     holder itself; the host releases that actor's leases when it activates a
+#     new branch conversation (the Pi branch extension's generation-activation
+#     cleanup; the supervision host also releases them after every engine turn),
+#     which also recovers a lease held by an abandoned branch conversation.
 #
 # THREAT MODEL (deliberate, captain-decided): these guards are
 # CONFUSED-AGENT-GRADE, the same grade bin/fm-gate-refuse-lib.sh documents
@@ -176,9 +173,8 @@ fm_lease_read() {
   return 0
 }
 
-# fm_lease_live <task>: 0 iff a well-formed lease exists, its recorded pid is
-# alive, and that pid IS the current session-lock holder (the staleness
-# contract above). The calling context never enters the verdict.
+# fm_lease_live <task>: 0 when the lease remains protected under the staleness
+# contract above, including unknown Codex ownership.
 fm_lease_live() {
   local lock_pid generation
   fm_lease_read "$1" || return 1

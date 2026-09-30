@@ -410,11 +410,9 @@ EOF
   fm_harness_pid_alive "$lock_pid"
 }
 
-# True when state dir $1 records a live verified harness outside this process's
-# contiguous harness ancestry that was not recorded by this same trusted Claude
-# session. Sets FM_SESSION_LOCK_FOREIGN_OWNER_PID for a diagnostic caller.
-# Malformed, missing, dead, and ancestry-uncertain locks are not foreign-owner
-# evidence.
+# True when inspection proves a held lock that owned_by_self does not accept.
+# Sets FM_SESSION_LOCK_FOREIGN_OWNER_PID for a diagnostic caller. Malformed,
+# missing, stale, and unknown locks are not foreign-live-owner evidence.
 # shellcheck disable=SC2034 # Output global, read by the sourcing guard caller.
 FM_SESSION_LOCK_FOREIGN_OWNER_PID=
 fm_session_lock_foreign_owner_live() {
@@ -442,11 +440,13 @@ fm_session_lock_foreign_owner_live() {
 #   FM_LOCK_INSPECT_PID           recorded pid, or empty
 #   FM_LOCK_INSPECT_LIVE_HARNESS  true|false|unknown
 #
-# held: the recorded pid is a live verified harness.
-# stale: the recorded pid is gone.
+# held: a verified same-session Codex record or a live verified harness owner.
+# stale: the recorded owner ended or its PID was reused, with namespace proof
+# required for a Codex process record.
 # unknown: the file or pid cannot be classified without guessing, including a
-# live process that is not a verified harness. Existence of a lock file, a
-# session record, or a pane is never treated as liveness.
+# foreign transient Codex owner or a live process that is not a verified
+# harness. Existence of a lock file, session record, or pane alone is never
+# treated as liveness.
 # shellcheck disable=SC2034 # Output globals, read by lock status and inbox ready.
 FM_LOCK_INSPECT_STATE=unknown
 FM_LOCK_INSPECT_PID=
