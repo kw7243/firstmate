@@ -1,0 +1,27 @@
+$ fm-lab-home.sh create /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/native-report-home
+exit=0
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/native-report-home
+$ fm-lock.sh 
+exit=0
+lock acquired: harness pid 953685
+$ fm-startup-network.sh start --locked 0 --harvest-pid 0
+exit=0
+
+Paused actual host worker to make in-flight reporting observable; no persisted coordinates changed.
+$ codex sandbox fm-startup-network.sh report
+exit=0
+NETWORK_CHECKS: deferred worker liveness is unknown from this process namespace; GitHub authentication are not yet confirmed.
+The current generation is preserved; read /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/bin/fm-startup-network.sh report from the originating context to check its result.
+Actual native sandbox reports unknown; host generation record unchanged.
+$ fm-startup-network.sh wait 30
+exit=0
+
+$ codex sandbox fm-startup-network.sh report
+exit=0
+completed off the startup path in 1s: GitHub authentication.
+(silent - no problems found)
+TIMINGS - where the deferred network checks spent their time (ms):
+  phase       gh-auth                                    start=+787     elapsed=383
+  stage       network-checks probe                       start=+587     elapsed=613
+  slowest: stage network-checks probe 613ms, phase gh-auth 383ms
+PASS: original generation published and its completed report is readable from the native sandbox.

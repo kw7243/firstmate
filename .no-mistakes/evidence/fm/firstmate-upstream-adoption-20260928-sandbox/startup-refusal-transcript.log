@@ -1,0 +1,61 @@
+$ fm-lab-home.sh create /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/paused-probe-home
+exit=0
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/paused-probe-home
+$ fm-lock.sh 
+exit=0
+lock acquired: harness pid 953685
+$ fm-startup-network.sh start --locked 0 --harvest-pid 0
+exit=0
+
+Paused the real deferred probe worker before publication.
+$ fm-startup-network.sh report
+exit=0
+NETWORK_CHECKS: deferred worker liveness is unknown from this process namespace; GitHub authentication are not yet confirmed.
+The current generation is preserved; read /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/bin/fm-startup-network.sh report from the originating context to check its result.
+$ fm-startup-network.sh start --locked 1
+exit=1
+NETWORK_CHECKS: preserving the existing GitHub authentication worker whose liveness is unknown; inspect /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/bin/fm-startup-network.sh report from its originating process context before retrying full session start
+NETWORK_CHECKS: requested checks were not scheduled: GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation
+$ fm-session-start.sh --source startup
+exit=0
+MISSING: quota-axi (install: npm install -g quota-axi)
+MISSING: tasks-axi (install: npm install -g tasks-axi)
+NETWORK_CHECKS: preserving the existing GitHub authentication worker whose liveness is unknown; inspect /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/bin/fm-startup-network.sh report from its originating process context before retrying full session start
+NETWORK_CHECKS: requested checks were not scheduled: GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation
+SESSION_START_COMPLETION: startup remains incomplete because the requested deferred checks could not be scheduled.
+NETWORK_CHECKS: deferred worker liveness is unknown from this process namespace; GitHub authentication are not yet confirmed.
+Startup remains incomplete. Resolve the NETWORK CHECKS diagnostic before retrying full session start.
+Full startup visibly refused unscheduled phases; completion marker absent; original probe still alive.
+$ fm-startup-network.sh wait 30
+exit=0
+
+$ fm-startup-network.sh report
+exit=0
+completed off the startup path in 21s: GitHub authentication.
+(silent - no problems found)
+TIMINGS - where the deferred network checks spent their time (ms):
+  phase       gh-auth                                    start=+19765   elapsed=366
+  stage       network-checks probe                       start=+19584   elapsed=592
+  slowest: stage network-checks probe 592ms, phase gh-auth 366ms
+Original real probe published the same generation after ownership coordinates were restored.
+$ fm-session-start.sh --source startup
+exit=0
+MISSING: quota-axi (install: npm install -g quota-axi)
+MISSING: tasks-axi (install: npm install -g tasks-axi)
+The digest above is complete for this session start. The READ-ONCE CONTRACT
+$ fm-startup-network.sh wait 30
+exit=0
+
+$ fm-startup-network.sh report
+exit=0
+completed off the startup path in 3s: GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation.
+(silent - no problems found)
+TIMINGS - where the deferred network checks spent their time (ms):
+  phase       gh-auth                                    start=+1216    elapsed=424
+  phase       secondmate-liveness                        start=+1754    elapsed=24
+  phase       secondmate-sync                            start=+1837    elapsed=91
+  phase       handoff-delivery                           start=+1994    elapsed=3
+  phase       fleet-sync                                 start=+1720    elapsed=1045
+  stage       network-checks probe_sweeps                start=+214     elapsed=2636
+  slowest: stage network-checks probe_sweeps 2636ms, phase fleet-sync 1045ms, phase gh-auth 424ms
+PASS: full startup completed after the original probe published. Namespace uncertainty was injected into the persisted record; this is not real restricted-context proof.

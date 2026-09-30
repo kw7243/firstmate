@@ -1,0 +1,1227 @@
+takeover_refusal_elapsed=2s
++1790732965.173189 set -u
++++1790732965.174190 dirname /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin/fm-lock.sh
+++1790732965.176063 cd /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin
+++1790732965.176164 pwd
++1790732965.176414 SCRIPT_DIR=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin
++1790732965.176489 FM_ROOT=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root
++1790732965.176515 FM_HOME=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home
++1790732965.176533 STATE=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state
++1790732965.176547 LOCK=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock
++1790732965.176562 LOCK_SESSION=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock-session
++1790732965.176622 mkdir -p /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state
++1790732965.179226 . /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin/fm-session-lock-lib.sh
+++1790732965.179375 _FM_SESSION_LOCK_LIB_DIR=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin
+++1790732965.179417 '[' /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin '!=' /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin/fm-session-lock-lib.sh ']'
+++1790732965.179443 . /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin/fm-cursor-lib.sh
++++1790732965.179536 FM_CURSOR_PROBE_TIMEOUT=10
+++1790732965.180160 . /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin/fm-process-identity-lib.sh
+++1790732965.180287 unset _FM_SESSION_LOCK_LIB_DIR
+++1790732965.180308 FM_HARNESS_RE='claude|codex|opencode|grok|kimi|^pi$|^pi-signed$|^omp$'
+++1790732965.180324 FM_HARNESS_NAMES=(claude codex opencode grok kimi pi-signed pi omp)
+++1790732965.180392 FM_HARNESS_IS_CLAUDE=0
+++1790732965.181285 FM_SESSION_LOCK_FOREIGN_OWNER_PID=
+++1790732965.181374 FM_LOCK_INSPECT_STATE=unknown
+++1790732965.181389 FM_LOCK_INSPECT_PID=
+++1790732965.181396 FM_LOCK_INSPECT_LIVE_HARNESS=unknown
++1790732965.181694 '[' '' = status ']'
+++1790732965.182977 fm_session_lock_anchor_pid
+++1790732965.183090 local pids
++++1790732965.183624 fm_harness_ancestry_pids
++++1790732965.183739 local pid=1297451 comm args extending=0 printed=0
++++1790732965.183778 for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
+++++1790732965.184335 ps -o comm= -p 1297451
++++1790732965.215148 comm=bash
+++++1790732965.215725 ps -o args= -p 1297451
++++1790732965.245025 args='bash -x /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin/fm-lock.sh'
++++1790732965.245128 fm_harness_process_matches bash 'bash -x /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin/fm-lock.sh'
++++1790732965.245216 local comm=bash 'args=bash -x /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin/fm-lock.sh' base argv0 name
++++1790732965.245241 FM_HARNESS_IS_CLAUDE=0
+++++1790732965.245789 basename -- bash
++++1790732965.247519 base=bash
++++1790732965.248120 printf %s bash
++++1790732965.248300 grep -qE 'claude|codex|opencode|grok|kimi|^pi$|^pi-signed$|^omp$'
++++1790732965.250540 argv0=bash
+++++1790732965.251036 fm_harness_path_name bash
+++++1790732965.251144 local path=bash name
+++++1790732965.251178 '[' -n bash ']'
+++++1790732965.251215 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.251225 case "/$path/" in
+++++1790732965.251236 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.251242 case "/$path/" in
+++++1790732965.251249 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.251255 case "/$path/" in
+++++1790732965.251262 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.251268 case "/$path/" in
+++++1790732965.251275 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.251281 case "/$path/" in
+++++1790732965.251287 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.251293 case "/$path/" in
+++++1790732965.251300 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.251306 case "/$path/" in
+++++1790732965.251312 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.251318 case "/$path/" in
+++++1790732965.251327 return 1
++++1790732965.251567 name=
+++++1790732965.252266 fm_harness_path_name bash
+++++1790732965.252400 local path=bash name
+++++1790732965.252448 '[' -n bash ']'
+++++1790732965.252506 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.252522 case "/$path/" in
+++++1790732965.252537 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.252547 case "/$path/" in
+++++1790732965.252560 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.252569 case "/$path/" in
+++++1790732965.252603 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.252614 case "/$path/" in
+++++1790732965.252624 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.252632 case "/$path/" in
+++++1790732965.252642 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.252650 case "/$path/" in
+++++1790732965.252660 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.252669 case "/$path/" in
+++++1790732965.252679 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.252687 case "/$path/" in
+++++1790732965.252701 return 1
++++1790732965.253035 name=
++++1790732965.253075 case "$comm" in
++++1790732965.253108 fm_cursor_process_matches bash 'bash -x /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin/fm-lock.sh' bash
++++1790732965.253164 local comm=bash argv0=bash base
++++1790732965.253200 '[' -n bash ']'
++++1790732965.253215 argv0=bash
+++++1790732965.253747 basename -- bash
++++1790732965.256092 base=bash
++++1790732965.256139 base=bash
++++1790732965.256147 case "$base" in
++++1790732965.256164 case "$comm" in
++++1790732965.256176 return 1
++++1790732965.256204 return 1
++++1790732965.256237 '[' 0 -eq 1 ']'
+++++1790732965.257408 ps -o ppid= -p 1297451
+++++1790732965.257683 tr -d ' '
++++1790732965.277726 pid=1297450
++++1790732965.277773 case "$pid" in
++++1790732965.277800 '[' 1297450 -ge 1 ']'
++++1790732965.277830 for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
+++++1790732965.278435 ps -o comm= -p 1297450
++++1790732965.308271 comm=bash
+++++1790732965.309143 ps -o args= -p 1297450
++++1790732965.336845 args='bash tests/.phase-startup-timing.test.sh'
++++1790732965.336919 fm_harness_process_matches bash 'bash tests/.phase-startup-timing.test.sh'
++++1790732965.336996 local comm=bash 'args=bash tests/.phase-startup-timing.test.sh' base argv0 name
++++1790732965.337027 FM_HARNESS_IS_CLAUDE=0
+++++1790732965.337636 basename -- bash
++++1790732965.339842 base=bash
++++1790732965.340560 printf %s bash
++++1790732965.340690 grep -qE 'claude|codex|opencode|grok|kimi|^pi$|^pi-signed$|^omp$'
++++1790732965.344980 argv0=bash
+++++1790732965.346043 fm_harness_path_name bash
+++++1790732965.346127 local path=bash name
+++++1790732965.346164 '[' -n bash ']'
+++++1790732965.346201 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.346209 case "/$path/" in
+++++1790732965.346221 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.346226 case "/$path/" in
+++++1790732965.346235 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.346240 case "/$path/" in
+++++1790732965.346248 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.346253 case "/$path/" in
+++++1790732965.346260 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.346270 case "/$path/" in
+++++1790732965.346278 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.346282 case "/$path/" in
+++++1790732965.346290 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.346295 case "/$path/" in
+++++1790732965.346303 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.346307 case "/$path/" in
+++++1790732965.346318 return 1
++++1790732965.347679 name=
+++++1790732965.348532 fm_harness_path_name bash
+++++1790732965.348651 local path=bash name
+++++1790732965.348692 '[' -n bash ']'
+++++1790732965.348734 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.348747 case "/$path/" in
+++++1790732965.348763 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.348771 case "/$path/" in
+++++1790732965.348783 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.348790 case "/$path/" in
+++++1790732965.348799 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.348807 case "/$path/" in
+++++1790732965.348815 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.348823 case "/$path/" in
+++++1790732965.348831 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.348838 case "/$path/" in
+++++1790732965.348855 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.348862 case "/$path/" in
+++++1790732965.348871 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.348878 case "/$path/" in
+++++1790732965.348890 return 1
++++1790732965.349293 name=
++++1790732965.349337 case "$comm" in
++++1790732965.349364 fm_cursor_process_matches bash 'bash tests/.phase-startup-timing.test.sh' bash
++++1790732965.349415 local comm=bash argv0=bash base
++++1790732965.349442 '[' -n bash ']'
++++1790732965.349490 argv0=bash
+++++1790732965.350029 basename -- bash
++++1790732965.352977 base=bash
++++1790732965.353029 base=bash
++++1790732965.353041 case "$base" in
++++1790732965.353059 case "$comm" in
++++1790732965.353072 return 1
++++1790732965.353118 return 1
++++1790732965.353162 '[' 0 -eq 1 ']'
+++++1790732965.354319 ps -o ppid= -p 1297450
+++++1790732965.356953 tr -d ' '
++++1790732965.374428 pid=1293675
++++1790732965.374479 case "$pid" in
++++1790732965.374509 '[' 1293675 -ge 1 ']'
++++1790732965.374535 for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
+++++1790732965.375159 ps -o comm= -p 1293675
++++1790732965.398000 comm=bash
+++++1790732965.398598 ps -o args= -p 1293675
++++1790732965.426991 args='bash tests/.phase-startup-timing.test.sh'
++++1790732965.427100 fm_harness_process_matches bash 'bash tests/.phase-startup-timing.test.sh'
++++1790732965.427200 local comm=bash 'args=bash tests/.phase-startup-timing.test.sh' base argv0 name
++++1790732965.427237 FM_HARNESS_IS_CLAUDE=0
+++++1790732965.428011 basename -- bash
++++1790732965.429830 base=bash
++++1790732965.430423 printf %s bash
++++1790732965.430902 grep -qE 'claude|codex|opencode|grok|kimi|^pi$|^pi-signed$|^omp$'
++++1790732965.433835 argv0=bash
+++++1790732965.434540 fm_harness_path_name bash
+++++1790732965.434663 local path=bash name
+++++1790732965.434698 '[' -n bash ']'
+++++1790732965.434734 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.434743 case "/$path/" in
+++++1790732965.434755 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.434762 case "/$path/" in
+++++1790732965.434769 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.434773 case "/$path/" in
+++++1790732965.434782 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.434786 case "/$path/" in
+++++1790732965.434793 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.434799 case "/$path/" in
+++++1790732965.434805 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.434809 case "/$path/" in
+++++1790732965.434816 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.434823 case "/$path/" in
+++++1790732965.434829 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.434833 case "/$path/" in
+++++1790732965.434844 return 1
++++1790732965.435157 name=
+++++1790732965.435958 fm_harness_path_name bash
+++++1790732965.436073 local path=bash name
+++++1790732965.436114 '[' -n bash ']'
+++++1790732965.436156 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.436171 case "/$path/" in
+++++1790732965.436185 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.436191 case "/$path/" in
+++++1790732965.436199 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.436207 case "/$path/" in
+++++1790732965.436216 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.436222 case "/$path/" in
+++++1790732965.436230 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.436237 case "/$path/" in
+++++1790732965.436245 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.436253 case "/$path/" in
+++++1790732965.436261 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.436266 case "/$path/" in
+++++1790732965.436277 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.436282 case "/$path/" in
+++++1790732965.436296 return 1
++++1790732965.436679 name=
++++1790732965.436756 case "$comm" in
++++1790732965.436802 fm_cursor_process_matches bash 'bash tests/.phase-startup-timing.test.sh' bash
++++1790732965.436882 local comm=bash argv0=bash base
++++1790732965.436943 '[' -n bash ']'
++++1790732965.436967 argv0=bash
+++++1790732965.437671 basename -- bash
++++1790732965.441062 base=bash
++++1790732965.441170 base=bash
++++1790732965.441182 case "$base" in
++++1790732965.441207 case "$comm" in
++++1790732965.441221 return 1
++++1790732965.441268 return 1
++++1790732965.441314 '[' 0 -eq 1 ']'
+++++1790732965.442960 ps -o ppid= -p 1293675
+++++1790732965.443797 tr -d ' '
++++1790732965.471915 pid=1293672
++++1790732965.473246 case "$pid" in
++++1790732965.473311 '[' 1293672 -ge 1 ']'
++++1790732965.473358 for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
+++++1790732965.474772 ps -o comm= -p 1293672
++++1790732965.485679 comm=/usr/local/bin/claude
+++++1790732965.487858 ps -o args= -p 1293672
++++1790732965.495510 args=claude
++++1790732965.495633 fm_harness_process_matches /usr/local/bin/claude claude
++++1790732965.495719 local comm=/usr/local/bin/claude args=claude base argv0 name
++++1790732965.495759 FM_HARNESS_IS_CLAUDE=0
+++++1790732965.496405 basename -- /usr/local/bin/claude
++++1790732965.499450 base=claude
++++1790732965.500679 printf %s claude
++++1790732965.500794 grep -qE 'claude|codex|opencode|grok|kimi|^pi$|^pi-signed$|^omp$'
++++1790732965.503350 case "$base" in
++++1790732965.503419 FM_HARNESS_IS_CLAUDE=1
++++1790732965.503453 return 0
++++1790732965.503523 printf '%s\n' 1293672
++++1790732965.503621 printed=1
++++1790732965.503656 '[' 1 -eq 1 ']'
++++1790732965.503685 extending=1
+++++1790732965.505174 ps -o ppid= -p 1293672
+++++1790732965.505639 tr -d ' '
++++1790732965.527472 pid=1293671
++++1790732965.527530 case "$pid" in
++++1790732965.527566 '[' 1293671 -ge 1 ']'
++++1790732965.527613 for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
+++++1790732965.528176 ps -o comm= -p 1293671
++++1790732965.551859 comm=bash
+++++1790732965.552759 ps -o args= -p 1293671
++++1790732965.589108 args='bash tests/.phase-startup-timing.test.sh'
++++1790732965.589193 fm_harness_process_matches bash 'bash tests/.phase-startup-timing.test.sh'
++++1790732965.589275 local comm=bash 'args=bash tests/.phase-startup-timing.test.sh' base argv0 name
++++1790732965.589308 FM_HARNESS_IS_CLAUDE=0
+++++1790732965.590317 basename -- bash
++++1790732965.592734 base=bash
++++1790732965.593449 printf %s bash
++++1790732965.593732 grep -qE 'claude|codex|opencode|grok|kimi|^pi$|^pi-signed$|^omp$'
++++1790732965.596644 argv0=bash
+++++1790732965.597218 fm_harness_path_name bash
+++++1790732965.597331 local path=bash name
+++++1790732965.597361 '[' -n bash ']'
+++++1790732965.597387 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.597391 case "/$path/" in
+++++1790732965.597402 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.597406 case "/$path/" in
+++++1790732965.597412 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.597416 case "/$path/" in
+++++1790732965.597422 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.597426 case "/$path/" in
+++++1790732965.597432 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.597435 case "/$path/" in
+++++1790732965.597442 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.597445 case "/$path/" in
+++++1790732965.597451 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.597455 case "/$path/" in
+++++1790732965.597461 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.597464 case "/$path/" in
+++++1790732965.597473 return 1
++++1790732965.597828 name=
+++++1790732965.598607 fm_harness_path_name bash
+++++1790732965.598771 local path=bash name
+++++1790732965.598818 '[' -n bash ']'
+++++1790732965.598858 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.598867 case "/$path/" in
+++++1790732965.598884 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.598890 case "/$path/" in
+++++1790732965.598902 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.598908 case "/$path/" in
+++++1790732965.598919 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.598926 case "/$path/" in
+++++1790732965.598936 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.598942 case "/$path/" in
+++++1790732965.598953 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.598959 case "/$path/" in
+++++1790732965.598970 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.598976 case "/$path/" in
+++++1790732965.598986 for name in "${FM_HARNESS_NAMES[@]}"
+++++1790732965.598992 case "/$path/" in
+++++1790732965.599007 return 1
++++1790732965.601012 name=
++++1790732965.601063 case "$comm" in
++++1790732965.601098 fm_cursor_process_matches bash 'bash tests/.phase-startup-timing.test.sh' bash
++++1790732965.601686 local comm=bash argv0=bash base
++++1790732965.601732 '[' -n bash ']'
++++1790732965.601749 argv0=bash
+++++1790732965.602668 basename -- bash
++++1790732965.605123 base=bash
++++1790732965.605189 base=bash
++++1790732965.605200 case "$base" in
++++1790732965.605217 case "$comm" in
++++1790732965.605227 return 1
++++1790732965.605273 return 1
++++1790732965.605316 '[' 1 -eq 1 ']'
++++1790732965.605338 break
++++1790732965.605361 '[' 1 -eq 1 ']'
+++1790732965.606279 pids=1293672
+++1790732965.606375 fm_session_lock_trusted_claude_session_id 1293672
+++1790732965.606724 local id= claude_pid= pids=1293672 pid comm args
+++1790732965.606801 '[' -n '' ']'
+++1790732965.606845 return 1
+++1790732965.607498 _fm_harness_outermost_pid 1293672
+++1790732965.607564 local pid outermost=
+++1790732965.607666 IFS=
+++1790732965.607683 read -r pid
+++1790732965.607748 '[' -n 1293672 ']'
+++1790732965.607774 outermost=1293672
+++1790732965.607795 IFS=
+++1790732965.607806 read -r pid
+++1790732965.607856 '[' -n 1293672 ']'
+++1790732965.607880 printf '%s\n' 1293672
++1790732965.608997 me=1293672
++1790732965.609164 fm_session_lock_codex_ancestor_pid
++1790732965.609311 local pid executable comm pids=
+++1790732965.610196 uname
++1790732965.612778 '[' Linux = Linux ']'
++1790732965.612860 '[' -z '' ']'
+++1790732965.613642 fm_harness_ancestry_pids
+++1790732965.613777 local pid=1297451 comm args extending=0 printed=0
+++1790732965.613832 for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
++++1790732965.615131 ps -o comm= -p 1297451
+++1790732965.643372 comm=bash
++++1790732965.644124 ps -o args= -p 1297451
+++1790732965.679090 args='bash -x /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin/fm-lock.sh'
+++1790732965.679145 fm_harness_process_matches bash 'bash -x /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin/fm-lock.sh'
+++1790732965.679238 local comm=bash 'args=bash -x /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin/fm-lock.sh' base argv0 name
+++1790732965.679261 FM_HARNESS_IS_CLAUDE=0
++++1790732965.680009 basename -- bash
+++1790732965.682510 base=bash
+++1790732965.683083 printf %s bash
+++1790732965.683325 grep -qE 'claude|codex|opencode|grok|kimi|^pi$|^pi-signed$|^omp$'
+++1790732965.686144 argv0=bash
++++1790732965.686796 fm_harness_path_name bash
++++1790732965.686941 local path=bash name
++++1790732965.687006 '[' -n bash ']'
++++1790732965.687080 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.687096 case "/$path/" in
++++1790732965.687112 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.687121 case "/$path/" in
++++1790732965.687130 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.687138 case "/$path/" in
++++1790732965.687147 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.687155 case "/$path/" in
++++1790732965.687163 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.687172 case "/$path/" in
++++1790732965.687184 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.687193 case "/$path/" in
++++1790732965.687201 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.687210 case "/$path/" in
++++1790732965.687218 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.687226 case "/$path/" in
++++1790732965.687238 return 1
+++1790732965.687568 name=
++++1790732965.688164 fm_harness_path_name bash
++++1790732965.688283 local path=bash name
++++1790732965.688348 '[' -n bash ']'
++++1790732965.688384 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.688394 case "/$path/" in
++++1790732965.688406 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.688415 case "/$path/" in
++++1790732965.688424 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.688431 case "/$path/" in
++++1790732965.688440 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.688448 case "/$path/" in
++++1790732965.688457 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.688465 case "/$path/" in
++++1790732965.688473 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.688482 case "/$path/" in
++++1790732965.688490 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.688498 case "/$path/" in
++++1790732965.688506 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.688514 case "/$path/" in
++++1790732965.688525 return 1
+++1790732965.688862 name=
+++1790732965.688896 case "$comm" in
+++1790732965.688940 fm_cursor_process_matches bash 'bash -x /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin/fm-lock.sh' bash
+++1790732965.689017 local comm=bash argv0=bash base
+++1790732965.689044 '[' -n bash ']'
+++1790732965.689059 argv0=bash
++++1790732965.689657 basename -- bash
+++1790732965.691425 base=bash
+++1790732965.691463 base=bash
+++1790732965.691469 case "$base" in
+++1790732965.691482 case "$comm" in
+++1790732965.691492 return 1
+++1790732965.691528 return 1
+++1790732965.691565 '[' 0 -eq 1 ']'
++++1790732965.692896 tr -d ' '
++++1790732965.692869 ps -o ppid= -p 1297451
+++1790732965.713351 pid=1297450
+++1790732965.713396 case "$pid" in
+++1790732965.713419 '[' 1297450 -ge 1 ']'
+++1790732965.713434 for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
++++1790732965.714164 ps -o comm= -p 1297450
+++1790732965.745726 comm=bash
++++1790732965.746507 ps -o args= -p 1297450
+++1790732965.792264 args='bash tests/.phase-startup-timing.test.sh'
+++1790732965.792316 fm_harness_process_matches bash 'bash tests/.phase-startup-timing.test.sh'
+++1790732965.792370 local comm=bash 'args=bash tests/.phase-startup-timing.test.sh' base argv0 name
+++1790732965.792390 FM_HARNESS_IS_CLAUDE=0
++++1790732965.793304 basename -- bash
+++1790732965.796514 base=bash
+++1790732965.797074 printf %s bash
+++1790732965.797329 grep -qE 'claude|codex|opencode|grok|kimi|^pi$|^pi-signed$|^omp$'
+++1790732965.800378 argv0=bash
++++1790732965.801390 fm_harness_path_name bash
++++1790732965.801641 local path=bash name
++++1790732965.801712 '[' -n bash ']'
++++1790732965.801781 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.801802 case "/$path/" in
++++1790732965.801826 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.801845 case "/$path/" in
++++1790732965.801860 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.801874 case "/$path/" in
++++1790732965.801888 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.801896 case "/$path/" in
++++1790732965.801909 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.801916 case "/$path/" in
++++1790732965.801929 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.801937 case "/$path/" in
++++1790732965.801950 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.801958 case "/$path/" in
++++1790732965.801971 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.801979 case "/$path/" in
++++1790732965.801997 return 1
+++1790732965.802732 name=
++++1790732965.804100 fm_harness_path_name bash
++++1790732965.804245 local path=bash name
++++1790732965.804305 '[' -n bash ']'
++++1790732965.804348 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.804364 case "/$path/" in
++++1790732965.804381 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.804389 case "/$path/" in
++++1790732965.804400 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.804406 case "/$path/" in
++++1790732965.804416 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.804422 case "/$path/" in
++++1790732965.804432 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.804438 case "/$path/" in
++++1790732965.804449 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.804455 case "/$path/" in
++++1790732965.804465 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.804471 case "/$path/" in
++++1790732965.804480 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.804486 case "/$path/" in
++++1790732965.804500 return 1
+++1790732965.804955 name=
+++1790732965.805034 case "$comm" in
+++1790732965.805073 fm_cursor_process_matches bash 'bash tests/.phase-startup-timing.test.sh' bash
+++1790732965.805149 local comm=bash argv0=bash base
+++1790732965.805200 '[' -n bash ']'
+++1790732965.805234 argv0=bash
++++1790732965.806146 basename -- bash
+++1790732965.809525 base=bash
+++1790732965.809636 base=bash
+++1790732965.809652 case "$base" in
+++1790732965.809677 case "$comm" in
+++1790732965.809702 return 1
+++1790732965.809758 return 1
+++1790732965.809819 '[' 0 -eq 1 ']'
++++1790732965.811336 ps -o ppid= -p 1297450
++++1790732965.811630 tr -d ' '
+++1790732965.841845 pid=1293675
+++1790732965.841915 case "$pid" in
+++1790732965.841956 '[' 1293675 -ge 1 ']'
+++1790732965.841987 for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
++++1790732965.842953 ps -o comm= -p 1293675
+++1790732965.877990 comm=bash
++++1790732965.878681 ps -o args= -p 1293675
+++1790732965.910961 args='bash tests/.phase-startup-timing.test.sh'
+++1790732965.911014 fm_harness_process_matches bash 'bash tests/.phase-startup-timing.test.sh'
+++1790732965.911071 local comm=bash 'args=bash tests/.phase-startup-timing.test.sh' base argv0 name
+++1790732965.911091 FM_HARNESS_IS_CLAUDE=0
++++1790732965.911943 basename -- bash
+++1790732965.916341 base=bash
+++1790732965.917487 printf %s bash
+++1790732965.918089 grep -qE 'claude|codex|opencode|grok|kimi|^pi$|^pi-signed$|^omp$'
+++1790732965.921962 argv0=bash
++++1790732965.923085 fm_harness_path_name bash
++++1790732965.923227 local path=bash name
++++1790732965.923273 '[' -n bash ']'
++++1790732965.923311 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.923328 case "/$path/" in
++++1790732965.923349 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.923360 case "/$path/" in
++++1790732965.923376 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.923386 case "/$path/" in
++++1790732965.923401 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.923412 case "/$path/" in
++++1790732965.923427 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.923433 case "/$path/" in
++++1790732965.923444 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.923450 case "/$path/" in
++++1790732965.923461 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.923467 case "/$path/" in
++++1790732965.923478 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.923484 case "/$path/" in
++++1790732965.923498 return 1
+++1790732965.924081 name=
++++1790732965.925185 fm_harness_path_name bash
++++1790732965.925347 local path=bash name
++++1790732965.925406 '[' -n bash ']'
++++1790732965.925451 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.925465 case "/$path/" in
++++1790732965.925488 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.925499 case "/$path/" in
++++1790732965.925516 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.925527 case "/$path/" in
++++1790732965.925543 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.925550 case "/$path/" in
++++1790732965.925563 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.925574 case "/$path/" in
++++1790732965.925738 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.925759 case "/$path/" in
++++1790732965.925772 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.925783 case "/$path/" in
++++1790732965.925799 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732965.925809 case "/$path/" in
++++1790732965.925830 return 1
+++1790732965.926368 name=
+++1790732965.926420 case "$comm" in
+++1790732965.926460 fm_cursor_process_matches bash 'bash tests/.phase-startup-timing.test.sh' bash
+++1790732965.926523 local comm=bash argv0=bash base
+++1790732965.926554 '[' -n bash ']'
+++1790732965.926623 argv0=bash
++++1790732965.927718 basename -- bash
+++1790732965.929573 base=bash
+++1790732965.929687 base=bash
+++1790732965.929699 case "$base" in
+++1790732965.929723 case "$comm" in
+++1790732965.929736 return 1
+++1790732965.929780 return 1
+++1790732965.929816 '[' 0 -eq 1 ']'
++++1790732965.931902 tr -d ' '
++++1790732965.932162 ps -o ppid= -p 1293675
+++1790732965.950331 pid=1293672
+++1790732965.950392 case "$pid" in
+++1790732965.950432 '[' 1293672 -ge 1 ']'
+++1790732965.950458 for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
++++1790732965.951113 ps -o comm= -p 1293672
+++1790732965.954923 comm=/usr/local/bin/claude
++++1790732965.955604 ps -o args= -p 1293672
+++1790732965.961648 args=claude
+++1790732965.961696 fm_harness_process_matches /usr/local/bin/claude claude
+++1790732965.961745 local comm=/usr/local/bin/claude args=claude base argv0 name
+++1790732965.961767 FM_HARNESS_IS_CLAUDE=0
++++1790732965.962474 basename -- /usr/local/bin/claude
+++1790732965.964900 base=claude
+++1790732965.965767 printf %s claude
+++1790732965.966407 grep -qE 'claude|codex|opencode|grok|kimi|^pi$|^pi-signed$|^omp$'
+++1790732965.969780 case "$base" in
+++1790732965.969838 FM_HARNESS_IS_CLAUDE=1
+++1790732965.969863 return 0
+++1790732965.969925 printf '%s\n' 1293672
+++1790732965.969991 printed=1
+++1790732965.970016 '[' 1 -eq 1 ']'
+++1790732965.970033 extending=1
++++1790732965.970987 ps -o ppid= -p 1293672
++++1790732965.971209 tr -d ' '
+++1790732965.994289 pid=1293671
+++1790732965.994346 case "$pid" in
+++1790732965.994378 '[' 1293671 -ge 1 ']'
+++1790732965.994398 for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
++++1790732965.995091 ps -o comm= -p 1293671
+++1790732966.032158 comm=bash
++++1790732966.032973 ps -o args= -p 1293671
+++1790732966.071754 args='bash tests/.phase-startup-timing.test.sh'
+++1790732966.071821 fm_harness_process_matches bash 'bash tests/.phase-startup-timing.test.sh'
+++1790732966.071889 local comm=bash 'args=bash tests/.phase-startup-timing.test.sh' base argv0 name
+++1790732966.071917 FM_HARNESS_IS_CLAUDE=0
++++1790732966.072559 basename -- bash
+++1790732966.074603 base=bash
+++1790732966.075034 printf %s bash
+++1790732966.075393 grep -qE 'claude|codex|opencode|grok|kimi|^pi$|^pi-signed$|^omp$'
+++1790732966.077994 argv0=bash
++++1790732966.078530 fm_harness_path_name bash
++++1790732966.078631 local path=bash name
++++1790732966.078686 '[' -n bash ']'
++++1790732966.078720 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.078729 case "/$path/" in
++++1790732966.078740 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.078747 case "/$path/" in
++++1790732966.078754 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.078760 case "/$path/" in
++++1790732966.078767 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.078773 case "/$path/" in
++++1790732966.078779 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.078785 case "/$path/" in
++++1790732966.078791 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.078797 case "/$path/" in
++++1790732966.078804 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.078810 case "/$path/" in
++++1790732966.078816 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.078822 case "/$path/" in
++++1790732966.078831 return 1
+++1790732966.079094 name=
++++1790732966.079795 fm_harness_path_name bash
++++1790732966.079916 local path=bash name
++++1790732966.079973 '[' -n bash ']'
++++1790732966.080017 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.080031 case "/$path/" in
++++1790732966.080048 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.080057 case "/$path/" in
++++1790732966.080068 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.080077 case "/$path/" in
++++1790732966.080088 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.080097 case "/$path/" in
++++1790732966.080107 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.080116 case "/$path/" in
++++1790732966.080127 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.080136 case "/$path/" in
++++1790732966.080146 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.080155 case "/$path/" in
++++1790732966.080166 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.080175 case "/$path/" in
++++1790732966.080189 return 1
+++1790732966.080522 name=
+++1790732966.080564 case "$comm" in
+++1790732966.080612 fm_cursor_process_matches bash 'bash tests/.phase-startup-timing.test.sh' bash
+++1790732966.080662 local comm=bash argv0=bash base
+++1790732966.080683 '[' -n bash ']'
+++1790732966.080700 argv0=bash
++++1790732966.081338 basename -- bash
+++1790732966.083413 base=bash
+++1790732966.083466 base=bash
+++1790732966.083474 case "$base" in
+++1790732966.083490 case "$comm" in
+++1790732966.083500 return 1
+++1790732966.083541 return 1
+++1790732966.083573 '[' 1 -eq 1 ']'
+++1790732966.083635 break
+++1790732966.083710 '[' 1 -eq 1 ']'
++1790732966.084165 pids=1293672
+++1790732966.084848 _fm_harness_outermost_pid 1293672
+++1790732966.084974 local pid outermost=
+++1790732966.085041 IFS=
+++1790732966.085057 read -r pid
+++1790732966.085111 '[' -n 1293672 ']'
+++1790732966.085125 outermost=1293672
+++1790732966.085135 IFS=
+++1790732966.085139 read -r pid
+++1790732966.085171 '[' -n 1293672 ']'
+++1790732966.085184 printf '%s\n' 1293672
++1790732966.085647 pid=1293672
+++1790732966.086344 readlink /proc/1293672/exe
++1790732966.089054 executable=/usr/bin/bash
++1790732966.089138 '[' bash = codex ']'
++1790732966.089161 return 1
+++1790732966.089959 mktemp /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock-write.XXXXXX
++1790732966.092527 probe=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock-write.qaRyED
++1790732966.092623 rm -f /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock-write.qaRyED
++1790732966.096112 . /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin/fm-wake-lib.sh
++++1790732966.097234 d=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin
++++1790732966.097383 '[' /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin '!=' /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin/fm-wake-lib.sh ']'
++++1790732966.097445 cd /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin
++++1790732966.097552 pwd
+++1790732966.098649 FM_WAKE_LIB_DIR=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin
++++1790732966.099467 cd /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin/..
++++1790732966.099718 pwd
+++1790732966.100200 FM_WAKE_DEFAULT_ROOT=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root
+++1790732966.100257 FM_ROOT=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root
+++1790732966.100281 FM_HOME=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home
+++1790732966.100303 STATE=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state
+++1790732966.100325 FM_WAKE_QUEUE=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.wake-queue
+++1790732966.100348 FM_WAKE_QUEUE_LOCK=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.wake-queue.lock
+++1790732966.100364 FM_LOCK_STALE_AFTER=2
+++1790732966.100385 . /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin/fm-path-lib.sh
+++1790732966.100547 . /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin/fm-process-identity-lib.sh
++++1790732966.101306 uname
+++1790732966.104269 _FM_UNAME=Linux
+++1790732966.104385 mkdir -p /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state
+++1790732966.107162 '[' 5 -gt 4 ']'
+++1790732966.107535 FM_WATCHER_MATCHED_IDENTITY=
+++1790732966.107649 FM_WATCHER_HEALTHY_PID=
+++1790732966.107661 FM_WATCHER_HEALTHY_IDENTITY=
+++1790732966.108747 FM_WATCHER_VERDICT_OK=false
+++1790732966.108773 FM_WATCHER_VERDICT_REASON=stale-beacon
+++1790732966.109594 FM_RECOVERY_MARKER_TOKEN=
+++1790732966.109612 FM_RECOVERY_MARKER_ACTION=none
+++1790732966.109619 FM_RECOVERY_MARKER_WRITTEN_TOKEN=
+++1790732966.109626 FM_WAKE_APPEND_RECOVERY_PREVIOUS_TOKEN=
+++1790732966.109633 FM_WAKE_APPEND_RECOVERY_PUBLISHED_TOKEN=
+++1790732966.115735 FM_WAKE_STATUS_KEY=
+++1790732966.115759 FM_WAKE_STATUS_HISTORICAL=false
+++1790732966.115842 FM_WAKE_EVENT_LINE=
+++1790732966.115850 FM_WAKE_UNREAD_LINES=
++1790732966.116321 CLAIM_LOCK=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire
++1790732966.116344 CLAIM_LOCK_HELD=0
++1790732966.116354 LOCK_SESSION_PHASE=0
++1790732966.116360 LOCK_SESSION_KIND=0
++1790732966.116375 LOCK_SESSION_PREV=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock-session.prev
++1790732966.116389 LOCK_LINE_PRE=
++1790732966.116470 trap on_lock_exit EXIT
++1790732966.116509 trap 'exit 1' HUP INT TERM
++1790732966.116947 check_previous_owner
++1790732966.116990 fm_session_lock_owned_by_self /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state
++1790732966.117034 local state=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state lock_pid pids pid
++1790732966.117065 '[' -f /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock ']'
++1790732966.117096 '[' '!' -L /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock ']'
+++1790732966.117941 cat /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock
++1790732966.120172 lock_pid=1295844
++1790732966.120208 case "$lock_pid" in
+++1790732966.121011 fm_harness_ancestry_pids
+++1790732966.121242 local pid=1297451 comm args extending=0 printed=0
+++1790732966.121328 for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
++++1790732966.122030 ps -o comm= -p 1297451
+++1790732966.160067 comm=bash
++++1790732966.160954 ps -o args= -p 1297451
+++1790732966.202572 args='bash -x /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin/fm-lock.sh'
+++1790732966.202695 fm_harness_process_matches bash 'bash -x /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin/fm-lock.sh'
+++1790732966.202818 local comm=bash 'args=bash -x /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin/fm-lock.sh' base argv0 name
+++1790732966.202856 FM_HARNESS_IS_CLAUDE=0
++++1790732966.203500 basename -- bash
+++1790732966.205513 base=bash
+++1790732966.206091 printf %s bash
+++1790732966.206379 grep -qE 'claude|codex|opencode|grok|kimi|^pi$|^pi-signed$|^omp$'
+++1790732966.208988 argv0=bash
++++1790732966.209780 fm_harness_path_name bash
++++1790732966.209996 local path=bash name
++++1790732966.210072 '[' -n bash ']'
++++1790732966.210143 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.210163 case "/$path/" in
++++1790732966.210185 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.210197 case "/$path/" in
++++1790732966.210215 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.210227 case "/$path/" in
++++1790732966.210244 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.210256 case "/$path/" in
++++1790732966.210273 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.210285 case "/$path/" in
++++1790732966.210301 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.210313 case "/$path/" in
++++1790732966.210330 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.210342 case "/$path/" in
++++1790732966.210359 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.210371 case "/$path/" in
++++1790732966.210388 return 1
+++1790732966.210875 name=
++++1790732966.211919 fm_harness_path_name bash
++++1790732966.212043 local path=bash name
++++1790732966.212086 '[' -n bash ']'
++++1790732966.212137 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.212152 case "/$path/" in
++++1790732966.212166 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.212174 case "/$path/" in
++++1790732966.212183 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.212187 case "/$path/" in
++++1790732966.212196 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.212200 case "/$path/" in
++++1790732966.212208 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.212212 case "/$path/" in
++++1790732966.212220 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.212225 case "/$path/" in
++++1790732966.212233 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.212237 case "/$path/" in
++++1790732966.212245 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.212250 case "/$path/" in
++++1790732966.212261 return 1
+++1790732966.212653 name=
+++1790732966.212692 case "$comm" in
+++1790732966.212731 fm_cursor_process_matches bash 'bash -x /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/root/bin/fm-lock.sh' bash
+++1790732966.212804 local comm=bash argv0=bash base
+++1790732966.212844 '[' -n bash ']'
+++1790732966.212864 argv0=bash
++++1790732966.213472 basename -- bash
+++1790732966.215660 base=bash
+++1790732966.215718 base=bash
+++1790732966.215732 case "$base" in
+++1790732966.215750 case "$comm" in
+++1790732966.215764 return 1
+++1790732966.215798 return 1
+++1790732966.215830 '[' 0 -eq 1 ']'
++++1790732966.216929 ps -o ppid= -p 1297451
++++1790732966.217317 tr -d ' '
+++1790732966.239275 pid=1297450
+++1790732966.239350 case "$pid" in
+++1790732966.239391 '[' 1297450 -ge 1 ']'
+++1790732966.239419 for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
++++1790732966.240190 ps -o comm= -p 1297450
+++1790732966.281013 comm=bash
++++1790732966.281709 ps -o args= -p 1297450
+++1790732966.305392 args='bash tests/.phase-startup-timing.test.sh'
+++1790732966.305446 fm_harness_process_matches bash 'bash tests/.phase-startup-timing.test.sh'
+++1790732966.305496 local comm=bash 'args=bash tests/.phase-startup-timing.test.sh' base argv0 name
+++1790732966.305519 FM_HARNESS_IS_CLAUDE=0
++++1790732966.307048 basename -- bash
+++1790732966.312863 base=bash
+++1790732966.313457 printf %s bash
+++1790732966.314608 grep -qE 'claude|codex|opencode|grok|kimi|^pi$|^pi-signed$|^omp$'
+++1790732966.316920 argv0=bash
++++1790732966.317519 fm_harness_path_name bash
++++1790732966.317707 local path=bash name
++++1790732966.317755 '[' -n bash ']'
++++1790732966.318073 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.318088 case "/$path/" in
++++1790732966.318105 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.318111 case "/$path/" in
++++1790732966.318121 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.318275 case "/$path/" in
++++1790732966.318295 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.318419 case "/$path/" in
++++1790732966.318438 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.318445 case "/$path/" in
++++1790732966.318455 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.318460 case "/$path/" in
++++1790732966.318470 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.318475 case "/$path/" in
++++1790732966.318485 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.318490 case "/$path/" in
++++1790732966.318505 return 1
+++1790732966.319061 name=
++++1790732966.319824 fm_harness_path_name bash
++++1790732966.319988 local path=bash name
++++1790732966.320055 '[' -n bash ']'
++++1790732966.320125 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.320154 case "/$path/" in
++++1790732966.320185 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.320205 case "/$path/" in
++++1790732966.320231 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.320250 case "/$path/" in
++++1790732966.320275 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.320294 case "/$path/" in
++++1790732966.320329 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.320349 case "/$path/" in
++++1790732966.320373 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.320392 case "/$path/" in
++++1790732966.320416 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.320435 case "/$path/" in
++++1790732966.320459 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.320478 case "/$path/" in
++++1790732966.320507 return 1
+++1790732966.321734 name=
+++1790732966.321765 case "$comm" in
+++1790732966.321788 fm_cursor_process_matches bash 'bash tests/.phase-startup-timing.test.sh' bash
+++1790732966.321834 local comm=bash argv0=bash base
+++1790732966.321852 '[' -n bash ']'
+++1790732966.321862 argv0=bash
++++1790732966.322306 basename -- bash
+++1790732966.325158 base=bash
+++1790732966.325199 base=bash
+++1790732966.325208 case "$base" in
+++1790732966.325222 case "$comm" in
+++1790732966.325230 return 1
+++1790732966.325261 return 1
+++1790732966.325285 '[' 0 -eq 1 ']'
++++1790732966.326343 ps -o ppid= -p 1297450
++++1790732966.326429 tr -d ' '
+++1790732966.350658 pid=1293675
+++1790732966.350722 case "$pid" in
+++1790732966.350769 '[' 1293675 -ge 1 ']'
+++1790732966.350802 for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
++++1790732966.351624 ps -o comm= -p 1293675
+++1790732966.378460 comm=bash
++++1790732966.379427 ps -o args= -p 1293675
+++1790732966.416996 args='bash tests/.phase-startup-timing.test.sh'
+++1790732966.417075 fm_harness_process_matches bash 'bash tests/.phase-startup-timing.test.sh'
+++1790732966.417149 local comm=bash 'args=bash tests/.phase-startup-timing.test.sh' base argv0 name
+++1790732966.417185 FM_HARNESS_IS_CLAUDE=0
++++1790732966.418120 basename -- bash
+++1790732966.422165 base=bash
+++1790732966.423680 grep -qE 'claude|codex|opencode|grok|kimi|^pi$|^pi-signed$|^omp$'
+++1790732966.423718 printf %s bash
+++1790732966.429079 argv0=bash
++++1790732966.430292 fm_harness_path_name bash
++++1790732966.430471 local path=bash name
++++1790732966.430537 '[' -n bash ']'
++++1790732966.430654 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.430679 case "/$path/" in
++++1790732966.430701 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.430715 case "/$path/" in
++++1790732966.430730 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.430743 case "/$path/" in
++++1790732966.430758 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.430771 case "/$path/" in
++++1790732966.430785 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.430797 case "/$path/" in
++++1790732966.430811 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.430823 case "/$path/" in
++++1790732966.430838 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.430850 case "/$path/" in
++++1790732966.430864 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.430877 case "/$path/" in
++++1790732966.430896 return 1
+++1790732966.431442 name=
++++1790732966.432447 fm_harness_path_name bash
++++1790732966.432686 local path=bash name
++++1790732966.432755 '[' -n bash ']'
++++1790732966.432812 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.432824 case "/$path/" in
++++1790732966.432843 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.432851 case "/$path/" in
++++1790732966.432865 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.432873 case "/$path/" in
++++1790732966.432887 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.432894 case "/$path/" in
++++1790732966.432925 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.432933 case "/$path/" in
++++1790732966.432947 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.432955 case "/$path/" in
++++1790732966.432969 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.432978 case "/$path/" in
++++1790732966.432991 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.432999 case "/$path/" in
++++1790732966.433017 return 1
+++1790732966.433533 name=
+++1790732966.433627 case "$comm" in
+++1790732966.433676 fm_cursor_process_matches bash 'bash tests/.phase-startup-timing.test.sh' bash
+++1790732966.433750 local comm=bash argv0=bash base
+++1790732966.433788 '[' -n bash ']'
+++1790732966.433814 argv0=bash
++++1790732966.434722 basename -- bash
+++1790732966.440530 base=bash
+++1790732966.440669 base=bash
+++1790732966.440692 case "$base" in
+++1790732966.440722 case "$comm" in
+++1790732966.440738 return 1
+++1790732966.440789 return 1
+++1790732966.440835 '[' 0 -eq 1 ']'
++++1790732966.442476 ps -o ppid= -p 1293675
++++1790732966.442977 tr -d ' '
+++1790732966.472282 pid=1293672
+++1790732966.472641 case "$pid" in
+++1790732966.472695 '[' 1293672 -ge 1 ']'
+++1790732966.472726 for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
++++1790732966.473360 ps -o comm= -p 1293672
+++1790732966.478615 comm=/usr/local/bin/claude
++++1790732966.479551 ps -o args= -p 1293672
+++1790732966.485715 args=claude
+++1790732966.485774 fm_harness_process_matches /usr/local/bin/claude claude
+++1790732966.485833 local comm=/usr/local/bin/claude args=claude base argv0 name
+++1790732966.485859 FM_HARNESS_IS_CLAUDE=0
++++1790732966.486514 basename -- /usr/local/bin/claude
+++1790732966.488155 base=claude
+++1790732966.488769 printf %s claude
+++1790732966.489073 grep -qE 'claude|codex|opencode|grok|kimi|^pi$|^pi-signed$|^omp$'
+++1790732966.491726 case "$base" in
+++1790732966.491777 FM_HARNESS_IS_CLAUDE=1
+++1790732966.491797 return 0
+++1790732966.491847 printf '%s\n' 1293672
+++1790732966.491912 printed=1
+++1790732966.491927 '[' 1 -eq 1 ']'
+++1790732966.491939 extending=1
++++1790732966.493289 ps -o ppid= -p 1293672
++++1790732966.493728 tr -d ' '
+++1790732966.520454 pid=1293671
+++1790732966.520520 case "$pid" in
+++1790732966.520555 '[' 1293671 -ge 1 ']'
+++1790732966.520602 for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
++++1790732966.521232 ps -o comm= -p 1293671
+++1790732966.559118 comm=bash
++++1790732966.560270 ps -o args= -p 1293671
+++1790732966.597129 args='bash tests/.phase-startup-timing.test.sh'
+++1790732966.597202 fm_harness_process_matches bash 'bash tests/.phase-startup-timing.test.sh'
+++1790732966.597282 local comm=bash 'args=bash tests/.phase-startup-timing.test.sh' base argv0 name
+++1790732966.597304 FM_HARNESS_IS_CLAUDE=0
++++1790732966.598287 basename -- bash
+++1790732966.600137 base=bash
+++1790732966.600986 printf %s bash
+++1790732966.601270 grep -qE 'claude|codex|opencode|grok|kimi|^pi$|^pi-signed$|^omp$'
+++1790732966.605516 argv0=bash
++++1790732966.606068 fm_harness_path_name bash
++++1790732966.606164 local path=bash name
++++1790732966.606199 '[' -n bash ']'
++++1790732966.606238 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.606252 case "/$path/" in
++++1790732966.606272 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.606282 case "/$path/" in
++++1790732966.606290 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.606296 case "/$path/" in
++++1790732966.606303 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.606309 case "/$path/" in
++++1790732966.606315 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.606321 case "/$path/" in
++++1790732966.606328 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.606334 case "/$path/" in
++++1790732966.606340 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.606346 case "/$path/" in
++++1790732966.606353 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.606359 case "/$path/" in
++++1790732966.606368 return 1
+++1790732966.606879 name=
++++1790732966.607836 fm_harness_path_name bash
++++1790732966.607961 local path=bash name
++++1790732966.607997 '[' -n bash ']'
++++1790732966.608031 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.608042 case "/$path/" in
++++1790732966.608052 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.608059 case "/$path/" in
++++1790732966.608066 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.608072 case "/$path/" in
++++1790732966.608078 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.608085 case "/$path/" in
++++1790732966.608091 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.608097 case "/$path/" in
++++1790732966.608103 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.608110 case "/$path/" in
++++1790732966.608116 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.608120 case "/$path/" in
++++1790732966.608129 for name in "${FM_HARNESS_NAMES[@]}"
++++1790732966.608135 case "/$path/" in
++++1790732966.608144 return 1
+++1790732966.608657 name=
+++1790732966.608688 case "$comm" in
+++1790732966.608709 fm_cursor_process_matches bash 'bash tests/.phase-startup-timing.test.sh' bash
+++1790732966.608744 local comm=bash argv0=bash base
+++1790732966.608782 '[' -n bash ']'
+++1790732966.608800 argv0=bash
++++1790732966.609568 basename -- bash
+++1790732966.612754 base=bash
+++1790732966.612940 base=bash
+++1790732966.612958 case "$base" in
+++1790732966.612970 case "$comm" in
+++1790732966.612981 return 1
+++1790732966.613007 return 1
+++1790732966.613039 '[' 1 -eq 1 ']'
+++1790732966.613051 break
+++1790732966.613065 '[' 1 -eq 1 ']'
++1790732966.613455 pids=1293672
++1790732966.613511 fm_session_lock_codex_record_present /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state
++1790732966.613548 case "$(fm_session_lock_recorded_session_id "$1" 2> /dev/null)" in
+++1790732966.614281 fm_session_lock_recorded_session_id /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state
++1790732966.615181 return 1
++1790732966.615237 fm_session_lock_codex_ancestor_pid 1293672
++1790732966.615293 local pid executable comm pids=1293672
+++1790732966.615975 uname
++1790732966.620169 '[' Linux = Linux ']'
++1790732966.620221 '[' -z 1293672 ']'
+++1790732966.620847 _fm_harness_outermost_pid 1293672
+++1790732966.620981 local pid outermost=
+++1790732966.621063 IFS=
+++1790732966.621071 read -r pid
+++1790732966.621125 '[' -n 1293672 ']'
+++1790732966.621140 outermost=1293672
+++1790732966.621152 IFS=
+++1790732966.621157 read -r pid
+++1790732966.621192 '[' -n 1293672 ']'
+++1790732966.621205 printf '%s\n' 1293672
++1790732966.621674 pid=1293672
+++1790732966.622369 readlink /proc/1293672/exe
++1790732966.626465 executable=/usr/bin/bash
++1790732966.626555 '[' bash = codex ']'
++1790732966.626605 return 1
++1790732966.626716 IFS=
++1790732966.626724 read -r pid
++1790732966.626762 '[' 1293672 = 1295844 ']'
++1790732966.626775 IFS=
++1790732966.626779 read -r pid
++1790732966.626824 fm_session_lock_same_session /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state 1293672
++1790732966.626862 local state=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state trusted recorded
+++1790732966.627919 fm_session_lock_recorded_session_id /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state
+++1790732966.628059 local state=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state recorded
+++1790732966.628113 '[' -f /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock-session ']'
+++1790732966.628143 return 1
++1790732966.628574 recorded=
++1790732966.628637 return 1
++1790732966.628720 return 1
++1790732966.628787 fm_session_lock_inspect /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state
++1790732966.628868 local state=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state lock pid
++1790732966.628903 FM_LOCK_INSPECT_STATE=unknown
++1790732966.628935 FM_LOCK_INSPECT_PID=
++1790732966.628949 FM_LOCK_INSPECT_LIVE_HARNESS=unknown
++1790732966.628973 lock=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock
++1790732966.628997 '[' '!' -e /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock ']'
++1790732966.629033 '[' '!' -f /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock ']'
++1790732966.629062 '[' -L /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock ']'
+++1790732966.629781 cat /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock
++1790732966.632490 pid=1295844
++1790732966.632563 pid=1295844
++1790732966.632623 FM_LOCK_INSPECT_PID=1295844
++1790732966.632649 case "$pid" in
++1790732966.632710 fm_session_lock_codex_record_present /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state
++1790732966.632757 case "$(fm_session_lock_recorded_session_id "$1" 2> /dev/null)" in
+++1790732966.633377 fm_session_lock_recorded_session_id /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state
++1790732966.633901 return 1
+++1790732966.634535 fm_harness_ancestry_pid
++1790732967.110168 '[' 1293672 = 1 ']'
++1790732967.110225 kill -0 1295844
++1790732967.110296 ps -o comm= -p 1295844
++1790732967.142282 FM_LOCK_INSPECT_STATE=stale
++1790732967.142316 FM_LOCK_INSPECT_LIVE_HARNESS=false
++1790732967.142382 case "$FM_LOCK_INSPECT_STATE" in
++1790732967.142395 return 0
++1790732967.142481 '[' 0 -ne 1 ']'
++1790732967.142501 fm_lock_try_acquire /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire
++1790732967.142572 local lockdir=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire pid steal cur rc steal_owner primary_owner current
++1790732967.142617 FM_LOCK_HELD_PID=
++1790732967.142624 FM_LOCK_OWNER_DIR=
++1790732967.142631 FM_LOCK_RECOVERED_PID=
++1790732967.142643 fm_lock_try_create /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire
++1790732967.142687 local lockdir=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire allowed_steal_owner= ownerdir
++1790732967.142703 FM_LOCK_OWNER_DIR=
+++1790732967.143411 fm_lock_owner_dir /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire
+++1790732967.143541 local lockdir=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire lock_abs
++++1790732967.144310 fm_lock_abs_path /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire
++++1790732967.144429 local path=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire dir base
++++1790732967.144480 fm_dirname_to dir /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire
++++1790732967.144533 local fm_path=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire
++++1790732967.144558 case "$fm_path" in
++++1790732967.144648 fm_path=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire
++++1790732967.144674 case "$fm_path" in
++++1790732967.144721 fm_path=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state
++++1790732967.144769 fm_path=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state
++++1790732967.144800 '[' -n /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state ']'
++++1790732967.144844 '[' /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state '!=' /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state ']'
++++1790732967.144882 printf -v dir %s /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state
++++1790732967.144950 fm_basename_to base /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire
++++1790732967.144994 local fm_path=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire
++++1790732967.145012 case "$fm_path" in
++++1790732967.145049 fm_path=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire
++++1790732967.145077 fm_path=.lock.acquire
++++1790732967.145098 '[' .lock.acquire '!=' .lock.acquire ']'
++++1790732967.145136 printf -v base %s .lock.acquire
+++++1790732967.145964 cd /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state
+++++1790732967.146121 pwd -P
++++1790732967.146672 dir=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state
++++1790732967.146730 printf '%s/%s\n' /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state .lock.acquire
+++1790732967.147104 lock_abs=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire
+++1790732967.147212 mktemp -d /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire.owner.XXXXXX
++1790732967.150352 ownerdir=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire.owner.2j12mv
++1790732967.150408 '[' -e /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire ']'
++1790732967.150463 fm_lock_discard_owner /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire.owner.2j12mv
++1790732967.150507 local ownerdir=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire.owner.2j12mv
++1790732967.150531 '[' -n /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire.owner.2j12mv ']'
++1790732967.150549 fm_lock_clean_known_files /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire.owner.2j12mv
++1790732967.150574 local lockdir=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire.owner.2j12mv
++1790732967.150695 rm -f /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire.owner.2j12mv/pid /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire.owner.2j12mv/pid-namespace /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire.owner.2j12mv/fm-home /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire.owner.2j12mv/pid-identity /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire.owner.2j12mv/role /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire.owner.2j12mv/watcher-path
++1790732967.155061 rmdir /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire.owner.2j12mv
++1790732967.159217 return 1
++1790732967.159283 fm_current_pid current
++1790732967.159305 local fm_pid
++1790732967.159342 fm_pid=1297451
++1790732967.159351 case "$fm_pid" in
++1790732967.159367 '[' 1 -gt 0 ']'
++1790732967.159382 printf -v current %s 1297451
+++1790732967.160168 cat /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire/pid
++1790732967.164836 pid=1296475
++1790732967.164967 fm_lock_same_namespace /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire
++1790732967.165024 local recorded current
+++1790732967.165835 cat /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.lock.acquire/pid-namespace
++1790732967.169741 recorded='2033171b-9858-4767-ad27-2c59662487fa/pid:[4026531836]'
++1790732967.169803 '[' Linux = Linux ']'
+++1790732967.170340 fm_process_namespace
+++1790732967.170521 local boot namespace
+++1790732967.170562 '[' -d /proc/self/ns ']'
++++1790732967.171341 cat /proc/sys/kernel/random/boot_id
+++1790732967.175606 boot=2033171b-9858-4767-ad27-2c59662487fa
++++1790732967.176150 readlink /proc/self/ns/pid
+++1790732967.180028 namespace='pid:[4026531836]'
+++1790732967.180084 '[' -n 2033171b-9858-4767-ad27-2c59662487fa ']'
+++1790732967.180104 '[' -n 'pid:[4026531836]' ']'
+++1790732967.180119 printf '%s/%s\n' 2033171b-9858-4767-ad27-2c59662487fa 'pid:[4026531836]'
++1790732967.180524 current='2033171b-9858-4767-ad27-2c59662487fa/pid:[4026531836]'
++1790732967.180608 '[' -n '2033171b-9858-4767-ad27-2c59662487fa/pid:[4026531836]' ']'
++1790732967.180634 '[' '2033171b-9858-4767-ad27-2c59662487fa/pid:[4026531836]' = '2033171b-9858-4767-ad27-2c59662487fa/pid:[4026531836]' ']'
++1790732967.180727 '[' -n 1296475 ']'
++1790732967.180752 '[' 1296475 = 1297451 ']'
++1790732967.180776 fm_pid_alive 1296475
++1790732967.180802 local pid=1296475
++1790732967.180816 case "$pid" in
++1790732967.180833 kill -0 1296475
++1790732967.180888 FM_LOCK_HELD_PID=1296475
++1790732967.180920 return 1
+++1790732967.182281 sed -n 's/^pid=//p' /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/tmp/fm-startup-network-tests.6JJTaD/sweep-lease/home/state/.startup-network.status
+++1790732967.182311 tail -1
++1790732967.186358 sweep_pid=1296475
++1790732967.186429 '[' -n 1296475 ']'
++1790732967.186452 '[' 1296475 = 1296475 ']'
++1790732967.186480 echo 'error: the prior session'\''s bounded startup sweep is finishing; operate read-only until it releases the fleet lock'
+error: the prior session's bounded startup sweep is finishing; operate read-only until it releases the fleet lock
++1790732967.186615 exit 1
++1790732967.186645 on_lock_exit
++1790732967.186669 restore_uncommitted_lock_session
++1790732967.186690 case "$LOCK_SESSION_PHASE" in
++1790732967.186704 LOCK_SESSION_PHASE=0
++1790732967.186716 LOCK_SESSION_KIND=0
++1790732967.186738 '[' -n '' ']'
++1790732967.186751 release_claim_lock
++1790732967.186772 '[' 0 -eq 1 ']'
+ok - fm-startup-network: fleet-lock takeover cannot overlap a mutating sweep

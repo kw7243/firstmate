@@ -1,0 +1,19 @@
+[
+  {
+    "name": "Native Codex startup, repeat entry, and lease continuity",
+    "result": "pass"
+  },
+  {
+    "name": "Forged thread identity and competing lease actor are refused",
+    "result": "pass"
+  },
+  {
+    "name": "Live watcher restart preserves an unqualified owner and cleanly stops after proof is restored",
+    "result": "pass"
+  },
+  {
+    "name": "Real file event survives uncertain claim handling, captures output, and acknowledges idempotently",
+    "result": "fail",
+    "error": "AssertionError(('fm-procevent-when.sh', 1, 'error: argv elements cannot contain newlines\\n'))"
+  }
+]

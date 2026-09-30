@@ -1,0 +1,49 @@
+$ fm-procevent-when.sh arm local-file-ready --interval 0.2 --stable 1 --deadline 120 --condition /usr/bin/test -f /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/event-home/ready --action /usr/bin/printf %s\n captured-from-live-file-event
+exit=0
+armed: when-local-file-ready
+starts on the watcher's next cycle; or run: bin/fm-procevent.sh reconcile
+reminder: deterministic, safe, reversible actions only; judgment and destructive actions stay on the wake-and-decide path
+$ fm-procevent.sh reconcile
+exit=0
+reconciled: published=0 started=1 stopped=0 uncertain=0 failed=0
+$ fm-procevent.sh list
+exit=0
+SOURCE                       ADAPTER      OWNER      PENDING
+when-local-file-ready        when         live       0
+Claim has namespace and process birth identity; original runner alive.
+$ fm-procevent.sh reconcile
+exit=0
+reconciled: published=0 started=0 stopped=0 uncertain=1 failed=0
+$ fm-procevent.sh start when-local-file-ready
+exit=0
+already owned: when-local-file-ready
+$ fm-procevent.sh retire when-local-file-ready
+exit=1
+error: cannot confirm runner identity; source remains registered: when-local-file-ready
+Injected unverifiable namespace: no replacement, no claim deletion, no signal to original runner.
+CAPTURED RESULT
+when: when-local-file-ready
+status: fired
+detail: the condition held and the action exited 0
+condition_polls: 8
+action_exit: 0
+output:
+captured-from-live-file-event
+
+$ fm-procevent.sh classify /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/event-home/state/procevent-inbox/when-local-file-ready.1.result
+exit=0
+fired
+$ fm-procevent.sh handled when-local-file-ready 1
+exit=0
+handled: when-local-file-ready 1
+$ fm-procevent.sh handled when-local-file-ready 1
+exit=0
+already-handled: when-local-file-ready 1
+$ fm-procevent-when.sh retire local-file-ready
+exit=0
+retired: when-local-file-ready
+retired: when-local-file-ready
+PASS: real condition/action and durable capture; guarded namespace state was synthetic, not actual cross-context proof.
+$ fm-procevent.sh sweep-home
+exit=0
+swept: attempted=0

@@ -1,0 +1,352 @@
+{
+  "candidate": "c3df8736c5225ff8c827e1ba6156f8c5cb78da25",
+  "verification": "All supplied evidence hashes match the prior evidence-only audit. Recorded observations remain external evidence, not new live execution.",
+  "files": [
+    {
+      "evidence_file": "read-only-identity.sh",
+      "sha256": "b0257379af1bec008cfbd18f68d8b9b2105214f11c3f1f7a07d27cc959276a66"
+    },
+    {
+      "evidence_file": "live-sweep-reentry-digest.log",
+      "sha256": "6aef3f59926c26d2e63d27204b6b6cfd1bbd5d0afe399f5367d6e8330b62f660"
+    },
+    {
+      "evidence_file": "event-transcript.log",
+      "sha256": "056e459edbf52b0c034c4482f342889349cd7757ec0fd4a0ce60f992fd2e832f"
+    },
+    {
+      "evidence_file": "watcher-process.log",
+      "sha256": "edc9132e16383148d05ad77cb6dd88d9056a3581a5d0aba1bfafaa9699af9d17"
+    },
+    {
+      "evidence_file": "targeted-check-results.json",
+      "sha256": "7c4901ecf0f6560259708f96c3995ddb82a66d55d75ffd71c5bcde79f2bb2d65"
+    },
+    {
+      "evidence_file": "fm-sessionstart-nudge-selected.log",
+      "sha256": "067a51a969ebb27edf4517894cbba373f7928307675fee8ffa723a3e1e97ae44"
+    },
+    {
+      "evidence_file": "product-results.json",
+      "sha256": "61cc5382847f516c13a37cd4e2899e19b75bebc48c07932161a4c5d6ccb3f250"
+    },
+    {
+      "evidence_file": "startup-serial.log",
+      "sha256": "06a1ee6c23e06aa84322b6802bdfa507df3b0f2accadf3a154b3ee3dc4d3cd3d"
+    },
+    {
+      "evidence_file": "drive-native-report.py",
+      "sha256": "ee1ac8e593716bf137cd52049f0e437e353d67b5c3fb172c04806e161822f1fe"
+    },
+    {
+      "evidence_file": "product-transcript.log",
+      "sha256": "7bf7ce23ebc89fa7c90ac3d7165af301a8f27d47575da74f5a74964207e8a9bb"
+    },
+    {
+      "evidence_file": "drive-event.py",
+      "sha256": "50d7059df16591c323fd5c34de520956e3a5863edaf7ddb49ab7d911273f30de"
+    },
+    {
+      "evidence_file": "procevent-namespace.log",
+      "sha256": "7200f17653f04456a495d9a4cdafaed822c27973999694ddbaaa5baac83e4119"
+    },
+    {
+      "evidence_file": "drive-live-reentry.py",
+      "sha256": "b67297cfbeecbbcdb23fa5b77514389b133c4c49b3f2afdf80f8451ad1856133"
+    },
+    {
+      "evidence_file": "native-sandbox-probe-retry.log",
+      "sha256": "aa17062b11e40cf2d8fba617a5942a4634a6c64e39f1dd6bebe7189d09abad2d"
+    },
+    {
+      "evidence_file": "sandbox-readonly-identity.log",
+      "sha256": "77439e2fbc32965df96cad5df0aa937e79540cd9e3b7b6fd4f0484e39d551589"
+    },
+    {
+      "evidence_file": "parent-takeover-trace.log",
+      "sha256": "089362a11eb9f1ce1b88811b09a6de1e71ada68cf601365c719d82216e7b21f3"
+    },
+    {
+      "evidence_file": "host-sandbox-identity.log",
+      "sha256": "b0b2daf2bf21139749b120fe97d7d8ca765dce604b62882a19378677d5d149f8"
+    },
+    {
+      "evidence_file": "candidate-takeover-trace.log",
+      "sha256": "4703864d47a6a246e2d13b155515bc2a02040241f4d6ca978d988cd4b89fef3f"
+    },
+    {
+      "evidence_file": "candidate-takeover-detail.log",
+      "sha256": "a556025cb049c889e27c913bee758488b4e1788f0a290af888989661baf28456"
+    },
+    {
+      "evidence_file": "live-sweep-reentry.log",
+      "sha256": "1b1a5934e91770f39baa52f855d77a44df5d0b178bfc8e11ee1ecee900e7caf8"
+    },
+    {
+      "evidence_file": "incomplete-startup-digest.log",
+      "sha256": "63c97d99aa14d07b3f6da47706e8311946eb2fe3cd68ed6c061233bff260a09d"
+    },
+    {
+      "evidence_file": "drive-live-reentry-retry.py",
+      "sha256": "309e980ee75fb8d257363078c07c53397196c67d261b4a5d02c8b3c41702d44b"
+    },
+    {
+      "evidence_file": "live-sweep-reentry-retry.log",
+      "sha256": "810706367bfa8c201478d37c3b4eccc1fa63eaf75c5dee458fa4334b132c05c0"
+    },
+    {
+      "evidence_file": "native-sandbox-probe.log",
+      "sha256": "77343e37111ad51cb9a5307d307c4b0939c1e4254c573fae9a7445d5f972e3ea"
+    },
+    {
+      "evidence_file": "parent-takeover-detail.log",
+      "sha256": "3fd93b953c38ac475fe2e0ecb994c7c72bf7cab61c5924f197e60d3c31a434c0"
+    },
+    {
+      "evidence_file": "fm-codex-session-lock.log",
+      "sha256": "eee3e9c413ec1b556f5ca48813f74be66c18d2b46a66984080dad2fc310a9faa"
+    },
+    {
+      "evidence_file": "fm-session-lock-ancestry-selected.log",
+      "sha256": "246c2136f761b78fc4dc462c8024b72fa0efb66069800246230541f24f6a33e0"
+    },
+    {
+      "evidence_file": "startup-refusal-transcript.log",
+      "sha256": "2f3cfeb9f119f8a30e5d73773f6ef65790edfca83f22ec4ae698a5769819cb77"
+    },
+    {
+      "evidence_file": "native-cross-namespace-report.log",
+      "sha256": "d15ac2271587409188adf756e9cad411a73c8e2b6e9c8781f143b9a63dbc2519"
+    },
+    {
+      "evidence_file": "native-home-fm-session-start-reemit.log",
+      "sha256": "35ea5b36d68af23cdd4373dd40da141251eb32755b8f9bb78942642407c0527c"
+    },
+    {
+      "evidence_file": "reader-check-results.json",
+      "sha256": "eaca136f3efe94ffea0b1aa5f9403811a46e88a87c7435754be3cdd58286e6ad"
+    },
+    {
+      "evidence_file": "captured-event.result",
+      "sha256": "c03c32d0ffeb00e10a94bbfc040ec1357418f2c37430d44379e0f212ef015cb8"
+    },
+    {
+      "evidence_file": "capabilities.log",
+      "sha256": "21697b40b96ce584218d34a50f25d73564dc94f1c3dea0367ebbf68e18065055"
+    },
+    {
+      "evidence_file": "watcher-targeted.log",
+      "sha256": "e8c70c322ce82795b680263d2fdad0ca025df1509729d4084be63f7a234a9e58"
+    },
+    {
+      "evidence_file": "host-readonly-identity.log",
+      "sha256": "86526bf3b62721c56008b5a50ef1f1f320850cbe3e9e0f0374431d73b7bd4508"
+    },
+    {
+      "evidence_file": "fm-startup-network.log",
+      "sha256": "25238394cdd0160ccf0282c04d1020f11c000a5b5084ab17f18b1a9d8d05c192"
+    },
+    {
+      "evidence_file": "native-identity-repeat.log",
+      "sha256": "aef75c314d478d1d73b1cab5a2b9a2a48afbc7755cc962a70a4ac1bca0bbed0f"
+    },
+    {
+      "evidence_file": "drive-product.py",
+      "sha256": "cb5fb1255e3ad25713bb682bd50131a10d6bec7e4b3f61f2564cef3fc0800a58"
+    },
+    {
+      "evidence_file": "native-home-fm-session-start.log",
+      "sha256": "cb0cd0ebf717829356062fa05b6eb2315262c1f72aecbf00554f88d74dab54c1"
+    },
+    {
+      "evidence_file": "live-sweep-reentry-retry-digest.log",
+      "sha256": "6aef3f59926c26d2e63d27204b6b6cfd1bbd5d0afe399f5367d6e8330b62f660"
+    },
+    {
+      "evidence_file": "drive-startup-refusal.py",
+      "sha256": "40fd8ada7c958761499380b74d016009674c965218df68ac0eb81b1a75632107"
+    },
+    {
+      "evidence_file": "cleanup.log",
+      "sha256": "0fca3b8255aa2c1d231e5024bf49d9c10eb5b1e0ec3d0ea0311c1f13d921eb9b"
+    },
+    {
+      "evidence_file": "recovered-startup-digest.log",
+      "sha256": "db8f4d05e264adf0ce8aefefa3cf7d465eced3211565da9d3db71bc4996452a5"
+    },
+    {
+      "evidence_file": "evidence-index.md",
+      "sha256": "6619a6da4307e59526d6cddcf78ce5a6d4c6d77bdf486282823c201ad3bfa486"
+    },
+    {
+      "evidence_file": "native-identity.log",
+      "sha256": "aef75c314d478d1d73b1cab5a2b9a2a48afbc7755cc962a70a4ac1bca0bbed0f"
+    },
+    {
+      "evidence_file": "final-head-evidence-index.md",
+      "sha256": "aac450e1c759c3358aecd42f6a9e5aecf4417c5295d2ec3c1757800142d30de0"
+    },
+    {
+      "evidence_file": "final-head-coordination-plan.md",
+      "sha256": "d108bf406bec644c1d1cb80b8e8f3bed76de18b96f07e395deaee6ad178af447"
+    },
+    {
+      "evidence_file": "decision-final-test-evidence.md",
+      "sha256": "61060a895b01edd4683fd1ae63c00df271d697a12c59335615e31240b898f3a5"
+    },
+    {
+      "evidence_file": "deferred-upstream-findings.md",
+      "sha256": "27466801fa3c86577af8bf7b5edc4d79a78bed405684114c6d89a876dfd95f9a"
+    },
+    {
+      "evidence_file": "review-decision.md",
+      "sha256": "0d3fdd92c85bf2601fa2e4f2ffe59e784152111b53bbe8293de8885b60677e01"
+    },
+    {
+      "evidence_file": "review-followup-decision.md",
+      "sha256": "b7d4ebbe90e527b39a7d167a7c4e7fb533355a982c89c369af52f30cd79bb18d"
+    },
+    {
+      "evidence_file": "review-third-decision.md",
+      "sha256": "7a66ecc61f6f84a7103015226c4ecedec39fab1b9dcbe86862170a19cb6f4e3e"
+    },
+    {
+      "evidence_file": "final-head-primary-restricted-identity.log",
+      "sha256": "53813c7d45c681e5d60233187b8503aced6e235b43a2c3d00685caedd8d68fd1"
+    },
+    {
+      "evidence_file": "final-head-primary-host-identity.log",
+      "sha256": "c898609d81c3f808ddf75bec89284f69165a63627abbe824a3c15ebea8ae3de7"
+    },
+    {
+      "evidence_file": "final-head-app-restricted-2.log",
+      "sha256": "c569f2366e4dd51e48070a37f13fa068019eae062fb188fc97751ae942a3b6db"
+    },
+    {
+      "evidence_file": "final-head-primary-restricted-enter-1.log",
+      "sha256": "b4cb27575e77a76ff131426baaf029113b726b545f6e1cfcd9ef7d7bf44842a0"
+    },
+    {
+      "evidence_file": "final-head-primary-host-enter.log",
+      "sha256": "8e94fc19642b622d74b091770c2a3dbf9a58d58973b0bde0f5db4da6f76f4ab5"
+    },
+    {
+      "evidence_file": "final-head-primary-restricted-enter-2.log",
+      "sha256": "faaa1373f17a5d75e21be24351764d0920564bd2c413262abf848ee47f5614da"
+    },
+    {
+      "evidence_file": "final-head-competitor.json",
+      "sha256": "575d8880c1f9a9af7ea15611003750a31eeab800c1cd0fee68707c7e79edec7a"
+    },
+    {
+      "evidence_file": "final-head-claim-observer.log",
+      "sha256": "22bda56209fe73171cea00583fba92120d0aab378b902e697897c99f23acae2b"
+    },
+    {
+      "evidence_file": "final-head-primary-restricted-claim.log",
+      "sha256": "6ff64ab41fbee079d2fc772f35754901aa676e37f89fa148a6f43ded6393533e"
+    },
+    {
+      "evidence_file": "final-head-smoke-runtime.json",
+      "sha256": "2461fdd6538cb9835842d7b92136c5453dade86660ee21eea0baf6c242e3f87f"
+    },
+    {
+      "evidence_file": "launch-evidence.json",
+      "sha256": "a9600412b86817370c719e41287d5f282c3aadf228be28fa1deed766df010f3a"
+    },
+    {
+      "evidence_file": "final-head-smoke-spawn.exit",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "evidence_file": "final-head-smoke-auto-start-pane.txt",
+      "sha256": "17bd24c63b3690379432230a597a4fd8935af88da3be55148b20f5329e276fe2"
+    },
+    {
+      "evidence_file": "check-evidence.json",
+      "sha256": "f410879bc5cfd619784ec6690a8482fd2454a0a29f6d2b40b71a76ffd768f9b9"
+    },
+    {
+      "evidence_file": "final-head-smoke-steer.json",
+      "sha256": "2491d3198b56a6d96bac9f969208a7e19e8c864a229b2d6190138ce457552c41"
+    },
+    {
+      "evidence_file": "report.md",
+      "sha256": "0dfd82880121a846f817780d2d4eba98c0ac287754ee345edf8ca2e9aa067a96"
+    },
+    {
+      "evidence_file": "001.msg",
+      "sha256": "edde05551548c9ee21f5acff868896ad92aff2362c3fc5a0fd56120ef401fdc4"
+    },
+    {
+      "evidence_file": "adoption-smoke-20260928.status",
+      "sha256": "5e5539abba916c47daa8141e4cfc15fa3c6be6a350c930e3a4afdb2a35fd809b"
+    },
+    {
+      "evidence_file": "002.msg",
+      "sha256": "fe17fb66881266b28dc2af160dcf04fb116992e62b37229f2c3df9cff031510f"
+    },
+    {
+      "evidence_file": "completion-gate.txt",
+      "sha256": "65ce5561f5bf6fd990d7a32a084ed349e849470023f01f3773d8b5be7030eee6"
+    },
+    {
+      "evidence_file": "completion-gate-confirmation.txt",
+      "sha256": "65ce5561f5bf6fd990d7a32a084ed349e849470023f01f3773d8b5be7030eee6"
+    },
+    {
+      "evidence_file": "startup-direct-confirmation.stdout",
+      "sha256": "b98d41e8826df07c3305f90d7355561525ff583bfdb805508347624ba2ad5fba"
+    },
+    {
+      "evidence_file": "startup-direct-confirmation.exit",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "evidence_file": "startup-direct-confirmation.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "evidence_file": "startup-direct-confirmation.before.sha256",
+      "sha256": "2d5780a31ecbe7983310c703ca3795777d9c5a02d2d9fc109fe24e4d360d056e"
+    },
+    {
+      "evidence_file": "startup-direct-confirmation.after.sha256",
+      "sha256": "2d5780a31ecbe7983310c703ca3795777d9c5a02d2d9fc109fe24e4d360d056e"
+    },
+    {
+      "evidence_file": "startup-python-confirmation.stdout",
+      "sha256": "1b48ba8a88201e0c291ddb5335844427995e802733818bbf7a18886c0432bbe5"
+    },
+    {
+      "evidence_file": "startup-python-confirmation.exit",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "evidence_file": "startup-python-confirmation.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "evidence_file": "startup-python-confirmation.before.sha256",
+      "sha256": "869a2c790a3ebd697493a6feef9086c75bf13d84571dca80d4c7f8715febb7b4"
+    },
+    {
+      "evidence_file": "startup-python-confirmation.after.sha256",
+      "sha256": "869a2c790a3ebd697493a6feef9086c75bf13d84571dca80d4c7f8715febb7b4"
+    },
+    {
+      "evidence_file": "startup.stdout",
+      "sha256": "1b48ba8a88201e0c291ddb5335844427995e802733818bbf7a18886c0432bbe5"
+    },
+    {
+      "evidence_file": "final-head-smoke-exit.json",
+      "sha256": "b7729c637e42c7987622ae78c6324ef1661b7b00017ccd11a863a75ed2088c9d"
+    },
+    {
+      "evidence_file": "final-head-smoke-cleanup.json",
+      "sha256": "480560801f92ec128bb01799f6b6b8d927aed13ca8aab7c79f2fc5ebb0417eac"
+    }
+  ],
+  "required_ancestries_present": true,
+  "tracked_files_changed": false
+}

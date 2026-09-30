@@ -1,0 +1,7 @@
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - watch restart preserves foreign and missing namespace locks despite a live local PID collision
+ok - shared stale clear refuses matching, missing, unreadable and malformed owner proof
+ok - shared stale clear publishes under the steal mutex before removing a proven dead owner
+ok - concurrent fm_lock_try_acquire yields exactly one winner
+ok - live-held lock is not stolen
+ok - dead-pid stale lock is reclaimed by a single acquirer

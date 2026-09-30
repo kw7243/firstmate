@@ -1,0 +1,27 @@
+[
+  {
+    "name": "parent-takeover-detail",
+    "exit": 0,
+    "elapsed": 15.15
+  },
+  {
+    "name": "candidate-takeover-detail",
+    "exit": 0,
+    "elapsed": 17.85
+  },
+  {
+    "name": "startup-serial",
+    "exit": 0,
+    "elapsed": 204.72
+  },
+  {
+    "name": "watcher-targeted",
+    "exit": 0,
+    "elapsed": 5.77
+  },
+  {
+    "name": "procevent-namespace",
+    "exit": 0,
+    "elapsed": 23.99
+  }
+]

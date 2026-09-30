@@ -1,0 +1,4 @@
+ok - fm-sessionstart-nudge: a lock holder in process ancestry is already run
+# skip: unprivileged PID namespaces are unavailable here, so the namespace pid 1 lock owner is unverified
+ok - run wrapper: clear and compact re-emit the digest without repeating startup sweeps
+ok - run wrapper: clear accepts completion only from the current harness

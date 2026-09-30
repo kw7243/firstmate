@@ -1,0 +1,97 @@
+$ fm-lab-home.sh create /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/native-home
+exit=0
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/native-home
+
+SCENARIO Native Codex startup, repeat entry, and lease continuity
+$ fm-session-start.sh --source startup
+exit=0
+full output: native-home-fm-session-start.log
+MISSING: quota-axi (install: npm install -g quota-axi)
+MISSING: tasks-axi (install: npm install -g tasks-axi)
+The digest above is complete for this session start. The READ-ONCE CONTRACT
+$ fm-startup-network.sh wait 30
+exit=0
+
+$ fm-startup-network.sh report
+exit=0
+completed off the startup path in 4s: GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation.
+(silent - no problems found)
+TIMINGS - where the deferred network checks spent their time (ms):
+  phase       gh-auth                                    start=+1429    elapsed=384
+  phase       secondmate-liveness                        start=+1926    elapsed=19
+  phase       secondmate-sync                            start=+1995    elapsed=98
+  phase       handoff-delivery                           start=+2140    elapsed=4
+  phase       fleet-sync                                 start=+1880    elapsed=2078
+  stage       network-checks probe_sweeps                start=+396     elapsed=3682
+  slowest: stage network-checks probe_sweeps 3682ms, phase fleet-sync 2078ms, phase gh-auth 384ms
+$ fm-lock.sh status
+exit=0
+lock: held by live harness pid 953685
+$ fm-lease.sh claim sample
+exit=0
+
+$ fm-lease.sh check sample
+exit=0
+main 953685 1790732764 live
+$ fm-session-start.sh --reemit
+exit=0
+full output: native-home-fm-session-start-reemit.log
+MISSING: quota-axi (install: npm install -g quota-axi)
+MISSING: tasks-axi (install: npm install -g tasks-axi)
+The digest above is complete for this session start. The READ-ONCE CONTRACT
+$ fm-lease.sh check sample
+exit=0
+main 953685 1790732764 live
+$ fm-startup-network.sh wait 30
+exit=0
+
+$ fm-startup-network.sh report
+exit=0
+completed off the startup path in 1s: GitHub authentication.
+(silent - no problems found)
+TIMINGS - where the deferred network checks spent their time (ms):
+  phase       gh-auth                                    start=+350     elapsed=361
+  stage       network-checks probe                       start=+160     elapsed=584
+  slowest: stage network-checks probe 584ms, phase gh-auth 361ms
+Completion record preserved across reentry; existing task lease remains live.
+
+SCENARIO Forged thread identity and competing lease actor are refused
+$ fm-lock.sh 
+exit=1
+error: cannot verify the Codex tool session identity; operate read-only until resolved
+$ fm-lease.sh claim sample
+exit=6
+error: claim refused - task 'sample' is leased to the main supervision actor (state/.lease-sample)
+$ fm-lease.sh release sample
+exit=0
+
+Caller override and competing actor refused without changing ownership.
+$ fm-lab-home.sh create /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/watch-home
+exit=0
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/watch-home
+
+SCENARIO Live watcher restart preserves an unqualified owner and cleanly stops after proof is restored
+watcher: started pid=1112692 (beacon fresh)
+$ fm-watch-arm.sh --restart
+exit=1
+watcher: FAILED - stale watcher recovery state could not be persisted
+Adversarial persisted namespace: restart refused; live watcher and lock preserved.
+$ fm-watch-arm.sh --stop
+exit=0
+watcher: stopped pid=1112692
+Original tracked arm exit=143
+$ fm-lab-home.sh create /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/event-home
+exit=0
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/event-home
+
+SCENARIO Real file event survives uncertain claim handling, captures output, and acknowledges idempotently
+$ fm-procevent-when.sh arm local-file-ready --interval 0.2 --stable 1 --deadline 120 --condition /usr/bin/test -f /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/.no-mistakes/test-phase/event-home/ready --action /usr/bin/printf captured-from-live-file-event
+
+exit=1
+error: argv elements cannot contain newlines
+$ fm-procevent.sh sweep-home
+exit=1
+error: process-event state root is not a private directory
+FAILED AssertionError(('fm-procevent-when.sh', 1, 'error: argv elements cannot contain newlines\n'))
+
+FINAL [{"name": "Native Codex startup, repeat entry, and lease continuity", "result": "pass"}, {"name": "Forged thread identity and competing lease actor are refused", "result": "pass"}, {"name": "Live watcher restart preserves an unqualified owner and cleanly stops after proof is restored", "result": "pass"}, {"name": "Real file event survives uncertain claim handling, captures output, and acknowledges idempotently", "result": "fail", "error": "AssertionError(('fm-procevent-when.sh', 1, 'error: argv elements cannot contain newlines\\n'))"}]

@@ -1,0 +1,11 @@
+HOST TOOL CALL
+pid1=systemd
+namespace=pid:[4026531836]
+identity_sha256=4276bacd3ad6a58604704f093eec911439d9aa92d8b9d9869d9df5b0e4e4b6e8
+Existing host-created session lock is self-owned; stable generation matches; caller override rejected.
+
+NATIVE CODEX SANDBOX (READ-ONLY)
+pid1=codex
+namespace=pid:[4026532283]
+identity_sha256=4276bacd3ad6a58604704f093eec911439d9aa92d8b9d9869d9df5b0e4e4b6e8
+Existing host-created session lock is self-owned; stable generation matches; caller override rejected.

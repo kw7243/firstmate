@@ -1,0 +1,6 @@
++1790732909.909626 set -u
++1790732909.909777 '[' 0 '!=' 1 ']'
++1790732909.909828 FM_STARTUP_NETWORK_TEST_PARENT=1
++1790732909.909845 bash -c '"$@"; result=$?; :; exit "$result"' _ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3N97R1VEZ4XYMGAH1PPZ819/tests/.phase-startup-timing.test.sh
+ok - fm-startup-network: fleet-lock takeover cannot overlap a mutating sweep
++1790732928.511649 exit 0

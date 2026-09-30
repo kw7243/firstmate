@@ -1,0 +1,7 @@
+ok - Codex identity comes from the tool boundary, rejects override and excludes a competing live session
+ok - proved dead host owner can be replaced and repeated entry keeps its generation
+ok - foreign namespace and unknown leases remain protected regardless of age
+ok - distinct threads sharing one Codex process cannot take each other's lock
+ok - Codex reemit waits for its own sweep, refreshes coordinates, and refuses a competing session
+ok - bare PID 1 is refused without a verified session record
+ok - transient mutex never steals or releases a foreign or unqualified namespace owner

@@ -1,0 +1,88 @@
+Recorded outer-worker product evidence; audited here, not rerun.
+candidate=c3df8736c5225ff8c827e1ba6156f8c5cb78da25
+
+Actual App restricted / host / restricted calls:
+final-head-primary-restricted-identity.log
+candidate=c3df8736c5225ff8c827e1ba6156f8c5cb78da25
+namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026532225]
+anchor=1
+verified_identity_sha256=def252d346a640a88d02e499e64428b4a4a515438dd3d2c6f614412d8bff82be
+override=refused
+
+final-head-primary-host-identity.log
+candidate=c3df8736c5225ff8c827e1ba6156f8c5cb78da25
+namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026531836]
+anchor=769828
+verified_identity_sha256=def252d346a640a88d02e499e64428b4a4a515438dd3d2c6f614412d8bff82be
+override=refused
+
+final-head-primary-restricted-enter-1.log
+candidate=c3df8736c5225ff8c827e1ba6156f8c5cb78da25
+namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026532225]
+lock acquired: harness pid 1
+self_owned=yes
+generation_sha256=8da27e01a0cd6ab0426ecfa0582da609bee021e3c55ec81b4ba85a9d7e0d6248
+lock: held by live harness pid 1
+
+final-head-primary-host-enter.log
+candidate=c3df8736c5225ff8c827e1ba6156f8c5cb78da25
+namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026531836]
+lock acquired: harness pid 769828
+self_owned=yes
+generation_sha256=8da27e01a0cd6ab0426ecfa0582da609bee021e3c55ec81b4ba85a9d7e0d6248
+lock: held by live harness pid 769828
+
+final-head-primary-restricted-enter-2.log
+candidate=c3df8736c5225ff8c827e1ba6156f8c5cb78da25
+namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026532226]
+lock acquired: harness pid 1
+self_owned=yes
+generation_sha256=8da27e01a0cd6ab0426ecfa0582da609bee021e3c55ec81b4ba85a9d7e0d6248
+lock: held by live harness pid 1
+
+Distinct actual Codex session:
+error: session owner cannot be verified in this process view; preserve the lock and operate read-only until resolved
+competing_session_refused=yes
+owner_bytes_unchanged=yes
+
+Actual namespace claim contention:
+observer_ready=yes
+different_namespace=yes
+acquire_refused=yes
+release_preserved_foreign_owner=yes
+owner_bytes_unchanged=yes
+host_acquired_only_after_release=yes
+
+
+Automatic worker lifecycle:
+source_head=c3df8736c5225ff8c827e1ba6156f8c5cb78da25
+worker_head=c3df8736c5225ff8c827e1ba6156f8c5cb78da25
+emitted_model=gpt-6-astra low
+automatic_brief_receipt=confirmed by original pane and initial worker response
+initial_completion_before_independent_steer=yes
+fresh_challenge_acknowledged=yes
+startup_continuation_acknowledged=yes
+seven_held_rows_byte_identical=yes
+stock_controlled_exit_status=0
+exact_recorded_private_server_cleaned=yes
+
+startup (exit 0):
+SUPERVISION OPERATING INSTRUCTIONS - primary harness: unknown
+Mode: Unknown harness fallback.
+This primary harness does not have a verified watcher wake adapter.
+Follow the supervision operating instructions block above for harness 'unknown'.
+The digest above is complete for this session start. The READ-ONCE CONTRACT
+
+startup-direct-confirmation (exit 0):
+SUPERVISION OPERATING INSTRUCTIONS - primary harness: codex
+Mode: Codex foreground checkpoint.
+Follow the supervision operating instructions block above for harness 'codex'.
+The digest above is complete for this session start. The READ-ONCE CONTRACT
+
+startup-python-confirmation (exit 0):
+SUPERVISION OPERATING INSTRUCTIONS - primary harness: unknown
+Mode: Unknown harness fallback.
+This primary harness does not have a verified watcher wake adapter.
+Follow the supervision operating instructions block above for harness 'unknown'.
+The digest above is complete for this session start. The READ-ONCE CONTRACT
+

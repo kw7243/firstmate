@@ -1,0 +1,20 @@
+$ fm-lock.sh 
+exit=0
+$ fm-startup-network.sh start --locked 1 --harvest-pid 0
+exit=0
+Paused real deferred sweep while it holds the session acquisition claim.
+$ fm-session-start.sh --reemit
+exit=0
+Reentry completed after 22.50s with the same verified session, no read-only fallback and no truncated startup.
+$ fm-startup-network.sh wait 30
+exit=0
+$ fm-startup-network.sh report
+exit=0
+completed off the startup path in 2s: GitHub authentication.
+(silent - no problems found)
+TIMINGS - where the deferred network checks spent their time (ms):
+  phase       gh-auth                                    start=+967     elapsed=404
+  stage       network-checks probe                       start=+716     elapsed=676
+  slowest: stage network-checks probe 676ms, phase gh-auth 404ms
+
+PASS: same-session native Codex reentry succeeds across a real sweep lasting beyond the former 10-second cutoff.

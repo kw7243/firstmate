@@ -1,0 +1,3 @@
+Stopped the exact leftover deferred worker from the initial failed startup regression: PID 1197696.
+Confirmed exit before removing disposable files.
+No remaining processes use the test homes. Removed this phase’s disposable homes, parent snapshot, temporary fixtures and selector runners.
