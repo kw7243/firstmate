@@ -137,6 +137,8 @@ start_watcher() {  # <home>: a live process holding a matching watcher lock
   printf '%s\n' "$home" > "$lock/fm-home"
   printf '%s\n' "$home/bin/fm-watch.sh" > "$lock/watcher-path"
   fm_test_pid_identity "$pid" > "$lock/pid-identity"
+  FM_STATE_OVERRIDE="$home/state" bash -c '. "$1"; fm_lock_write_namespace "$2"' _ "$ROOT/bin/fm-wake-lib.sh" "$lock" \
+    || fail "could not record the watcher's namespace"
   touch "$home/state/.last-watcher-beat"
 }
 

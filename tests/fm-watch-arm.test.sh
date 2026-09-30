@@ -350,6 +350,8 @@ test_attached_arm_hands_a_stalled_holder_to_its_replacement() {
   printf '%s\n' "$dir" > "$state/.watch.lock/fm-home"
   printf '%s\n' "$WATCH" > "$state/.watch.lock/watcher-path"
   printf '%s\n' "$identity" > "$state/.watch.lock/pid-identity"
+  FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_lock_write_namespace "$2"' _ "$ROOT/bin/fm-wake-lib.sh" "$state/.watch.lock" \
+    || fail "could not record the fake holder's namespace"
   : > "$state/.last-watcher-beat"
 
   PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_ARM_ATTACH_POLL=0.1 \
@@ -801,6 +803,8 @@ test_restart_preserves_recovery_across_reused_pid_lock() {
   printf '%s\n' "$home" > "$owner/fm-home"
   printf '%s\n' "$WATCH" > "$owner/watcher-path"
   printf '%s\n' 'reused-pid-does-not-match' > "$owner/pid-identity"
+  FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_lock_write_namespace "$2"' _ "$ROOT/bin/fm-wake-lib.sh" "$owner" \
+    || fail "could not record the reused-pid fixture's namespace"
   ln -s "$owner" "$state/.watch.lock"
 
   start_rearm_arm "$home" "$state" "$fakebin" "$armout"

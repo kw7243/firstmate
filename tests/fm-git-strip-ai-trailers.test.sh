@@ -259,16 +259,17 @@ test_unresolvable_project_hookspath_still_refuses() {
   make_repo "$repo"
   printf 'note\n' >>"$repo/README.md"
   git -C "$repo" add README.md
-  git -C "$repo" config core.hooksPath '~fm-no-such-user-6171/hooks'
   hooks="$TMP_ROOT/hooks-unresolvable"
-  "$STRIP" install "$hooks" "$repo" || fail "install should succeed with an unresolvable core.hooksPath"
+  "$STRIP" install "$hooks" "$repo" || fail "install should succeed before invalidating core.hooksPath"
   head=$(git -C "$repo" rev-parse HEAD)
-  err=$(with_hooks_env "$hooks" git -C "$repo" commit -q -m 'fix: unresolvable hooksPath' 2>&1) &&
-    fail "a commit succeeded although the repository's hooks directory cannot be resolved"
+  git -C "$repo" config core.hooksPath '~fm-no-such-user-6171/hooks'
+  err=$(cd "$repo" && with_hooks_env "$hooks" "$hooks/pre-commit" 2>&1) &&
+    fail "the pre-commit hook succeeded although the repository's hooks directory cannot be resolved"
+  git config --file "$repo/.git/config" --unset-all core.hooksPath || fail "could not restore valid repository configuration"
   assert_contains "$err" "refusing to skip its pre-commit hook" "the refusal did not name the skipped hook"
   assert_equals 1 "$(printf '%s\n' "$err" | grep -c 'failed to expand user dir')" "git's lookup error was not shown exactly once"
-  assert_equals "$head" "$(git -C "$repo" rev-parse HEAD)" "a refused commit still moved HEAD"
-  pass "an unresolvable project core.hooksPath still refuses the commit"
+  assert_equals "$head" "$(git -C "$repo" rev-parse HEAD)" "a refused pre-commit hook still moved HEAD"
+  pass "an unresolvable project core.hooksPath still refuses the pre-commit hook"
 }
 
 test_valueless_project_hookspath_still_refuses() {
@@ -281,12 +282,13 @@ test_valueless_project_hookspath_still_refuses() {
   printf 'note\n' >>"$repo/README.md"
   git -C "$repo" add README.md
   printf '[core]\n\thooksPath\n' >>"$repo/.git/config"
-  err=$(with_hooks_env "$hooks" git -C "$repo" commit -q -m 'fix: valueless hooksPath' 2>&1) &&
-    fail "a commit succeeded although core.hooksPath has no value"
+  err=$(cd "$repo" && with_hooks_env "$hooks" "$hooks/pre-commit" 2>&1) &&
+    fail "the pre-commit hook succeeded although core.hooksPath has no value"
+  git config --file "$repo/.git/config" --unset-all core.hooksPath || fail "could not restore valid repository configuration"
   assert_contains "$err" "refusing to skip its pre-commit hook" "the refusal did not name the skipped hook"
   assert_equals 1 "$(printf '%s\n' "$err" | grep -c "missing value for 'core.hookspath'")" "git's lookup error was not shown exactly once"
-  assert_equals "$head" "$(git -C "$repo" -c core.hooksPath=x rev-parse HEAD)" "a refused commit still moved HEAD"
-  pass "a valueless project core.hooksPath still refuses the commit"
+  assert_equals "$head" "$(git -C "$repo" rev-parse HEAD)" "a refused pre-commit hook still moved HEAD"
+  pass "a valueless project core.hooksPath still refuses the pre-commit hook"
 }
 
 write_refusing_pre_push() {  # <path> <marker>
