@@ -388,19 +388,29 @@ fm_task_inbox_oldest_unhandled() {  # <state-dir> <task-id>
 # Owe a fire-and-forget record its one retry ring (see the header). A newer
 # mark replaces an older one: a ring names the whole inbox, not one record.
 fm_task_inbox_mark_retry() {  # <state-dir> <task-id> <record-path>
-  local dir
+  local dir lock status=0
   dir=$(fm_task_inbox_dir "$1" "$2")
-  { printf '%s\n' "${3##*/}" > "$dir/.retry-ring"; } 2>/dev/null
+  lock="$dir/.seq.lock"
+  fm_task_inbox_lock_acquire "$lock" || return 1
+  { printf '%s\n' "${3##*/}" > "$dir/.retry-ring"; } 2>/dev/null || status=1
+  fm_lock_release "$lock"
+  return "$status"
 }
 
 # Spend the retry mark after its ring, only while it still names that record:
 # a newer mark written meanwhile is owed its own retry and survives. Fails only
 # when the processed record's mark stays behind.
 fm_task_inbox_clear_retry() {  # <state-dir> <task-id> <record-path>
-  local dir
+  local dir lock status=0
   dir=$(fm_task_inbox_dir "$1" "$2")
-  [ "$(cat "$dir/.retry-ring" 2>/dev/null)" = "${3##*/}" ] || return 0
-  rm -f "$dir/.retry-ring" 2>/dev/null
+  [ -d "$dir" ] || return 0
+  lock="$dir/.seq.lock"
+  fm_task_inbox_lock_acquire "$lock" || return 1
+  if [ "$(cat "$dir/.retry-ring" 2>/dev/null)" = "${3##*/}" ]; then
+    rm -f "$dir/.retry-ring" 2>/dev/null || status=1
+  fi
+  fm_lock_release "$lock"
+  return "$status"
 }
 
 # The re-ring ladder decision for one task. Prints exactly one of:
@@ -412,22 +422,24 @@ fm_task_inbox_clear_retry() {  # <state-dir> <task-id> <record-path>
 # An empty inbox also resets the ladder bookkeeping so the next message starts
 # a fresh ladder.
 fm_task_inbox_due_action() {  # <state-dir> <task-id>
-  local dir oldest base now grace max ladder rec_base count last
+  local dir oldest base now grace max ladder rec_base count last lock action=quiet
   dir=$(fm_task_inbox_dir "$1" "$2")
   if ! oldest=$(fm_task_inbox_oldest_unhandled "$1" "$2"); then
     rm -f "$dir/.ring-state" "$dir/.escalated" 2>/dev/null || true
     # The one retry ring exists only while config/wait-no-turns is present.
     # Absent, a mark is left untouched and the inbox stays quiet, as before.
-    if [ -e "${FM_CONFIG_OVERRIDE:-${FM_HOME:-}/config}/wait-no-turns" ]; then
+    if [ -e "${FM_CONFIG_OVERRIDE:-${FM_HOME:-}/config}/wait-no-turns" ] && [ -d "$dir" ]; then
+      lock="$dir/.seq.lock"
+      fm_task_inbox_lock_acquire "$lock" || return 1
       base=$(cat "$dir/.retry-ring" 2>/dev/null || true)
       if ! fm_task_inbox_seq_of "$base" >/dev/null || [ ! -f "$dir/$base" ]; then
         rm -f "$dir/.retry-ring" 2>/dev/null || true
       elif [ "$(fm_path_age "$dir/.retry-ring")" -ge "$(fm_task_inbox_grace_secs)" ]; then
-        printf 'retry %s' "$dir/$base"
-        return 0
+        action="retry $dir/$base"
       fi
+      fm_lock_release "$lock"
     fi
-    printf 'quiet'
+    printf '%s' "$action"
     return 0
   fi
   base=${oldest##*/}

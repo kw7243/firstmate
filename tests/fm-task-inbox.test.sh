@@ -608,6 +608,130 @@ test_fire_and_forget_retry_is_quiet_without_the_flag() {
   pass "inbox: without config/wait-no-turns a fire-and-forget retry mark stays quiet"
 }
 
+test_retry_cleanup_preserves_concurrent_publication() {
+  local mode dir state fire newer action
+  for mode in clear handled missing invalid; do
+    dir="$TMP_ROOT/retry-cleanup-$mode"
+    state="$dir/state"
+    mkdir -p "$state" "$dir/config"
+    : > "$dir/config/wait-no-turns"
+    fire=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "older steer" fire-and-forget)
+    newer=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "newer steer" fire-and-forget)
+    inbox_lib "$state" fm_task_inbox_mark_retry "$state" t1 "$fire"
+    case "$mode" in
+      handled) mv "$fire" "$state/t1.inbox/handled/" ;;
+      missing) rm "$fire" ;;
+      invalid) printf 'invalid\n' > "$state/t1.inbox/.retry-ring" ;;
+    esac
+
+    FM_STATE_OVERRIDE="$state" FM_CONFIG_OVERRIDE="$dir/config" bash -c '
+      set -e
+      . "$1"
+      state=$2 fire=$3 newer=$4 mode=$5
+      mkfifo "$state/paused" "$state/release" "$state/publisher-ready"
+      exec 7<> "$state/paused" 8<> "$state/release" 9<> "$state/publisher-ready"
+      cleaner= publisher=
+      trap '\''kill ${cleaner:-} ${publisher:-} 2>/dev/null || true; wait 2>/dev/null || true'\'' EXIT
+      (
+        rm() {
+          local arg signal
+          for arg in "$@"; do
+            if [ "$arg" = "$state/t1.inbox/.retry-ring" ]; then
+              printf "paused\n" >&7
+              IFS= read -r -t 10 signal <&8 || return 1
+              break
+            fi
+          done
+          command rm "$@"
+        }
+        if [ "$mode" = clear ]; then
+          fm_task_inbox_clear_retry "$state" t1 "$fire"
+        else
+          fm_task_inbox_due_action "$state" t1 > "$state/cleanup-action"
+        fi
+      ) &
+      cleaner=$!
+      IFS= read -r -t 10 signal <&7
+      (
+        announced=0
+        sleep() {
+          if [ "$announced" = 0 ]; then
+            printf "contended\n" >&9
+            announced=1
+          fi
+          command sleep "$@"
+        }
+        fm_task_inbox_mark_retry "$state" t1 "$newer"
+        [ "$announced" = 1 ] || printf "published\n" >&9
+      ) &
+      publisher=$!
+      IFS= read -r -t 10 signal <&9
+      printf "release\n" >&8
+      wait "$cleaner"
+      cleaner=
+      wait "$publisher"
+      publisher=
+    ' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$state" "$fire" "$newer" "$mode" \
+      || fail "retry $mode cleanup/publication race did not complete"
+
+    [ "$(cat "$state/t1.inbox/.retry-ring" 2>/dev/null)" = "${newer##*/}" ] \
+      || fail "retry $mode cleanup erased a concurrently published newer mark"
+    action=$(FM_CONFIG_OVERRIDE="$dir/config" FM_TASK_INBOX_GRACE_SECS=0 \
+      inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
+    [ "$action" = "retry $newer" ] || fail "retry $mode cleanup lost the newer retry: $action"
+    inbox_lib "$state" fm_task_inbox_clear_retry "$state" t1 "$newer" \
+      || fail "retry $mode cleanup left the inbox locked"
+    [ ! -e "$state/t1.inbox/.retry-ring" ] || fail "the newer retry could not be spent"
+  done
+  pass "inbox: conditional and stale retry cleanup preserve concurrent publication"
+}
+
+test_retry_reader_waits_for_publication() {
+  local dir state fire newer action
+  dir="$TMP_ROOT/retry-publication"
+  state="$dir/state"
+  mkdir -p "$state" "$dir/config"
+  : > "$dir/config/wait-no-turns"
+  fire=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "older steer" fire-and-forget)
+  newer=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "newer steer" fire-and-forget)
+  inbox_lib "$state" fm_task_inbox_mark_retry "$state" t1 "$fire"
+
+  FM_STATE_OVERRIDE="$state" FM_CONFIG_OVERRIDE="$dir/config" bash -c '
+    set -e
+    . "$1"
+    state=$2 newer=$3
+    mkfifo "$state/paused" "$state/release"
+    exec 7<> "$state/paused" 8<> "$state/release"
+    publisher=
+    trap '\''kill ${publisher:-} 2>/dev/null || true; wait 2>/dev/null || true'\'' EXIT
+    (
+      printf() {
+        local signal
+        if [ "${1:-}" = "%s\\n" ] && [ "${2:-}" = "${newer##*/}" ]; then
+          builtin printf "paused\n" >&7
+          IFS= read -r -t 10 signal <&8 || return 1
+        fi
+        builtin printf "$@"
+      }
+      fm_task_inbox_mark_retry "$state" t1 "$newer"
+    ) &
+    publisher=$!
+    IFS= read -r -t 10 signal <&7
+    FM_TASK_INBOX_LOCK_WAIT_SECS=0 fm_task_inbox_due_action "$state" t1 > "$state/read-action" || true
+    printf "release\n" >&8
+    wait "$publisher"
+    publisher=
+  ' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$state" "$newer" \
+    || fail "retry publication/read race did not complete"
+
+  [ "$(cat "$state/t1.inbox/.retry-ring" 2>/dev/null)" = "${newer##*/}" ] \
+    || fail "a retry reader removed the marker during publication"
+  action=$(FM_CONFIG_OVERRIDE="$dir/config" FM_TASK_INBOX_GRACE_SECS=0 \
+    inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
+  [ "$action" = "retry $newer" ] || fail "the published retry was lost: $action"
+  pass "inbox: retry readers cannot remove a marker during publication"
+}
+
 test_ring_ladder_policy() {
   local state rec action
   state="$TMP_ROOT/ladder/state"; mkdir -p "$state"
@@ -969,6 +1093,8 @@ test_ladder_writes_ignore_vanished_inbox
 test_fire_and_forget_records_never_enter_the_ladder
 test_fire_and_forget_retry_is_owed_once
 test_fire_and_forget_retry_is_quiet_without_the_flag
+test_retry_cleanup_preserves_concurrent_publication
+test_retry_reader_waits_for_publication
 test_ring_ladder_policy
 test_watcher_rerings_idle_pane_quietly
 test_watcher_waits_on_busy_pane
