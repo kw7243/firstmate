@@ -1,0 +1,10 @@
+1790876169	2	signal	retry.status	signal: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-inbox-validation/fm-lab.v_3k4lmb/state/retry.status
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 1048169.1790876168.R61Htj
+wake annotation: unread wake-EVENT since last drain, not current state: retry.status: needs-decision [key=live-check]: waiting for this isolated decision
+wake annotation: latest wake-EVENT observed at drain, not current state: retry.status: resolved [key=live-check]: cleared for delivery
+WARNING: watcher still down (same stale episode; last beat: 30s ago, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+
+watcher: exiting - home no longer exists: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-inbox-validation/fm-lab.v_3k4lmb
+

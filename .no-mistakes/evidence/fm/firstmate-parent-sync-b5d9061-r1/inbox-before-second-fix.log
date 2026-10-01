@@ -1,0 +1,14 @@
+FM_TEST_BEGIN 2026-10-01T17:32:13Z tests/fm-send-inbox.test.sh family=backend-dispatch expected_gate_skip=none
+ok - fm-send inbox: the payload is recorded durably and only the doorbell is typed
+ok - fm-send inbox: a deep home rings the same short doorbell naming the inbox once
+ok - fm-send inbox: newlines are legal and the terminal can no longer truncate a steer
+ok - fm-send inbox: a re-send is a new durable record, never a retyped payload
+ok - fm-send inbox: a visibly pending composer skips the ring, and the steer stays durably sent
+ok - fm-send inbox: a failed doorbell is still a durably sent steer
+ok - fm-send inbox: a fire-and-forget ring that did not land owes one retry ring
+ok - fm-send inbox: without config/wait-no-turns a fire-and-forget ring is not retried
+not ok - contention delayed send lost the pending retry for 001.msg
+FM_TEST_END 2026-10-01T17:33:04Z tests/fm-send-inbox.test.sh exit=1 duration_ms=50508 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=50709
+FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=1 duration_ms=50508 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-send-inbox.test.sh duration_ms=50508

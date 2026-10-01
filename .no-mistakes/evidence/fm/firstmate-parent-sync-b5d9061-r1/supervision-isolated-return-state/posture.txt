@@ -1,0 +1,2 @@
+away record absent at case completion
+case_exit=0

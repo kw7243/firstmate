@@ -1,0 +1,31 @@
+{
+  "families": [
+    {
+      "count": 1,
+      "duration_ms": 439950,
+      "failed": 0,
+      "name": "unclassified"
+    }
+  ],
+  "finished_at": "2026-10-01T18:11:20Z",
+  "run_id": "fm-test-run-1790877840309-2618446",
+  "scripts": [
+    {
+      "duration_ms": 439950,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-supervision-host-validation-tail.test.sh"
+    }
+  ],
+  "selection": "scripts;jobs=1",
+  "started_at": "2026-10-01T18:04:00Z",
+  "summary": {
+    "duration_ms": 440103,
+    "failed": 0,
+    "skipped_gate": 0,
+    "total": 1
+  }
+}

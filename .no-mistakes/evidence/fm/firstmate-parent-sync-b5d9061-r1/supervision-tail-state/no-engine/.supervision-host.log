@@ -1,0 +1,2 @@
+1790878265	start	gen=host-2941914-1790878265	primary=claude
+1790878270	to-main	no supervision engine runs here: config/supervision-host names 'pi', which is not a verified supervision engine (verified: claude); this wake is yours

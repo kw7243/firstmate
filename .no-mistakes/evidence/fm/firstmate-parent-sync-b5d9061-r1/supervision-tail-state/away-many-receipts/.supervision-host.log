@@ -1,0 +1,3 @@
+1790877868	start	gen=host-2634009-1790877867	primary=claude
+1790877879	handled	turn=host-2634009-1790877867.1	posture=away	rc=0	reports=1001	error=0 cost=0.25 conversation_cost=0.25 input=5 cache_read=100 cache_write=10 output=20 turns=3	signal: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-supervision-tail-n0197oa3/tmp/fm-supervision-host.LcnscL/away-many-receipts/state/demo.status
+1790877881	to-main	the captain returned while the away session was handling this wake, which it finished after the return brief was rendered; relay its visible outcomes (store rows 1, listed next and in bin/fm-branch-outcome.sh list) to the captain

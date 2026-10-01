@@ -1,0 +1,1 @@
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-supervision-tail-n0197oa3/code/bin/fm-supervision-host.sh: line 9: 2884820 Killed                  "$0" park "$@" > "$FM_HOME/host.out" 2>&1

@@ -1,0 +1,87 @@
+$ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/bin/fm-lab-home.sh create /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-resume-gerrit/lab
+exit=0
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-resume-gerrit/lab
+
+$ tasks-axi add gerrit-answer Disposable retained Gerrit decision --kind ship --start
+exit=0
+ok: added gerrit-answer (ship) -> In flight
+task:
+  id: gerrit-answer
+  title: Disposable retained Gerrit decision
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-10-01
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi done gerrit-answer --pr <url>` when it ships
+  - Run `tasks-axi block gerrit-answer --by <other>` to record a dependency
+
+$ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/bin/fm-captain-hold.sh hold gerrit-answer --reason Choose the disposable follow-up
+exit=0
+gerrit-answer
+
+$ bash -ec . "$1/bin/fm-backlog-transition-lib.sh"; fm_backlog_close_marker_write "$FM_HOME/state" gerrit-answer "$FM_HOME/data" fixture-gerrit --retain --pr "$2" _ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB https://gerrit.example.com/c/project/+/12345
+exit=0
+
+$ tasks-axi show gerrit-answer --full
+exit=0
+task:
+  id: gerrit-answer
+  title: Disposable retained Gerrit decision
+  state: in_flight
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: Choose the disposable follow-up
+  hold_kind: captain
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-10-01
+  closed: "-"
+  deps: none
+  links: none
+  body: "Captain hold set: 2026-10-01T18:04:07Z"
+
+$ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/bin/fm-captain-hold.sh answer gerrit-answer --decision-file /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-resume-gerrit/lab/answer.txt
+exit=0
+answered: gerrit-answer
+
+$ tasks-axi show gerrit-answer --full
+exit=0
+task:
+  id: gerrit-answer
+  title: Disposable retained Gerrit decision
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: Choose the disposable follow-up
+  hold_kind: captain
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: "-"
+  closed: 2026-10-01
+  deps: none
+  links: none
+  body: "Resolution recorded by fm-captain-hold.\nDecision digest: 12cda84be0ab441e46e2f8244114418abe6c4fa480b4ba798f8ab598673ac0fa\nResolution mode: answered\n\nCaptain decision:\nProceed with the landed change.\nGerrit change https://gerrit.example.com/c/project/+/12345"
+
+$ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/bin/fm-captain-hold.sh answer gerrit-answer --decision-file /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-resume-gerrit/lab/answer.txt
+exit=0
+answered: gerrit-answer
+
+SCENARIO PASS: real answer CLI closes a retained Gerrit call, preserves its change URL and exact answer, and is idempotent.

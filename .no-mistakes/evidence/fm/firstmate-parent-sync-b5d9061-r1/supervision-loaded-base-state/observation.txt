@@ -1,0 +1,5 @@
+original_case_exit=0
+original_case_end=2026-10-01T17:56:59Z
+eventual_exit_receipt_seen=1
+observation_end=2026-10-01T17:56:59Z
+away record absent at observation end

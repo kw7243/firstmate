@@ -1,0 +1,12 @@
+{
+  "acted": "message-1\nmessage-2\nmessage-3\nmessage-5\n",
+  "handled": [
+    "001.msg",
+    "002.msg",
+    "003.msg",
+    "004.msg",
+    "005.msg"
+  ],
+  "retry_marker_exists": false,
+  "watcher_log": "[2026-10-01T17:39:54+0000] steer-inbox retry ring: retry 005.msg result=0\n"
+}

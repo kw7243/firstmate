@@ -1,0 +1,16 @@
+{
+  "head": "c0018329e19eafc94cc8285c5b7b6cbfb2491257",
+  "required_ancestors": {
+    "7370f1567b2aa0acf54d1bc353da2c7fc8091816": true,
+    "bd744684ee9d7457c000496d16d6d2c136c24e9e": true,
+    "b5d906129ab50eedb3f006791372872dcc01146e": true,
+    "6862d6fc8afdef59abeeeb1c27b0bcc369c0d290": true
+  },
+  "merge_parents": "7370f1567b2aa0acf54d1bc353da2c7fc8091816 b5d906129ab50eedb3f006791372872dcc01146e",
+  "adopted_upstream_commits": "8",
+  "commits_beyond_submitted_merge": [
+    "c0018329e19eafc94cc8285c5b7b6cbfb2491257 no-mistakes(review): Preserve pending retries and honor configured waiting verbs",
+    "79e0ac9e09c7a45a66ea2dbe68422e3e35a81393 no-mistakes(review): Serialize retry-marker updates with the existing inbox lock"
+  ],
+  "upstream_only_delta_matches_merge": true
+}

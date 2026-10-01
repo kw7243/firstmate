@@ -1,0 +1,2 @@
+1790877841	start	gen=host-2618856-1790877841	primary=claude
+1790877852	handled	turn=host-2618856-1790877841.1	posture=away	rc=0	reports=1	error=0 cost=0.25 conversation_cost=0.25 input=5 cache_read=100 cache_write=10 output=20 turns=3	signal: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-supervision-tail-n0197oa3/tmp/fm-supervision-host.LcnscL/away-return-silent/state/demo.status

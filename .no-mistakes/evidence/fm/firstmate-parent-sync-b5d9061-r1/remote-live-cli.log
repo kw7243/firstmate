@@ -1,0 +1,377 @@
+$ bash -c . "$1/bin/fm-remote-job-lib.sh"; shift; fm_remote_job_stage "$HOME" "$FM_ROOT_OVERRIDE" "$FM_HOME" "$@" _ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB fm-remote-delta-read.sh state/parent-replies.status 0 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 15
+exit=0
+job-Ml1z5P
+
+Before newline: queued delta read remains unfinished; complete-line contract held.
+$ bash -c . "$1/bin/fm-remote-job-lib.sh"; fm_remote_job_wait "$HOME" "$2" || exit; printf "job_exit=%s\n" "$FM_REMOTE_JOB_EXIT"; cat "$FM_REMOTE_JOB_STDOUT"; cat "$FM_REMOTE_JOB_STDERR" >&2 _ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB job-Ml1z5P
+exit=0
+job_exit=0
+schema=fm-remote-delta.v1
+status=delta
+path=state/parent-replies.status
+from_offset=0
+to_offset=44
+from_prefix_sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+to_prefix_sha256=402050cc35fc0cebe8d3b8d95990502a9217ee4762e9c688cbde31bbebd200ac
+payload_sha256=402050cc35fc0cebe8d3b8d95990502a9217ee4762e9c688cbde31bbebd200ac
+payload_bytes=44
+reason=
+
+done [corr=0123456789abcdef]: partial reply
+
+$ bash -c . "$1/bin/fm-remote-job-lib.sh"; shift; fm_remote_job_stage "$HOME" "$FM_ROOT_OVERRIDE" "$FM_HOME" "$@" _ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB fm-remote-delta-read.sh state/parent-replies.status 44 402050cc35fc0cebe8d3b8d95990502a9217ee4762e9c688cbde31bbebd200ac 30
+exit=0
+job-VYyyIL
+
+$ bash -c . "$1/bin/fm-remote-job-lib.sh"; shift; fm_remote_job_stage "$HOME" "$FM_ROOT_OVERRIDE" "$FM_HOME" "$@" _ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB fm-contributions.sh --help
+exit=0
+job-7vg6AR
+
+$ bash -c . "$1/bin/fm-remote-job-lib.sh"; fm_remote_job_wait "$HOME" "$2" || exit; printf "job_exit=%s\n" "$FM_REMOTE_JOB_EXIT"; cat "$FM_REMOTE_JOB_STDOUT"; cat "$FM_REMOTE_JOB_STDERR" >&2 _ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB job-VYyyIL
+exit=0
+job_exit=76
+
+$ bash -c . "$1/bin/fm-remote-job-lib.sh"; fm_remote_job_wait "$HOME" "$2" || exit; printf "job_exit=%s\n" "$FM_REMOTE_JOB_EXIT"; cat "$FM_REMOTE_JOB_STDOUT"; cat "$FM_REMOTE_JOB_STDERR" >&2 _ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB job-7vg6AR
+exit=0
+job_exit=0
+Observe published contributions owned by this home's durable task records.
+
+Usage:
+  fm-contributions.sh snapshot <input.json> [--all]
+  fm-contributions.sh poll
+  fm-contributions.sh pending
+  fm-contributions.sh verdict <task> <url> <judged-head> <source-url> <captain|fleet|maintainer|nobody> <summary>
+  fm-contributions.sh ack <task> <url> <event-token>
+  fm-contributions.sh arm [--if-owned]
+
+snapshot is read-only and never contacts a forge. Its input is the canonical
+fleet snapshot's backlog/tasks pair; --all adds rows for supervisor inspection.
+Every URL explicitly linked by a structured backlog row or a task's pr= is
+owned. Previously observed URLs remain in data/<task>/contributions.json after
+endpoint teardown. Repository-wide PR discovery never establishes ownership.
+GitHub PRs and issues are supported; other forges remain visibly unmeasured.
+
+This script owns fm-contributions.v1: one atomic file per durable task with
+task and records[]. Each record contains url, kind, checked_at, error,
+observation, verdict, seen event tokens, pending events, and notified tokens.
+observation is one coherent forge read (a PR head is rechecked after fetching
+checks/reviews). Checks are normalized by name, id, started_at, status and
+conclusion; projection picks the newest attempt per distinct name. The last
+observation's lane names also disclose a lane absent from the next head.
+A verdict records the EXACT judged head, source URL, actor and summary. The
+actor is exactly one of captain, fleet, maintainer or nobody; any other value
+is refused. A comment's arrival time never supplies its judged head. Record a
+prose verdict only after its source identifies that head; otherwise leave it unbound and
+triage its signal. Formal reviews carry GitHub's own commit_id. Neither kind
+can grant merge authority. Captain-actor prose requires an existing live hold;
+an eligible merge remains a captain call, never an automatic forge action.
+
+poll consumes fm-fleet-snapshot.sh --contribution-input, a local-only read,
+and spends at most FM_CONTRIBUTIONS_BUDGET seconds on forge reads (default 20,
+1..25). A configured value rides the generated check shim into watcher runs
+and is cut down to the watcher's own per-check bound (FM_CHECK_TIMEOUT,
+default 30, read from the poll's environment because the watcher runs it as
+a direct child) with a three-second margin. Every read is capped at five
+seconds, and a read killed at that bound or at the deadline is budget
+refusal, never a forge failure. A pull observation has three
+dependent waves: core, six independent reads, then the closing head read;
+an issue has two waves. Before starting a URL, poll reserves the smaller of
+the effective budget and 15 seconds for those waves. URLs needing forge
+reads are sorted by URL and rotated by the current five-minute epoch bucket
+modulo their count, without stored scheduling state or freshness-based
+reordering. Terminal URLs settle separately before the forge budget starts
+and consume no rotation slots.
+A deliberately smaller configured budget remains bounded and may be
+unmeasured, rather than being mislabeled unavailable. Each distinct URL is
+attempted at most once per poll and its observation applied to every owner.
+A final observation applies
+to every owner without another forge read. When the budget refuses a read
+mid-observation, that URL's records stay untouched and the poll moves to the
+next URL that still has a full observation reserve; only a genuine forge
+failure or head change records an error.
+API failure leaves error evidence; an expired or absent observation is not
+silence. FM_CONTRIBUTIONS_MAX_AGE (default 900 seconds) bounds freshness.
+A URL whose last good observation is merged or closed is final: it is
+never re-read, stays fresh, and every owner's saved row converges on that
+observation, with a stale error beside it cleared.
+A genuine failure prints its unavailable line only when it starts an episode
+(no prior owner has an error); a successful read ends the episode.
+FM_CONTRIBUTIONS_NOW supplies an ISO UTC clock for tests, otherwise UTC now.
+FM_CONTRIBUTIONS_READY_LABEL selects the equivalent triage label, default
+ready-for-pr. Labels are matched case-insensitively and exactly.
+
+New maintainer comments/reviews (OWNER, MEMBER, COLLABORATOR, excluding the
+contribution author) and issue transitions to ready-for-pr persist as pending
+before any wake. poll appends ordinary durable check wakes through fm-wake-lib
+and emits only newly durable signals for the authenticated check to surface.
+ack removes
+only the named pending token. A crash after enqueue can duplicate a wake but
+cannot consume the pending signal. Source bodies are data, never commands.
+All mutations serialize on this home's .contributions.lock. Writes refuse
+symlinks and publish by rename. No forge writes are performed.
+
+arm registers the existing authenticated custom-check path. Startup and PR
+registration call it; when filing a linked upstream issue, call arm as well.
+jq_lib receives literal jq programs, not shell expressions.
+shellcheck disable=SC2016
+
+$ bash -c . "$1/bin/fm-remote-job-lib.sh"; shift; fm_remote_job_stage "$HOME" "$FM_ROOT_OVERRIDE" "$FM_HOME" "$@" _ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB fm-remote-delta-read.sh state/parent-replies.status 44 402050cc35fc0cebe8d3b8d95990502a9217ee4762e9c688cbde31bbebd200ac 10
+exit=0
+job-wSw4Or
+
+$ bash -c . "$1/bin/fm-remote-job-lib.sh"; fm_remote_job_wait "$HOME" "$2" || exit; printf "job_exit=%s\n" "$FM_REMOTE_JOB_EXIT"; cat "$FM_REMOTE_JOB_STDOUT"; cat "$FM_REMOTE_JOB_STDERR" >&2 _ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB job-wSw4Or
+exit=0
+job_exit=0
+schema=fm-remote-delta.v1
+status=delta
+path=state/parent-replies.status
+from_offset=44
+to_offset=67
+from_prefix_sha256=402050cc35fc0cebe8d3b8d95990502a9217ee4762e9c688cbde31bbebd200ac
+to_prefix_sha256=7ac14e0aa2180bff4a2c09b5b8b04a69b706957111069aaf34ca48f8068f6359
+payload_sha256=edef8fcc4bbc38f582068cdd0bcbe91f5188c3c7450903313eb595979c77f206
+payload_bytes=23
+reason=
+
+note: after preemption
+
+$ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/bin/fm-remote-delta-read.sh state/parent-replies.status 44 402050cc35fc0cebe8d3b8d95990502a9217ee4762e9c688cbde31bbebd200ac 0
+exit=0
+schema=fm-remote-delta.v1
+status=continuity-broken
+path=state/parent-replies.status
+from_offset=44
+to_offset=67
+from_prefix_sha256=402050cc35fc0cebe8d3b8d95990502a9217ee4762e9c688cbde31bbebd200ac
+to_prefix_sha256=e2876e32394adf8e6e195de84f7c34503b348085f77191669e67e7c497cafc0e
+payload_sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+payload_bytes=0
+reason=prefix-changed
+
+
+SCENARIO PASS: real queued delta read waits for complete lines, survives preemption, preserves source, and rejects prefix rewrites.
+$ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/bin/fm-wake-drain.sh
+exit=0
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+real-task note: ready evidence
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+real-task [key=real-task] needs-decision: actual task choice
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+$ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/bin/fm-wake-drain.sh
+exit=0
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+real-task note: ready evidence
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+parent-replies [key=parent-only] needs-decision: outbound parent question
+real-task [key=real-task] needs-decision: actual task choice
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+$ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/bin/fm-wake-drain.sh
+exit=0
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+real-task note: ready evidence
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+parent-replies [key=parent-only] needs-decision: outbound parent question
+real-task [key=real-task] needs-decision: actual task choice
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+SCENARIO PASS: real wake-drain excludes only a remote mate outbound channel, discards stale channel presentation, and keeps main/local same-name task files.
+$ tasks-axi add gerrit-done Disposable closure proof --kind ship --file /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-remote-validation/backlog-home/data/backlog.md
+exit=0
+ok: added gerrit-done (ship) -> Queued
+task:
+  id: gerrit-done
+  title: Disposable closure proof
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-10-01
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start gerrit-done --file=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-remote-validation/backlog-home/data/backlog.md` to move it to in flight
+  - Run `tasks-axi block gerrit-done --by <other> --file=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-remote-validation/backlog-home/data/backlog.md` to record a dependency
+
+$ tasks-axi start gerrit-done --file /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-remote-validation/backlog-home/data/backlog.md
+exit=0
+ok: start gerrit-done -> In flight
+help[1]:
+  - Run `tasks-axi done gerrit-done --pr <url> --file=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-remote-validation/backlog-home/data/backlog.md` when it ships
+
+$ tasks-axi add gerrit-retained Disposable closure proof --kind ship --file /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-remote-validation/backlog-home/data/backlog.md
+exit=0
+ok: added gerrit-retained (ship) -> Queued
+task:
+  id: gerrit-retained
+  title: Disposable closure proof
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-10-01
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start gerrit-retained --file=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-remote-validation/backlog-home/data/backlog.md` to move it to in flight
+  - Run `tasks-axi block gerrit-retained --by <other> --file=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-remote-validation/backlog-home/data/backlog.md` to record a dependency
+
+$ tasks-axi start gerrit-retained --file /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-remote-validation/backlog-home/data/backlog.md
+exit=0
+ok: start gerrit-retained -> In flight
+help[1]:
+  - Run `tasks-axi done gerrit-retained --pr <url> --file=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-remote-validation/backlog-home/data/backlog.md` when it ships
+
+$ tasks-axi add github-control Disposable closure proof --kind ship --file /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-remote-validation/backlog-home/data/backlog.md
+exit=0
+ok: added github-control (ship) -> Queued
+task:
+  id: github-control
+  title: Disposable closure proof
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-10-01
+  closed: "-"
+  deps: none
+  links: none
+  body: ""
+help[2]:
+  - Run `tasks-axi start github-control --file=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-remote-validation/backlog-home/data/backlog.md` to move it to in flight
+  - Run `tasks-axi block github-control --by <other> --file=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-remote-validation/backlog-home/data/backlog.md` to record a dependency
+
+$ tasks-axi start github-control --file /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-remote-validation/backlog-home/data/backlog.md
+exit=0
+ok: start github-control -> In flight
+help[1]:
+  - Run `tasks-axi done github-control --pr <url> --file=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-remote-validation/backlog-home/data/backlog.md` when it ships
+
+$ bash -ec . "$1/bin/fm-tasks-axi-lib.sh"; . "$1/bin/fm-backlog-transition-lib.sh"; fm_backlog_done "$FM_HOME/data" gerrit-done --pr https://gerrit.example.com/c/project/+/12345; fm_backlog_retain "$FM_HOME/data" gerrit-retained --pr https://gerrit.example.com/c/project/+/12345; fm_backlog_done "$FM_HOME/data" github-control --pr https://github.com/example/project/pull/7 _ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB
+exit=0
+
+$ tasks-axi show gerrit-done --file /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-remote-validation/backlog-home/data/backlog.md --full
+exit=0
+task:
+  id: gerrit-done
+  title: Disposable closure proof
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: "-"
+  closed: 2026-10-01
+  deps: none
+  links: none
+  body: "Gerrit change https://gerrit.example.com/c/project/+/12345"
+
+$ tasks-axi show gerrit-retained --file /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-remote-validation/backlog-home/data/backlog.md --full
+exit=0
+task:
+  id: gerrit-retained
+  title: Disposable closure proof
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: 2026-10-01
+  closed: "-"
+  deps: none
+  links: none
+  body: "Deliverable of the finished work: Gerrit change https://gerrit.example.com/c/project/+/12345"
+
+$ tasks-axi show github-control --file /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-remote-validation/backlog-home/data/backlog.md --full
+exit=0
+task:
+  id: github-control
+  title: "Disposable closure proof https://github.com/example/project/pull/7"
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: "-"
+  closed: 2026-10-01
+  deps: none
+  links: "pr:https://github.com/example/project/pull/7"
+  body: ""
+
+$ tasks-axi show github-control --file /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-remote-validation/backlog-home/data/backlog.md --full
+exit=0
+task:
+  id: github-control
+  title: "Disposable closure proof https://github.com/example/project/pull/7"
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: "-"
+  priority: "-"
+  created: "-"
+  closed: 2026-10-01
+  deps: none
+  links: "pr:https://github.com/example/project/pull/7"
+  body: ""
+
+SCENARIO PASS: real tasks-axi closes Gerrit work with its change link in the body, retains unfinished decisions, and preserves normal GitHub PR links.
+$ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/bin/fm-contributions.sh verdict delivery https://github.com/example/project/pull/7 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa https://github.com/example/project/pull/7#issuecomment-99 bogus invalid actor
+exit=1
+fm-contributions: invalid required actor 'bogus'; expected one of: captain, fleet, maintainer, nobody
+
+$ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/bin/fm-contributions.sh verdict delivery https://github.com/example/project/pull/7 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa https://github.com/example/project/pull/7#issuecomment-99 captain Documented actor
+exit=0
+
+$ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/bin/fm-contributions.sh verdict delivery https://github.com/example/project/pull/7 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa https://github.com/example/project/pull/7#issuecomment-99 fleet Documented actor
+exit=0
+
+$ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/bin/fm-contributions.sh verdict delivery https://github.com/example/project/pull/7 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa https://github.com/example/project/pull/7#issuecomment-99 maintainer Documented actor
+exit=0
+
+$ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/bin/fm-contributions.sh verdict delivery https://github.com/example/project/pull/7 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa https://github.com/example/project/pull/7#issuecomment-99 nobody Documented actor
+exit=0
+
+SCENARIO PASS: unknown actor is refused without mutation; all four documented actors persist exact judged head.

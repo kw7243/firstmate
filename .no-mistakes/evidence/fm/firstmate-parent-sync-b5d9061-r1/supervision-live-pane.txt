@@ -1,0 +1,83 @@
+╭───────────────────────────────────────╮
+│ >_ OpenAI Codex (v0.153.4)            │
+│                                       │
+│ model:     loading   /model to change │
+│ directory: loading                    │
+╰───────────────────────────────────────╯
+
+
+› Ask Codex to do anything
+
+  ? for shortcuts
+╭──────────────────────────────────────────────────────────╮
+│ >_ OpenAI Codex (v0.153.4)                               │
+│                                                          │
+│ model:       loading   /model to change                  │
+│ directory:   ~/…/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB │
+│ permissions: YOLO mode                                   │
+╰──────────────────────────────────────────────────────────╯
+
+
+› Ask Codex to do anything
+
+  gpt-6-astra default fast · ~/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB · Context 100% left
+╭──────────────────────────────────────────────────────────╮
+│ >_ OpenAI Codex (v0.153.4)                               │
+│                                                          │
+│ model:       loading   /model to change                  │
+│ directory:   ~/…/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB │
+│ permissions: YOLO mode                                   │
+╰──────────────────────────────────────────────────────────╯
+
+• You have 3 usage limit resets available. Run /usage to use one.
+
+
+› Ask Codex to do anything
+
+  gpt-6-astra default fast · ~/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB · Context 100% left · weekly 83% left
+
+╭──────────────────────────────────────────────────────────╮
+│ >_ OpenAI Codex (v0.153.4)                               │
+│                                                          │
+│ model:       gpt-6-astra xhigh   fast   /model to change │
+│ directory:   ~/…/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB │
+│ permissions: YOLO mode                                   │
+╰──────────────────────────────────────────────────────────╯
+
+  Tip: Use /rename to rename your threads for easier thread resuming.
+
+• You have 3 usage limit resets available. Run /usage to use one.
+
+
+› This is a disposable test primary within the already active Test phase. Do only this exact authorized test action: run bash "$FM_HOME/
+  drive.sh" from the current directory, with enough foreground tool time for about 45 seconds. That script owns fresh marked lab homes and
+  this private tmux socket only. Evidence writes are explicitly authorized under /home/ubuntu/.no-mistakes/
+  evidence/01M3W6M4RHHDDM2YRZYDVZPYBB. Do not run session-start, bootstrap, pipeline commands, updates, installation, Git writes, or any
+  other commands. Do not change files yourself. Then report the exit status and stop. This specific instruction overrides default session-
+  start duties for this isolated test.
+
+
+• Captain, I’ll run the authorized script, report its exit status, and stop.
+
+• Ran bash "$FM_HOME/drive.sh"
+  └ (no output)
+
+◦ Working (39s • esc to interrupt)
+
+
+› Ask Codex to do anything
+
+  gpt-6-astra xhigh fast · ~/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB · Context 93% left · weekly 82% left · 258K win…
+
+
+
+
+
+
+
+
+
+
+
+
+

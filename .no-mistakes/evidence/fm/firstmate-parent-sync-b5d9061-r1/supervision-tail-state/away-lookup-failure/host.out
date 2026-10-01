@@ -1,0 +1,4 @@
+watcher: started pid=2643362 (beacon fresh)
+signal: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-supervision-tail-n0197oa3/tmp/fm-supervision-host.LcnscL/away-lookup-failure/state/demo.status
+supervision-host: the captain returned while the away session was handling this wake, but the recorded outcomes could not be verified; main must review them
+supervision-host: outcome lookup failed for turn receipt rows 1; visible outcomes may require manual review

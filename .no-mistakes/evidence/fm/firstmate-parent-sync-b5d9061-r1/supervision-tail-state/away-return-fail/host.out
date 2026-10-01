@@ -1,0 +1,4 @@
+watcher: started pid=2682089 (beacon fresh)
+signal: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-supervision-tail-n0197oa3/tmp/fm-supervision-host.LcnscL/away-return-fail/state/demo.status
+supervision-host: the away session could not take this wake: the engine turn failed (exit 3); this wake is yours, and the captain returned during its turn, so relay the visible outcomes it recorded (store rows 1, listed next and in bin/fm-branch-outcome.sh list) to the captain
+supervision-host: outcome 1 for demo [routine]: stub handled demo

@@ -1,0 +1,4 @@
+watcher: started pid=2490165 (beacon fresh)
+signal: /tmp/fm-supervision-host.knah55/away-return/state/demo.status
+supervision-host: the captain returned while the away session was handling this wake, which it finished after the return brief was rendered; relay its visible outcomes (store rows 1, listed next and in bin/fm-branch-outcome.sh list) to the captain
+supervision-host: outcome 1 for demo [routine]: stub handled demo

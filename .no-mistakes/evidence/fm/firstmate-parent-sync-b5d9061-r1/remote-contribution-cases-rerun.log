@@ -1,0 +1,10 @@
+FM_TEST_BEGIN 2026-10-01T17:57:31Z tests/fm-contributions.test.sh family=snapshot-bearings expected_gate_skip=optional-binary
+actionable: PR https://github.com/o/r/pull/8 is registered but its ready line did not reach the parent channel (rc=3)
+ok - cross-home away yolo delivery is fleet work
+ok - expired child unsupported-forge coverage remains unmeasured
+ok - parent consumes measured child coverage and refuses expired child silence
+FM_TEST_END 2026-10-01T17:57:39Z tests/fm-contributions.test.sh exit=0 duration_ms=8056 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=8220
+FM_TEST_SUMMARY_FAMILY family=snapshot-bearings count=1 duration_ms=8056 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-contributions.test.sh duration_ms=8056
+fm-test-run: wrote timing artifact: /home/ubuntu/.no-mistakes/evidence/01M3W6M4RHHDDM2YRZYDVZPYBB/remote-contribution-cases-rerun-timing.json

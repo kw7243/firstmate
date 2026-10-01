@@ -1,0 +1,3 @@
+1790877918	1	signal	demo.status	signal: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-supervision-tail-n0197oa3/tmp/fm-supervision-host.LcnscL/away-killed-mid-turn/state/demo.status
+1790877918	2	signal	demo.status	signal: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-supervision-tail-n0197oa3/tmp/fm-supervision-host.LcnscL/away-killed-mid-turn/state/demo.status
+1790877925	3	check	supervision-host-return:1	check: supervision-host outcome 1 for demo [routine] was recorded after the captain returned, so the return brief may not show it; relay it to the captain: stub handled demo

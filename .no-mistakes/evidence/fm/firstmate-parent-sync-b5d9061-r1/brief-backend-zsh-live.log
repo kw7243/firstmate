@@ -1,0 +1,15 @@
+$ source bin/fm-backend.sh; fm_backend_source herdr
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/bin/backends/herdr.sh:.:79: no such file or directory: /home/ubuntu/.no-mistakes/worktrees/bin/fm-composer-lib.sh
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/bin/backends/herdr.sh:.:87: no such file or directory: /home/ubuntu/.no-mistakes/worktrees/bin/fm-transition-lib.sh
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/bin/backends/herdr.sh:.:94: no such file or directory: /home/ubuntu/.no-mistakes/worktrees/bin/fm-agent-process-lib.sh
+source_rc=0
+fm_backend_herdr_capture: function
+PATH retained; dirname=/usr/bin/dirname
+$ fm_backend_source bogus
+error: unknown backend 'bogus' (known: tmux herdr zellij orca cmux)
+unknown_rc=1
+$ fm_backend_source "tmux herdr"
+error: unknown backend 'tmux herdr' (known: tmux herdr zellij orca cmux)
+multi_token_rc=1
+$ FM_BACKEND_LIB_DIR=<copy with absent composer library> fm_backend_source herdr
+missing_sibling_rc=1

@@ -1,0 +1,35 @@
+REAL PRIMARY LOCK
+lock acquired: harness pid 877772
+lock: held by live harness pid 877772
+
+BOUNDARY SCENARIO: real host with 6-second park
+watcher: started pid=938861 (beacon fresh)
+supervision-host: cycle boundary - the host ended its park at its bound; drain, acknowledge, and end the turn, and the next park starts on its own
+boundary_rc=0 elapsed_seconds=8
+lock acquired: harness pid 877772
+
+CHECKPOINT SCENARIO: quiet 6-second checkpoint
+checkpoint: no actionable wake within 6s
+checkpoint_rc=124 elapsed_seconds=7
+lock acquired: harness pid 877772
+
+CLOSE SCENARIO: wait for real watcher then append task status
+watcher: started pid=963560 (beacon fresh)
+signal: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-supervision-validation/lab/close/state/demo.status
+close_rc=0 elapsed_seconds=9
+
+HOST LEDGER
+park
+1790876075	start	gen=host-937879-1790876074	primary=codex
+1790876081	boundary	after 7s
+checkpoint
+1790876085	start	gen=host-949933-1790876084	primary=codex
+1790876091	boundary	after 7s
+close
+1790876095	start	gen=host-961887-1790876094	primary=codex
+1790876103	pass-through	attended	no supervision engine	signal: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-supervision-validation/lab/close/state/demo.status
+
+DURABLE WAKE QUEUE
+1790876100	1	signal	demo.status	signal: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-supervision-validation/lab/close/state/demo.status
+1790876100	2	signal	demo.status	signal: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-supervision-validation/lab/close/state/demo.status
+Lab root removed; private socket and server teardown completed by driver.

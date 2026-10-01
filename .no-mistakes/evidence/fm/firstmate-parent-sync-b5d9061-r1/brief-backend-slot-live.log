@@ -1,0 +1,29 @@
+$ FM_HOME=<marked lab> bin/fm-teardown.sh stale-task
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-brief-backend/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: task stale-task's recorded worktree /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-brief-backend/treehouse-root/.treehouse/project-1237b8/1/project was reassigned to task live-task (home /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-brief-backend/home), which claimed that pool slot after this record was written; that slot is no longer stale-task's, so its processes, copy, and claim are left untouched and only stale-task's own cleanup runs.
+teardown stale-task complete (window fm-lab-cleanup:fm-stale-task; pool slot /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-brief-backend/treehouse-root/.treehouse/project-1237b8/1/project left to task live-task (home /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-brief-backend/home), which it was reassigned to)
+Backlog: stale-task just finished (config/backlog-backend selects manual editing). Update /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-brief-backend/home/data/backlog.md - move stale-task to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+
+Persisted-state checks after retiring stale-task:
+stale-task.meta removed
+live-task.meta retained byte-for-byte:
+window=fm-lab-cleanup:fm-live-task
+endpoint_task_id=live-task
+worktree=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-brief-backend/treehouse-root/.treehouse/project-1237b8/1/project
+project=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-brief-backend/project
+kind=ship
+mode=local-only
+pool claim retained byte-for-byte:
+task=live-task
+home=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-brief-backend/home
+claimant process 884653 is alive
+claimant uncommitted work
+?? claimant.txt
+
+$ FM_HOME=<marked lab> bin/fm-teardown.sh invalid-claim
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-brief-backend/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+REFUSED: task invalid-claim's recorded worktree /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-brief-backend/treehouse-root/.treehouse/project-1237b8/1/project carries a slot-owner claim that cannot be read, so the slot cannot be proved to still be this task's; nothing was changed - not even with --force.
+Inspect or repair the claim file at /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-brief-backend/treehouse-root/.treehouse/project-1237b8/1/.fm-slot-owner (task= and home= lines), then re-run teardown.
+Refusal exit=1; task record, process, and claimant file retained

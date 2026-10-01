@@ -1,0 +1,46 @@
+{
+  "families": [
+    {
+      "count": 1,
+      "duration_ms": 105831,
+      "failed": 0,
+      "name": "backend-dispatch"
+    },
+    {
+      "count": 1,
+      "duration_ms": 76943,
+      "failed": 0,
+      "name": "watcher-wake-lock"
+    }
+  ],
+  "finished_at": "2026-10-01T17:32:42Z",
+  "run_id": "fm-test-run-1790875779229-669676",
+  "scripts": [
+    {
+      "duration_ms": 76943,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "watcher-wake-lock",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-task-inbox.test.sh"
+    },
+    {
+      "duration_ms": 105831,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "backend-dispatch",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-send-inbox.test.sh"
+    }
+  ],
+  "selection": "scripts;jobs=1",
+  "started_at": "2026-10-01T17:29:39Z",
+  "summary": {
+    "duration_ms": 183093,
+    "failed": 0,
+    "skipped_gate": 0,
+    "total": 2
+  }
+}

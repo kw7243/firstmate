@@ -1,0 +1,3 @@
+1790878190	start	gen=host-2870361-1790878189	primary=claude
+1790878203	failed	turn=host-2870361-1790878189.1	posture=away	rc=124	reports=0	unacked=1 2	no-result		signal: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-supervision-tail-n0197oa3/tmp/fm-supervision-host.LcnscL/away-hang/state/demo.status
+1790878204	to-main	the away session could not take this wake: the engine turn hit its 3s bound; this wake is yours

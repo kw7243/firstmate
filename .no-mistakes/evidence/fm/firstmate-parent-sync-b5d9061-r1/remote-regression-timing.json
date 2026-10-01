@@ -1,0 +1,100 @@
+{
+  "families": [
+    {
+      "count": 2,
+      "duration_ms": 197938,
+      "failed": 1,
+      "name": "secondmate"
+    },
+    {
+      "count": 1,
+      "duration_ms": 1065493,
+      "failed": 1,
+      "name": "session-bootstrap"
+    },
+    {
+      "count": 1,
+      "duration_ms": 229604,
+      "failed": 1,
+      "name": "snapshot-bearings"
+    },
+    {
+      "count": 1,
+      "duration_ms": 186812,
+      "failed": 0,
+      "name": "standalone"
+    },
+    {
+      "count": 1,
+      "duration_ms": 9133,
+      "failed": 0,
+      "name": "watcher-wake-lock"
+    }
+  ],
+  "finished_at": "2026-10-01T17:56:48Z",
+  "run_id": "fm-test-run-1790875769991-664442",
+  "scripts": [
+    {
+      "duration_ms": 9133,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "watcher-wake-lock",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-parent-channel-scan-exclusion.test.sh"
+    },
+    {
+      "duration_ms": 51722,
+      "exit": 1,
+      "expected_gate_skip": "none",
+      "family": "secondmate",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-remote-reply.test.sh"
+    },
+    {
+      "duration_ms": 146216,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "secondmate",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-remote-job.test.sh"
+    },
+    {
+      "duration_ms": 1065493,
+      "exit": 1,
+      "expected_gate_skip": "none",
+      "family": "session-bootstrap",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-backlog-atomicity.test.sh"
+    },
+    {
+      "duration_ms": 186812,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "standalone",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-pending-reply.test.sh"
+    },
+    {
+      "duration_ms": 229604,
+      "exit": 1,
+      "expected_gate_skip": "optional-binary",
+      "family": "snapshot-bearings",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-contributions.test.sh"
+    }
+  ],
+  "selection": "scripts;jobs=4",
+  "started_at": "2026-10-01T17:29:29Z",
+  "summary": {
+    "duration_ms": 1638570,
+    "failed": 3,
+    "skipped_gate": 0,
+    "total": 6
+  }
+}

@@ -1,0 +1,52 @@
+$ FM_HOME=<disposable lab> FM_CLASSIFY_PAUSED_VERB=paused bin/fm-brief.sh brief-live-ship-off fixture-project --mode no-mistakes
+scaffolded: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-brief-backend/home/data/brief-live-ship-off/brief.md (ship, mode=no-mistakes; replace {TASK} and {FIRSTMATE_SPEC})
+
+
+Generated contract result: waiting section=False, kind=ship, configured declaration=paused
+
+$ FM_HOME=<disposable lab> FM_CLASSIFY_PAUSED_VERB=paused bin/fm-brief.sh brief-live-scout-off fixture-project --scout
+scaffolded: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-brief-backend/home/data/brief-live-scout-off/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+
+
+Generated contract result: waiting section=False, kind=scout, configured declaration=paused
+
+$ FM_HOME=<disposable lab> FM_CLASSIFY_PAUSED_VERB=paused bin/fm-brief.sh brief-live-ship-paused fixture-project --mode no-mistakes
+scaffolded: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-brief-backend/home/data/brief-live-ship-paused/brief.md (ship, mode=no-mistakes; replace {TASK} and {FIRSTMATE_SPEC})
+
+
+Classifier consumes emitted paused: waiting for validation -> exit 0
+
+Classifier consumes emitted paused: waiting for validation -> exit 0
+
+Generated contract result: waiting section=True, kind=ship, configured declaration=paused
+
+$ FM_HOME=<disposable lab> FM_CLASSIFY_PAUSED_VERB=paused bin/fm-brief.sh brief-live-scout-paused fixture-project --scout
+scaffolded: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-brief-backend/home/data/brief-live-scout-paused/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+
+
+Classifier consumes emitted paused: waiting for validation -> exit 0
+
+Classifier consumes emitted paused: waiting for validation -> exit 0
+
+Generated contract result: waiting section=True, kind=scout, configured declaration=paused
+
+$ FM_HOME=<disposable lab> FM_CLASSIFY_PAUSED_VERB=awaiting bin/fm-brief.sh brief-live-ship-awaiting fixture-project --mode no-mistakes
+scaffolded: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-brief-backend/home/data/brief-live-ship-awaiting/brief.md (ship, mode=no-mistakes; replace {TASK} and {FIRSTMATE_SPEC})
+
+
+Classifier consumes emitted awaiting: waiting for validation -> exit 0
+
+Classifier consumes emitted awaiting: waiting for validation -> exit 0
+
+Generated contract result: waiting section=True, kind=ship, configured declaration=awaiting
+
+$ FM_HOME=<disposable lab> FM_CLASSIFY_PAUSED_VERB=awaiting bin/fm-brief.sh brief-live-scout-awaiting fixture-project --scout
+scaffolded: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-brief-backend/home/data/brief-live-scout-awaiting/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+
+
+Classifier consumes emitted awaiting: waiting for validation -> exit 0
+
+Classifier consumes emitted awaiting: waiting for validation -> exit 0
+
+Generated contract result: waiting section=True, kind=scout, configured declaration=awaiting
+Adversarial classifier check: configured awaiting, input paused -> exit 1 (rejected).

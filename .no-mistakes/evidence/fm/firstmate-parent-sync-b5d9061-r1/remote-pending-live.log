@@ -1,0 +1,66 @@
+correlation=b8eabfcc9c58ebf3
+Before recovery attempt:
+schema=fm-pending-reply.v1
+corr_id=b8eabfcc9c58ebf3
+task_id=mate
+parent_home=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-remote-validation/pending-live/parent
+parent_status=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-remote-validation/pending-live/parent/state/mate.status
+parent_status_scan_signature=
+request_summary=Report the disposable release status
+created_epoch=1790875880
+phase=awaiting_report
+recovery_attempted_epoch=
+recovery_sender_pid=
+recovery_sender_identity=
+recovery_sent_epoch=
+recovery_delivery_outcome=
+recovery_turn_seen_busy=0
+recovery_turn_completed_epoch=
+escalated_epoch=
+resolved_epoch=
+resolved_via=
+wrong_home_hits=0
+wrong_home_first_sighting=
+wrong_home_sightings=
+wrong_home_scan_signature=
+grace_secs=0
+delivered_epoch=1790875880
+turn_seen_busy=1
+request_turn_completed_epoch=1790875880
+Recovery while own decision open: exit=1
+Decision still open; no recovery_attempted_epoch and no delivery inbox were created.
+Recovery while own blocker open: exit=1
+Parent status after actual fm-secondmate-report:
+needs-decision [key=scope]: choose narrow or wide
+resolved [key=scope]: narrow selected
+blocked [key=resource]: awaiting disposable artifact
+done [corr=b8eabfcc9c58ebf3] [at=1790875881]: Release status ready through real parent channel (via-helper)
+Pending record after correlated reply:
+schema=fm-pending-reply.v1
+corr_id=b8eabfcc9c58ebf3
+task_id=mate
+parent_home=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-remote-validation/pending-live/parent
+parent_status=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-remote-validation/pending-live/parent/state/mate.status
+parent_status_scan_signature=
+request_summary=Report the disposable release status
+created_epoch=1790875880
+recovery_attempted_epoch=
+recovery_sender_pid=
+recovery_sender_identity=
+recovery_sent_epoch=
+recovery_delivery_outcome=
+recovery_turn_seen_busy=0
+recovery_turn_completed_epoch=
+escalated_epoch=
+wrong_home_hits=0
+wrong_home_first_sighting=
+wrong_home_sightings=
+wrong_home_scan_signature=
+grace_secs=0
+delivered_epoch=1790875880
+turn_seen_busy=1
+request_turn_completed_epoch=1790875880
+phase=resolved
+resolved_epoch=1790875881
+resolved_via=helper
+SCENARIO PASS: real recovery boundary suppresses own open decision and blocker, and the real report helper resolves the pending request without sending a recovery.

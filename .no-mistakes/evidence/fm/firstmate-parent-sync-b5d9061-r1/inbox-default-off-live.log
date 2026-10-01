@@ -1,0 +1,66 @@
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-default-off/fm-lab.X8ADNh
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-default-off/fm-lab.X8ADNh
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the requested message WILL still be sent.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+fm-send: doorbell skipped (composer visibly holds pending text); the steer is durably recorded at /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-default-off/fm-lab.X8ADNh/state/default-off.inbox/001.msg and the watcher will re-ring
+ABSENT FLAG: 001.msg durable; no retry marker
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-default-off/fm-lab.X8ADNh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+fm-send: doorbell skipped (composer visibly holds pending text); the steer is durably recorded at /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-default-off/fm-lab.X8ADNh/state/default-off.inbox/002.msg and the watcher will ring it once more
+PRESENT FLAG: 002.msg durable; retry marker=002.msg
+REMOVED FLAG: live watcher keeps 002.msg retry dormant; no ordinary retry ladder
+╭──────────────────────────────────────────────────────────╮
+│ >_ OpenAI Codex (v0.153.4)                               │
+│                                                          │
+│ model:       gpt-6-astra xhigh   fast   /model to change │
+│ directory:   ~/…/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB │
+│ permissions: YOLO mode                                   │
+╰──────────────────────────────────────────────────────────╯
+
+  Tip: Use /feedback to send logs to the maintainers when something looks off.
+
+• You have 3 usage limit resets available. Run /usage to use one.
+
+
+› Unsubmitted default-off validation draft
+
+  gpt-6-astra xhigh fast · ~/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB · Context 100% left · weekly 78% left
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

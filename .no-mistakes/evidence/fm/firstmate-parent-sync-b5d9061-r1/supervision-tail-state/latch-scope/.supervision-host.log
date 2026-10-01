@@ -1,0 +1,11 @@
+1790878052	start	gen=host-2759693-1790878052	primary=claude
+1790878062	failed	turn=host-2759693-1790878052.1	posture=away	rc=3	reports=0	unacked=1 2	no-result		signal: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-supervision-tail-n0197oa3/tmp/fm-supervision-host.LcnscL/latch-scope/state/demo.status
+1790878063	to-main	the away session could not take this wake: the engine turn failed (exit 3); this wake is yours
+1790878068	start	gen=host-2772195-1790878068	primary=claude
+1790878080	latch	errors=2	cooldown=300s
+1790878080	failed	turn=host-2772195-1790878068.1	posture=away	rc=3	reports=0	unacked=3 4	no-result		signal: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-supervision-tail-n0197oa3/tmp/fm-supervision-host.LcnscL/latch-scope/state/demo.status
+1790878081	to-main	the away session could not take this wake: the engine turn failed (exit 3); this wake is yours
+1790878085	start	gen=host-2784767-1790878085	primary=claude
+1790878090	pass-through	attended	the supervision session is cooling down after engine errors	signal: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-supervision-tail-n0197oa3/tmp/fm-supervision-host.LcnscL/latch-scope/state/demo.status
+1790878094	start	gen=host-2790734-1790878093	primary=claude
+1790878098	to-main	the home no longer runs the supervision host

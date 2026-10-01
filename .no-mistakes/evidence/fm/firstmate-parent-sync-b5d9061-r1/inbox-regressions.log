@@ -1,0 +1,56 @@
+FM_TEST_BEGIN 2026-10-01T17:29:39Z tests/fm-task-inbox.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - inbox: a steer is written durably and round-trips byte-exact with a self-describing doorbell
+ok - inbox: a hostile-name doorbell executes as a no-op in bare shells
+ok - inbox: terminal-control inbox names are rejected without typing
+ok - inbox: the ring skips dead or missing endpoints and still rings live or unclassifiable endpoints
+ok - inbox: the ring submits its own stuck doorbell, skips other pending text, and retries a lost Enter once on both paths
+ok - inbox: the idempotent enqueue dedups an exact re-run onto the same record, handled or not
+ok - inbox: idempotent enqueue follows a record concurrently moved to handled
+ok - inbox: the handled mv is the idempotent ack and sequences are never reissued
+ok - inbox: concurrent writers serialize on the sequence lock and lose nothing
+ok - inbox: a writer retries when a competing lock vanishes after its failed claim
+ok - inbox: ladder bookkeeping ignores a concurrently removed inbox
+ok - inbox: fire-and-forget records stay durable and outside the ladder
+ok - inbox: a fire-and-forget record whose ring did not land is owed exactly one retry
+ok - inbox: without config/wait-no-turns a fire-and-forget retry mark stays quiet
+ok - inbox: retry publication orders numeric sequences and ignores handled records
+ok - inbox: conditional and stale retry cleanup preserve concurrent publication
+ok - inbox: retry readers cannot remove a marker during publication
+ok - inbox: the re-ring ladder paces by grace, escalates once, and resets on ack
+ok - watcher: an unhandled aged message on an idle pane re-rings without waking firstmate, and the ack silences it
+ok - watcher: a busy pane just waits - the record is durable and no doorbell is typed
+ok - watcher: a healthy or empty inbox stays completely silent
+ok - watcher: acknowledgement silences an unwritable ladder without a stale wake
+ok - watcher: unwritable ladder bookkeeping surfaces a stale wake after the doorbell
+ok - watcher: a fire-and-forget record's owed retry rings exactly once and never escalates
+ok - watcher: a fire-and-forget retry waits out the worker's own decision, then rings once
+ok - watcher: spending a retry keeps a newer record's mark written during its ring
+ok - watcher: a spent ring budget emits exactly one ordinary stale wake for recovery
+ok - watcher: a positively dead pane is never typed into and surfaces exactly one stale wake
+ok - watcher: dead-pane recovery overrides stale busy state
+FM_TEST_END 2026-10-01T17:30:56Z tests/fm-task-inbox.test.sh exit=0 duration_ms=76943 gate_skip=false
+FM_TEST_BEGIN 2026-10-01T17:30:56Z tests/fm-send-inbox.test.sh family=backend-dispatch expected_gate_skip=none
+ok - fm-send inbox: the payload is recorded durably and only the doorbell is typed
+ok - fm-send inbox: a deep home rings the same short doorbell naming the inbox once
+ok - fm-send inbox: newlines are legal and the terminal can no longer truncate a steer
+ok - fm-send inbox: a re-send is a new durable record, never a retyped payload
+ok - fm-send inbox: a visibly pending composer skips the ring, and the steer stays durably sent
+ok - fm-send inbox: a failed doorbell is still a durably sent steer
+ok - fm-send inbox: a fire-and-forget ring that did not land owes one retry ring
+ok - fm-send inbox: without config/wait-no-turns a fire-and-forget ring is not retried
+ok - fm-send inbox: delayed retry publication waits through contention and preserves newer pending sends
+ok - fm-send planes: slash and codex $skill invocations stay typed; plain $-text rides the inbox
+ok - fm-send planes: an explicit backend target keeps the typed plane
+ok - fm-send planes: the --key lifecycle path never touches the inbox
+ok - fm-send inbox: a secondmate steer records marker+corr in the body and is delivered at enqueue
+ok - fm-send inbox: lost reply bookkeeping never invites a resend, and the delivered steer is never duplicated
+ok - fm-send inbox: metadata lock contention fails bounded without enqueue
+ok - fm-send inbox: an unwritable record is a loud local failure that leaves no false expectation
+ok - fm-send: an empty or whitespace-only text steer refuses before marking, recording, or typing
+FM_TEST_END 2026-10-01T17:32:42Z tests/fm-send-inbox.test.sh exit=0 duration_ms=105831 gate_skip=false
+FM_TEST_SUMMARY total=2 failed=0 skipped_gate=0 duration_ms=183093
+FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=1 duration_ms=105831 failed=0
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=76943 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-send-inbox.test.sh duration_ms=105831
+FM_TEST_SLOWEST rank=2 script=tests/fm-task-inbox.test.sh duration_ms=76943
+fm-test-run: wrote timing artifact: /home/ubuntu/.no-mistakes/evidence/01M3W6M4RHHDDM2YRZYDVZPYBB/inbox-regressions.json

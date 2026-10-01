@@ -1,0 +1,20 @@
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-inbox-validation/fm-lab.v_3k4lmb
+real composer state with draft: pending
+sender-1: paused after durable enqueue and metadata unlock
+sender-1: remains waiting while real inbox lock is held despite FM_TASK_INBOX_LOCK_WAIT_SECS=0
+sender-1: fm-send: doorbell skipped (composer visibly holds pending text); the steer is durably recorded at /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-inbox-validation/fm-lab.v_3k4lmb/state/retry.inbox/001.msg and the watcher will ring it once more
+sender-2: paused after durable enqueue and metadata unlock
+sender-3: fm-send: doorbell skipped (composer visibly holds pending text); the steer is durably recorded at /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-inbox-validation/fm-lab.v_3k4lmb/state/retry.inbox/003.msg and the watcher will ring it once more
+sender-2: fm-send: doorbell skipped (composer visibly holds pending text); the steer is durably recorded at /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-inbox-validation/fm-lab.v_3k4lmb/state/retry.inbox/002.msg and the watcher will ring it once more
+out-of-order unhandled send: marker stays 003.msg
+sender-4: paused after durable enqueue and metadata unlock
+sender-5: fm-send: doorbell skipped (composer visibly holds pending text); the steer is durably recorded at /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-inbox-validation/fm-lab.v_3k4lmb/state/retry.inbox/005.msg and the watcher will ring it once more
+sender-4: fm-send: doorbell skipped (composer visibly holds pending text); the steer is durably recorded at /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-inbox-validation/fm-lab.v_3k4lmb/state/retry.inbox/004.msg and the watcher will ring it once more
+out-of-order acknowledged send: marker stays 005.msg
+open own decision: watcher leaves retry owed and draft untouched
+Traceback (most recent call last):
+  File "/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-inbox-validation/live-retries.py", line 86, in <module>
+    waitfor(lambda:all((inbox/f'handled/{n:03d}.msg').exists() for n in [1,2,3,5]),120)
+  File "/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-inbox-validation/live-retries.py", line 21, in waitfor
+    raise RuntimeError('Condition did not occur within '+str(seconds)+'s')
+RuntimeError: Condition did not occur within 120s

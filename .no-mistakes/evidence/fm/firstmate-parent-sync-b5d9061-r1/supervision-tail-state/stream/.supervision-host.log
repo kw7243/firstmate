@@ -1,0 +1,5 @@
+1790878210	start	gen=host-2889285-1790878209	primary=claude
+1790878215	pass-through	attended	no supervision engine	signal: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-supervision-tail-n0197oa3/tmp/fm-supervision-host.LcnscL/stream/state/demo.status
+1790878221	start	gen=host-2900322-1790878221	primary=claude
+1790878223	pass-through	attended	no supervision engine	check: rearm-resurface
+1790878224	start	gen=host-2903378-1790878224	primary=claude

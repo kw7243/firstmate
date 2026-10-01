@@ -1,0 +1,3 @@
+watcher: started pid=2627762 (beacon fresh)
+signal: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-supervision-tail-n0197oa3/tmp/fm-supervision-host.LcnscL/away-return-fail-silent/state/demo.status
+supervision-host: the away session could not take this wake: the engine turn failed (exit 3); this wake is yours

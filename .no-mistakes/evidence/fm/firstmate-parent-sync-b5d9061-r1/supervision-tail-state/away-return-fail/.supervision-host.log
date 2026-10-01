@@ -1,0 +1,3 @@
+1790877945	start	gen=host-2681688-1790877945	primary=claude
+1790877958	failed	turn=host-2681688-1790877945.1	posture=away	rc=3	reports=1	unacked=none	no-result		signal: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB/.test-supervision-tail-n0197oa3/tmp/fm-supervision-host.LcnscL/away-return-fail/state/demo.status
+1790877959	to-main	the away session could not take this wake: the engine turn failed (exit 3); this wake is yours, and the captain returned during its turn, so relay the visible outcomes it recorded (store rows 1, listed next and in bin/fm-branch-outcome.sh list) to the captain

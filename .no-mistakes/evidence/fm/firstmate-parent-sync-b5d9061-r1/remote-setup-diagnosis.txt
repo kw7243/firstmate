@@ -1,0 +1,9 @@
+Initial fm-remote-reply regression used a TMPDIR below its code root. Direct real entrypoint reproduction:
+exit=64
+error: remote root and home must be separate, non-overlapping directories
+
+Corrected setup: exact tracked HEAD archived into a disposable code root, git-initialized, with TMPDIR alongside that copy inside the gate worktree. No product change.
+
+The full backlog subject passed its Gerrit cases, then its final pre-existing persistent-secondmate case was refused because the fixture home was below the code root. Recreated the exact tracked target in a sibling code directory and selected only test_a_persistent_secondmate_is_never_a_backlog_item from the existing test definitions. That selected case passed; production files were unchanged. remote-backlog-case-rerun.log is this one-case rerun, not the full backlog subject.
+
+The contributions subject also had three cross-home fixture failures under the code root: test_away_yolo_cross_home_is_fleet_work, test_expired_child_unsupported_forge_stays_unmeasured, and test_home_summary_coverage. With the same exact production code and sibling fixture TMPDIR, all three selected existing cases passed in remote-contribution-cases-rerun.log. The unchanged actionable parent-channel diagnostic appears in both runs and does not cause these assertions to fail.

@@ -1,0 +1,62 @@
+{
+  "checked_at": "2026-10-01T18:04:58.604839+00:00",
+  "head": "c0018329e19eafc94cc8285c5b7b6cbfb2491257",
+  "codex_version": "codex-cli 0.153.4",
+  "path_availability": {
+    "bash": "/usr/bin/bash",
+    "tmux": "/usr/bin/tmux",
+    "tasks-axi": "/home/ubuntu/.local/bin/tasks-axi",
+    "herdr": null,
+    "zsh": null
+  },
+  "retained_evidence_sha256": {
+    "remote-regressions.log": "3c519c76aa2bf31f98ff9b7a3e210b5fc6e6f6e55f82c3e65cf6edb00d8b7930",
+    "remote-regression-timing.json": "01055f90eb9889d14bf640d895da0f1b36375a271a88f892045b00b512ced2d3",
+    "remote-backlog-case-rerun.log": "216f0adfae28be9792a3c7f9b0ee0c60762aba6bdc768d631a5654ed9d0868ce",
+    "remote-contribution-cases-rerun.log": "6f26bf86d0ce13df4f4972d6952eb9d1cf318dcb3d54637452a6e0f239411ebf",
+    "remote-reply-rerun.log": "865e09d70b9f1108a7742b93b8f1788934fef5dfcb7a6a5e2eb0fd06a67315ae",
+    "remote-setup-diagnosis.txt": "22be267b5740e161fdc720c17d9f21caf421bd8665a3e9c38d0b507467741afa",
+    "supervision-focused-transcript.txt": "7af555e422df77492ab18ec4faa31e45b060a490e672c050f15d07d4c2db8bbb",
+    "supervision-focused-timing.json": "ccede7bbb01d313348a24ddda58c11f3182598e5dd3374b1a6a2de85db6d9462",
+    "supervision-isolated-transcript.txt": "af562048414440388b6902fb7af89b7af3fa696f2e60763622941fd79d3c6bcf",
+    "supervision-loaded-target-transcript.txt": "599934ec609f00d15b656c551fd0e78ea931b10ebf654c70e90969a2f2c9ebaf",
+    "supervision-loaded-base-transcript.txt": "e60d46f87a9b799253da39e432ae4bc25a4692ad8db50631485a35955fd65635",
+    "herdr-lab-availability.log": "1d1914543318b74fda8973e85d39adcb4fb732dc263a37476acb17814993a096",
+    "brief-backend-zsh-live.log": "b22c4137865bb092b41e4a084c446a7b41885a2c981471eb0bed767176d49c6d",
+    "inbox-before-first-fix.log": "fa9706cae55d6ff05ff4dbcd2d1f105dd52750dfe34e4859ab40ed73706b13aa",
+    "inbox-before-second-fix.log": "91699c145a502e47705fa5d1d1da5263cbe72a3511a08baf58c580fb96d9f070",
+    "inbox-before-sequence-fix.log": "d478e1ecbb9c616289c86414f2650656e4edc2e33ff5542282b9be4f7ac70478"
+  },
+  "fixture_failure_reconciliation": [
+    {
+      "original": "fm-remote-reply.test.sh failed capturing remote delta",
+      "cause": "fixture TMPDIR nested inside code root violates root/home non-overlap guard",
+      "resolution": "exact target in sibling disposable code root; full remote-reply rerun exit 0",
+      "evidence": "remote-reply-rerun.log"
+    },
+    {
+      "original": "fm-backlog-atomicity.test.sh last case refused secondmate home inside code root",
+      "cause": "nested fixture home; all preceding cases ran and passed",
+      "resolution": "selected final case with sibling fixture root exit 0",
+      "evidence": "remote-backlog-case-rerun.log"
+    },
+    {
+      "original": "fm-contributions.test.sh three cross-home cases failed",
+      "cause": "nested cross-home fixture paths",
+      "resolution": "all three failed cases rerun against unchanged code with sibling fixtures, exit 0; remaining cases passed original run",
+      "evidence": "remote-contribution-cases-rerun.log"
+    }
+  ],
+  "supervision_original": "Original bounded return wait failed after 41 passing cases. The unchanged return case and six clock cases passed isolated reruns; return also passed controlled-load target and baseline reruns. All 18 previously unreached tail cases passed on resume with original assertions and timeouts. All 66 invocations of the originally begun subject are accounted for; original timeout cause remains unproven.",
+  "mutations": "No tracked source/tests, global configuration, Codex install, credentials, or shared services changed on resume. All newly created scratch and owned test processes removed; git status clean; installed codex-cli remains 0.153.4.",
+  "finished_at": "2026-10-01T18:11:52.512284+00:00",
+  "originals_preserved": true,
+  "completed_resume_checks": {
+    "gerrit_changed_cases": [
+      "test_answer_before_cleanup_replay_notes_a_retained_gerrit_change",
+      "test_teardown_retains_a_gerrit_captain_call_with_its_change_url"
+    ],
+    "gerrit_live": "Real fm-captain-hold answer + tasks-axi show verified done state, exact answer, Gerrit URL, and idempotent retry. No fake dependencies.",
+    "supervision_tail": "18 original cases passed via fm-test-run; stubs used for external engine and tmux, so this is supplemental regression evidence, not live-harness proof."
+  }
+}

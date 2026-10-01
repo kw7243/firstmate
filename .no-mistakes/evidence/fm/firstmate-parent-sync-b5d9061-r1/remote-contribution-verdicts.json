@@ -1,0 +1,26 @@
+[
+  {
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "source": "https://github.com/example/project/pull/7#issuecomment-99",
+    "actor": "captain",
+    "summary": "Documented actor"
+  },
+  {
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "source": "https://github.com/example/project/pull/7#issuecomment-99",
+    "actor": "fleet",
+    "summary": "Documented actor"
+  },
+  {
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "source": "https://github.com/example/project/pull/7#issuecomment-99",
+    "actor": "maintainer",
+    "summary": "Documented actor"
+  },
+  {
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "source": "https://github.com/example/project/pull/7#issuecomment-99",
+    "actor": "nobody",
+    "summary": "Documented actor"
+  }
+]

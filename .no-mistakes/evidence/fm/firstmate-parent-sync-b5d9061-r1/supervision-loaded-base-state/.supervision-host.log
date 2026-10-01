@@ -1,0 +1,3 @@
+1790877398	start	gen=host-2535737-1790877397	primary=claude
+1790877417	handled	turn=host-2535737-1790877397.1	posture=away	rc=0	reports=1	error=0 cost=0.25 conversation_cost=0.25 input=5 cache_read=100 cache_write=10 output=20 turns=3	signal: /tmp/fm-supervision-host.jutuRZ/away-return/state/demo.status
+1790877418	to-main	the captain returned while the away session was handling this wake, which it finished after the return brief was rendered; relay its visible outcomes (store rows 1, listed next and in bin/fm-branch-outcome.sh list) to the captain

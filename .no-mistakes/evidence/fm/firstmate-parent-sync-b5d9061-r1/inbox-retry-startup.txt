@@ -1,0 +1,50 @@
+╭──────────────────────────────────────────────────────────╮
+│ >_ OpenAI Codex (v0.153.4)                               │
+│                                                          │
+│ model:       gpt-6-astra xhigh   fast   /model to change │
+│ directory:   ~/…/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB │
+│ permissions: YOLO mode                                   │
+╰──────────────────────────────────────────────────────────╯
+
+  Tip: When the composer is empty, press Esc to step back and edit your last message; Enter confirms.
+
+• You have 3 usage limit resets available. Run /usage to use one.
+
+
+› Ask Codex to do anything
+
+  gpt-6-astra xhigh fast · ~/.no-mistakes/worktrees/9c45ef16ef2c/01M3W6M4RHHDDM2YRZYDVZPYBB · Context 100% left · weekly 81% left
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

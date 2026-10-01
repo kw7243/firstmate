@@ -1,0 +1,3 @@
+1790878206	start	gen=host-2884820-1790878205	primary=claude
+1790878208	start	gen=host-2887025-1790878207	primary=claude
+1790878215	to-main	the away session could not take this wake: a queued wake could not be read or resolved to a task record, so its scope is unknown; this wake is yours
