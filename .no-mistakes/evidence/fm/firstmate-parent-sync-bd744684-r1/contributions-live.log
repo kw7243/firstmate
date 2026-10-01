@@ -1,0 +1,264 @@
+Persisted records before polling:
+{
+  "terminal": {
+    "url": "https://github.com/example/fixture/pull/8",
+    "kind": "pr",
+    "checked_at": "2026-09-16T08:00:00Z",
+    "error": null,
+    "pending": [],
+    "seen": [],
+    "notified": [],
+    "verdict": null,
+    "observation": {
+      "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "state": "merged",
+      "draft": false,
+      "mergeable": "mergeable",
+      "review_decision": "APPROVED",
+      "can_merge": false,
+      "checks": [],
+      "reviews": [],
+      "events": []
+    }
+  },
+  "duplicate": {
+    "url": "https://github.com/example/fixture/pull/8",
+    "kind": "pr",
+    "checked_at": "2026-09-15T08:00:00Z",
+    "error": "previous failed observation",
+    "pending": [
+      {
+        "token": "evt-retained"
+      }
+    ],
+    "seen": [],
+    "notified": [
+      "evt-previous"
+    ],
+    "verdict": null,
+    "observation": {
+      "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "state": "open",
+      "draft": false,
+      "mergeable": "mergeable",
+      "review_decision": "APPROVED",
+      "can_merge": false,
+      "checks": [],
+      "reviews": [],
+      "events": []
+    }
+  },
+  "late": "no record"
+}
+$ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-fleet-snapshot.sh --contribution-input
+{
+  "backlog": {
+    "path": "/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-main/contributions-live/home/data/backlog.md",
+    "present": true,
+    "records": [
+      {
+        "order": 1,
+        "state": "queued",
+        "structured": true,
+        "id": "terminal",
+        "checked": false,
+        "title": "Contribution",
+        "repo": "sample",
+        "kind": "ship",
+        "priority": null,
+        "hold_reason": null,
+        "hold_kind": null,
+        "hold_until": null,
+        "hold_set": null,
+        "blocked_by": null,
+        "blocked_by_ids": [],
+        "blocked_reason": null,
+        "since": null,
+        "merged": null,
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "links": [
+          "https://github.com/example/fixture/pull/8"
+        ],
+        "pr_url": "https://github.com/example/fixture/pull/8",
+        "report_path": null,
+        "local_note": null,
+        "raw": "- [ ] terminal - Contribution https://github.com/example/fixture/pull/8 (repo: sample) (kind: ship)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "unresolved_blocker_ids": [],
+        "current_role": "queued",
+        "requires_child_metadata": false,
+        "hold_age_days": null,
+        "hold_bucket": null,
+        "captain_actionable": false
+      },
+      {
+        "order": 2,
+        "state": "queued",
+        "structured": true,
+        "id": "duplicate",
+        "checked": false,
+        "title": "Contribution",
+        "repo": "sample",
+        "kind": "ship",
+        "priority": null,
+        "hold_reason": null,
+        "hold_kind": null,
+        "hold_until": null,
+        "hold_set": null,
+        "blocked_by": null,
+        "blocked_by_ids": [],
+        "blocked_reason": null,
+        "since": null,
+        "merged": null,
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "links": [
+          "https://github.com/example/fixture/pull/8"
+        ],
+        "pr_url": "https://github.com/example/fixture/pull/8",
+        "report_path": null,
+        "local_note": null,
+        "raw": "- [ ] duplicate - Contribution https://github.com/example/fixture/pull/8 (repo: sample) (kind: ship)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "unresolved_blocker_ids": [],
+        "current_role": "queued",
+        "requires_child_metadata": false,
+        "hold_age_days": null,
+        "hold_bucket": null,
+        "captain_actionable": false
+      },
+      {
+        "order": 3,
+        "state": "queued",
+        "structured": true,
+        "id": "late",
+        "checked": false,
+        "title": "Contribution",
+        "repo": "sample",
+        "kind": "ship",
+        "priority": null,
+        "hold_reason": null,
+        "hold_kind": null,
+        "hold_until": null,
+        "hold_set": null,
+        "blocked_by": null,
+        "blocked_by_ids": [],
+        "blocked_reason": null,
+        "since": null,
+        "merged": null,
+        "reported": null,
+        "done": null,
+        "completion": {
+          "verb": null,
+          "date": null
+        },
+        "links": [
+          "https://github.com/example/fixture/pull/8"
+        ],
+        "pr_url": "https://github.com/example/fixture/pull/8",
+        "report_path": null,
+        "local_note": null,
+        "raw": "- [ ] late - Contribution https://github.com/example/fixture/pull/8 (repo: sample) (kind: ship)",
+        "body_lines": [],
+        "body_excerpt": null,
+        "unresolved_blocker_ids": [],
+        "current_role": "queued",
+        "requires_child_metadata": false,
+        "hold_age_days": null,
+        "hold_bucket": null,
+        "captain_actionable": false
+      }
+    ]
+  },
+  "tasks": []
+}
+[exit 0]
+$ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-contributions.sh poll
+[exit 0]
+Persisted terminal after poll:
+{
+  "url": "https://github.com/example/fixture/pull/8",
+  "kind": "pr",
+  "checked_at": "2026-09-16T08:00:00Z",
+  "error": null,
+  "pending": [],
+  "seen": [],
+  "notified": [],
+  "verdict": null,
+  "observation": {
+    "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "state": "merged",
+    "draft": false,
+    "mergeable": "mergeable",
+    "review_decision": "APPROVED",
+    "can_merge": false,
+    "checks": [],
+    "reviews": [],
+    "events": []
+  }
+}
+Persisted duplicate after poll:
+{
+  "url": "https://github.com/example/fixture/pull/8",
+  "kind": "pr",
+  "checked_at": "2026-09-16T08:00:00Z",
+  "error": null,
+  "pending": [
+    {
+      "token": "evt-retained"
+    }
+  ],
+  "seen": [],
+  "notified": [
+    "evt-previous"
+  ],
+  "verdict": null,
+  "observation": {
+    "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "state": "merged",
+    "draft": false,
+    "mergeable": "mergeable",
+    "review_decision": "APPROVED",
+    "can_merge": false,
+    "checks": [],
+    "reviews": [],
+    "events": []
+  }
+}
+Persisted late after poll:
+{
+  "url": "https://github.com/example/fixture/pull/8",
+  "kind": "pr",
+  "checked_at": "2026-09-16T08:00:00Z",
+  "error": null,
+  "pending": [],
+  "seen": [],
+  "notified": [],
+  "verdict": null,
+  "observation": {
+    "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "state": "merged",
+    "draft": false,
+    "mergeable": "mergeable",
+    "review_decision": "APPROVED",
+    "can_merge": false,
+    "checks": [],
+    "reviews": [],
+    "events": []
+  }
+}
+$ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-contributions.sh poll
+[exit 0]
+Observed: all three owners retain the known terminal result; prior pending/notification state survives; repeated polling makes no forge calls and queues no new wake.
+Cleanup: isolated home and records removed.

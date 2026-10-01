@@ -1,0 +1,34 @@
+$ git rev-parse HEAD
+f560c406994acc99228a9b2b131ccd49af094816
+$ git merge-base --is-ancestor 0fa6e7453643ef98d482a3aa08e1beae27c57c09 HEAD
+$ git merge-base --is-ancestor bd744684ee9d7457c000496d16d6d2c136c24e9e HEAD
+$ git show -s --format=%P 3dd53bb8a77a6d8535afbb8dfd5089469ce8a60d
+0fa6e7453643ef98d482a3aa08e1beae27c57c09 bd744684ee9d7457c000496d16d6d2c136c24e9e
+$ git rev-list --count eb219c80f6bba1e89ffe77ec51c517abbab76a1c..bd744684ee9d7457c000496d16d6d2c136c24e9e
+17
+$ git rev-list HEAD --not 0fa6e7453643ef98d482a3aa08e1beae27c57c09 bd744684ee9d7457c000496d16d6d2c136c24e9e
+f560c406994acc99228a9b2b131ccd49af094816
+ba8e6ddcd354323ae309c919863ea68870c85b66
+3dd53bb8a77a6d8535afbb8dfd5089469ce8a60d
+$ git log --oneline eb219c80f6bba1e89ffe77ec51c517abbab76a1c..bd744684ee9d7457c000496d16d6d2c136c24e9e
+bd74468 fix(bin): run no repository hook when core.hooksPath is empty (#6216)
+eb77f02 ci: rebalance portable test groups and enforce a packing budget (#6192)
+c35b9a6 fix: reduce supervision exit latency and stabilize host tests (#6179)
+12e90e1 fix: inherit supervision host opt-out across secondmates (#6154)
+b3d4133 fix: confirm Lavish board replies before worker handoff (#6169)
+e2668de fix: restore portable CI behavior across Pi rendering and remote provisioning (#6162)
+a774c44 fix(bin): stop provider-table lookup from writing broken-pipe errors to stderr (#6001)
+1f2c954 fix(bin): measure pending-reply grace from turn completion, not delivery (#6126)
+5bddfc4 fix(bin): create the state dir on a fresh primary before the session-start scope check (#6125)
+0a2cdf9 feat: enable supervision host by default for Claude primaries (#6124)
+260c4f0 fix(bin): converge every open owner onto a known terminal contribution (#6112)
+c5f48e4 fix(bin): retry fm-pr-merge a bounded number of times when GitHub mergeable is UNKNOWN (#6110)
+46d58d6 fix: keep watcher arms and reply listeners alive through slow cycles (#6103)
+b5fdf74 feat(bin): add a disposable live supervision lab builder (#6037)
+40e981d fix: shorten Claude Code Calm supervision note label (#6086)
+00679ae fix: report supervision host latches accurately in away return briefs (#6043)
+2d833ff fix: treat quiet records as attended across supervision (#6064)
+$ git log --oneline 3dd53bb8a77a6d8535afbb8dfd5089469ce8a60d..HEAD
+f560c40 no-mistakes(review): Enforce source ownership for replies and listener confirmation
+ba8e6dd no-mistakes(review): Repair watcher ownership and Git hook test fixtures
+Verified: both histories retained; merge second parent equals the exact upstream pin; 17 new upstream commits; only the approved fixture and ownership repairs follow the merge.

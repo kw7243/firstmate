@@ -1,0 +1,124 @@
+Scenario 1: Real condition/action source registers, captures output, wakes, and acknowledges once.
+
+$ env FM_HOME=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/when-home /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-procevent-when.sh arm evidence --interval 0.1 --stable 1 --deadline 60 --condition test -f /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/condition-ready --action printf local\ action\ completed\\n 
+armed: when-evidence
+starts on the watcher's next cycle; or run: bin/fm-procevent.sh reconcile
+reminder: deterministic, safe, reversible actions only; judgment and destructive actions stay on the wake-and-decide path
+
+$ env FM_HOME=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/when-home /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-procevent.sh reconcile 
+reconciled: published=0 started=1 stopped=0 uncertain=0 failed=0
+
+$ env FM_HOME=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/when-home /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-procevent.sh list 
+SOURCE                       ADAPTER      OWNER      PENDING
+when-evidence                when         live       0
+
+$ touch /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/condition-ready 
+
+$ cat /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/when-home/state/procevent-inbox/when-evidence.1.result 
+when: when-evidence
+status: fired
+detail: the condition held and the action exited 0
+condition_polls: 1
+action_exit: 0
+output:
+local action completed
+
+$ cat /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/when-home/state/.wake-queue 
+1790814995	1	check	procevent:when-evidence:1	check: procevent when when-evidence 1
+
+$ env FM_HOME=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/when-home /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-procevent.sh classify /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/when-home/state/procevent-inbox/when-evidence.1.result 
+fired
+
+$ env FM_HOME=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/when-home /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-procevent.sh handled when-evidence 1 
+handled: when-evidence 1
+
+$ env FM_HOME=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/when-home /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-procevent.sh handled when-evidence 1 
+already-handled: when-evidence 1
+
+$ env FM_HOME=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/when-home /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-procevent-when.sh retire evidence 
+retired: when-evidence
+retired: when-evidence
+
+$ env FM_HOME=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/when-home /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-procevent.sh list 
+no sources registered
+
+Scenario 2: Real registration/delivery path with a recording Lavish connector; no external server or post.
+
+$ env FM_HOME=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/home-a /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-procevent-lavish.sh arm /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/board.html --for owner --agent-reply-file /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/owner-reply 
+registered: lavish-fc825210f515fb0c (lavish, task=owner)
+armed: lavish-fc825210f515fb0c
+artifact: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/board.html
+owner-task: owner
+
+$ env FM_HOME=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/home-a /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-procevent.sh list 
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-fc825210f515fb0c      lavish       task:owner/listening 0
+
+$ cat /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/replies 
+reply: accepted home A reply
+
+Adversarial: home B attempts a reply while home A owns the live claim.
+
+$ env FM_HOME=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/home-b /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-procevent-lavish.sh arm /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/board.html --for intruder --agent-reply-file /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/foreign-reply 
+error: cannot arm source lavish-fc825210f515fb0c owned by home /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/home-a at state /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/home-a/state
+foreign-home exit: 1
+Observed: no additional send, no foreign task registration, original live claim unchanged.
+
+Adversarial: same home string with a different state root attempts a reply.
+
+$ env FM_HOME=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/home-a FM_STATE_OVERRIDE=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/alternate-state /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-procevent-lavish.sh arm /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/board.html --for intruder --agent-reply-file /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/foreign-reply 
+error: cannot arm source lavish-fc825210f515fb0c owned by home /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/home-a at state /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/home-a/state
+foreign-state exit: 1
+
+Adversarial: home B ordinary arm must not adopt home A as a predecessor.
+
+$ env FM_HOME=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/home-b /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-procevent-lavish.sh arm /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/board.html 
+registered: lavish-fc825210f515fb0c (lavish)
+error: listener is not running: lavish-fc825210f515fb0c
+foreign predecessor exit: 1
+
+Control: same home completes a feedback round and re-arms with its next reply.
+
+$ touch /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/release-1 
+
+$ env FM_HOME=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/home-a /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-procevent-lavish.sh read /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/home-a/state/procevent-inbox/lavish-fc825210f515fb0c.1.result 
+CAPTAIN MESSAGE
+| Please confirm the change
+END CAPTAIN MESSAGE
+
+declared_items: 1
+presented_items: 1
+malformed_items: 0
+complete: yes
+lifecycle: feedback
+session_ended: (unset)
+annotation_count: 0
+session_ending_message_count: 1
+
+ANNOTATIONS: (none)
+END LAVISH RESULT (1 of 1)
+
+$ env FM_HOME=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/home-a /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-procevent-lavish.sh arm /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/board.html --for owner --agent-reply-file /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/owner-reply-2 
+registered: lavish-fc825210f515fb0c (lavish, task=owner)
+armed: lavish-fc825210f515fb0c
+artifact: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/board.html
+owner-task: owner
+
+$ cat /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/replies 
+reply: accepted home A reply
+reply: accepted same-home second reply
+
+$ cat /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/home-a/state/procevent-inbox/lavish-fc825210f515fb0c.1.handled 
+
+$ env FM_HOME=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/manual/home-a /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-procevent.sh list 
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-fc825210f515fb0c      lavish       task:owner/listening 0
+Observed: both same-home replies accepted once; foreign reply never sent; completed round acknowledged and next listener live.
+swept: attempted=0
+retired: lavish-fc825210f515fb0c
+swept: attempted=1
+retired: lavish-fc825210f515fb0c
+swept: attempted=1
+swept: attempted=0
+Cleanup: no process-event claims remain
+Cleanup: removed disposable manual homes and connector fixtures

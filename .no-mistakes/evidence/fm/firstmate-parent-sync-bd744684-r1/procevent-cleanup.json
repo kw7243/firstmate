@@ -1,0 +1,13 @@
+{
+  "time_utc": "2026-10-01T01:00:07.972623+00:00",
+  "scratch_path": "/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation",
+  "pre_removal_processes": 0,
+  "pre_removal_source_claims": 0,
+  "cleanup_command": "rm -r -- .test-procevent-validation",
+  "scratch_exists_after_cleanup": false,
+  "production_files_changed_by_this_agent": [],
+  "test_files_changed_by_this_agent": [
+    "tests/fm-procevent.test.sh",
+    "tests/fm-remote-reply.test.sh"
+  ]
+}

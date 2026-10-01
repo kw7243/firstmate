@@ -1,0 +1,168 @@
+FM_TEST_BEGIN 2026-10-01T00:35:01Z tests/fm-codex-session-lock.test.sh family=unclassified expected_gate_skip=none
+ok - Codex identity comes from the tool boundary, rejects override and excludes a competing live session
+ok - proved dead host owner can be replaced and repeated entry keeps its generation
+ok - foreign namespace and unknown leases remain protected regardless of age
+ok - distinct threads sharing one Codex process cannot take each other's lock
+ok - Codex reemit waits for its own sweep, refreshes coordinates, and refuses a competing session
+ok - bare PID 1 is refused without a verified session record
+ok - transient mutex never steals or releases a foreign or unqualified namespace owner
+FM_TEST_END 2026-10-01T00:35:56Z tests/fm-codex-session-lock.test.sh exit=0 duration_ms=55342 gate_skip=false
+FM_TEST_BEGIN 2026-10-01T00:35:56Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - wait deadline diagnoses and reaps a stopped test child without hanging
+ok - simultaneous watcher starts leave exactly one live process
+ok - fm_pid_identity real ps fallback is locale-invariant
+ok - fm_pid_identity is locale-invariant across LC_ALL/LC_TIME
+ok - fm_pid_identity ps fallback is terminal-width-invariant
+ok - /proc process identity ignores simulated btime changes
+ok - /proc process identity detects pid reuse
+ok - MSYS /proc process identity regression skipped on non-Windows host
+ok - killed watcher stale lock is reclaimed
+tests/fm-watcher-lock.test.sh: line 1655: 163573 Killed                  FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    fm_lock_remove_path() {
+      if [ "$1" = "$STATE/.watch.lock" ]; then
+        kill -KILL "${BASHPID:-$$}"
+      fi
+      return 1
+    }
+    fm_lock_try_acquire "$2"
+  ' _ "$LIB" "$lockdir" > /dev/null 2>&1
+ok - stale watcher reclaim publishes durable recovery evidence before clear
+ok - live watcher lock with stale heartbeat is actionable
+ok - live watcher lock with a beacon past the hard bound is replaced, under it is still refused
+ok - guard banner leads when down with pending wakes (repair-after-drain) and stays silent when live and fresh
+ok - concurrent fm_lock_try_acquire yields exactly one winner
+ok - dead-pid stale lock is reclaimed by a single acquirer
+ok - concurrent stale-lock steal yields exactly one winner
+ok - dead steal owner is reclaimed once without a nested steal marker
+ok - dead nested steal chain from an interrupted reclaim is recovered
+ok - a competing reaper cannot remove the successor's steal mutex
+ok - a steal mutex abandoned by this process does not block its own reclaim
+ok - a steal reap interrupted in this process is resumed from its own tombstone
+ok - live steal mutex is not reclaimed
+ok - live-held lock is not stolen
+ok - empty mid-acquire lock keeps a minimum grace
+ok - late original claimant cannot claim a recreated lock
+ok - paused mid-acquire claimant backs off to active stealer
+ok - watch restart preserves foreign and missing namespace locks despite a live local PID collision
+ok - shared stale clear refuses matching, missing, unreadable and malformed owner proof
+ok - shared stale clear publishes under the steal mutex before removing a proven dead owner
+ok - watch restart preserves recovery without signaling a reused pid
+ok - watch restart attaches to a verified healthy peer and later surfaces a successor gap
+ok - watcher self-evicts when the lock pid no longer names it
+ok - arm turns clean self-eviction without a successor into a typed failure
+ok - arm attaches to a live fresh watcher and fails loudly when that cycle has no successor
+ok - attached arm signals record a classified lifecycle entry
+ok - arm starts cleanly and resurfaces recovery after a dead-pid lock
+ok - arm cleans child watcher and temp output on HUP
+ok - arm defers TERM until startup watcher can run its lock cleanup
+ok - arm TERM stops a startup watcher that never becomes cleanup-ready
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 274821.1790815054.MmMlDR
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 registered custom check(s), but no live watcher process holds this home lock (last beat: 7s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+ok - arm propagates an immediate watcher wake before confirmation
+ok - arm attaches to a peer watcher after child stands down and surfaces a missing successor
+watcher: lock held by live pid 310211 but heartbeat is stale for 844130276s (>300s); inspect or stop that watcher before re-arming.
+ok - arm reports FAILED and exits non-zero when no fresh watcher can be confirmed
+ok - cycle-exit ledger links a verified successor and remains size-capped
+ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+FM_TEST_END 2026-10-01T00:39:08Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=191419 gate_skip=false
+FM_TEST_BEGIN 2026-10-01T00:39:08Z tests/fm-watch-arm.test.sh family=watcher-wake-lock expected_gate_skip=none
+ok - watch-arm: an attached arm reports the wake its cycle delivered instead of a false failure
+ok - watch-arm: a delivered wake consumed by the handling turn still closes the attached arm cleanly
+ok - watch-arm: an unusable launch confirm window refuses to arm by name
+ok - watch-arm: a disposable validation checkout refuses to arm
+ok - watch-arm: a watcher exits when its state directory is removed
+ok - watch-arm: a watcher exits when its home is removed
+ok - watch-arm: the test reaper stops a watcher armed for a tracked temporary home
+ok - watch-arm: a cycle that delivered no wake of its own still fails loudly
+ok - watch-arm: an attached arm keeps following a slow live holder and reports its wake
+ok - watch-arm: an attached arm hands a holder stalled past the bound to its owner's replacement
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-watch-arm.sh: line 680: 515194 Killed                  "$WATCH" > "$child_out"
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 518162.1790815236.6NVfjh
+ok - watch-arm: re-arm surfaces every queued wake and an open remote decision after downtime
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-watch-arm.sh: line 680: 554838 Killed                  "$WATCH" > "$child_out"
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 559004.1790815269.ZCwB41
+ok - watch-arm: a re-arm whose recovery cycle runs slowly still surfaces it
+watcher: recovery state could not be persisted; retaining stale lock evidence
+ok - watch-arm: marker publication failure retains stale-lock recovery evidence
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 605395.1790815308.Verrog
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 658715.1790815342.AlSr06
+ok - watch-arm: a wake queued after handling drain is recovered once at successor arm
+ok - watch-arm: interrupted handling leaves its wake durable for successor re-drain
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 727012.1790815392.pfAsny
+ok - watch-arm: malformed recovery state is quarantined without a successor loop
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 755291.1790815410.DRacFP
+ok - watch-arm: publication after recovery handoff is surfaced
+ok - watch-arm: restart publishes recovery before clearing a reused-pid watcher lock
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 7 --recovery-generation 786453.1790815432.BfHsLZ
+ok - watch-arm: markerless legacy queues are adopted and recovered
+not ok - could not start the Lavish fixture source
+FM_TEST_END 2026-10-01T00:44:06Z tests/fm-watch-arm.test.sh exit=1 duration_ms=297857 gate_skip=false
+FM_TEST_BEGIN 2026-10-01T00:44:06Z tests/fm-startup-network.test.sh family=session-bootstrap expected_gate_skip=none
+ok - fm-startup-network: wait fails when no deferred stage publishes before its deadline
+ok - fm-startup-network: start returns immediately and never holds the caller's stdout open
+ok - fm-startup-network: exactly one of the digest and the wake reports each actionable result
+ok - fm-startup-network: a claimant crash after publication still surfaces the result
+ok - fm-startup-network: a report-publication failure is failed, diagnosed, and still wakes
+ok - fm-startup-network: silent and explicitly informational successes never queue a main-blocking wake
+ok - fm-startup-network: an actionable state=done report still queues a wake
+ok - fm-startup-network: deferred invalid secondmate markers produce durable wakes
+ok - fm-startup-network: manual callers cannot forge mutation authority
+ok - fm-startup-network: an aggregate bound turns a wedged sweep into an actionable line
+ok - fm-startup-network: process identity distinguishes live, dead and reused worker PIDs
+ok - fm-startup-network: an exited worker awaiting reaping permits recovery
+ok - fm-startup-network: unknown worker coordinates preserve status, output and generation
+ok - fm-startup-network: namespace uncertainty preserves the original worker's publication
+ok - fm-startup-network: an unknown probe leaves full startup incomplete until a successful retry
+ok - fm-startup-network: locked requests supersede in-flight probe-only workers
+ok - fm-startup-network: a second start never launches a competing worker
+ok - fm-startup-network: start atomically reserves the generation harvest observes
+ok - fm-startup-network: a new lock owner gets a distinct worker generation
+not ok - lock takeover blocked 6s behind deferred network work
+FM_TEST_END 2026-10-01T00:48:16Z tests/fm-startup-network.test.sh exit=1 duration_ms=249990 gate_skip=false
+FM_TEST_BEGIN 2026-10-01T00:48:16Z tests/fm-sessionstart-nudge.test.sh family=session-bootstrap expected_gate_skip=none
+ok - fm-sessionstart-nudge: a genuine primary gets one explicitly marked instruction line
+ok - fm-sessionstart-nudge: NO_MISTAKES_GATE is silent
+ok - fm-sessionstart-nudge: .no-mistakes gate common-dir is silent
+ok - fm-sessionstart-nudge: an unmarked linked task worktree is silent
+ok - fm-sessionstart-nudge: a marked linked secondmate home is a primary
+ok - fm-sessionstart-nudge: a checkout without state is silent
+ok - fm-sessionstart-nudge: a lock holder in process ancestry is already run
+# skip: unprivileged PID namespaces are unavailable here, so the namespace pid 1 lock owner is unverified
+ok - OpenCode session.created delivers the exact wrapper nudge once per session
+ok - run wrapper: startup runs the full digest and never also nudges
+ok - run wrapper: clear and compact re-emit the digest without repeating startup sweeps
+ok - run wrapper forwards only stale-cache rebuild sources to immutable-baseline instruction refresh
+ok - run wrapper refreshes a compact even when startup completion is unproven
+ok - run wrapper: clear falls back to full startup when completion is unproven
+ok - run wrapper: clear accepts completion only from the current harness
+ok - run wrapper: resume delegates to the nudge instead of re-running the digest
+ok - run wrapper: the hook payload's source field drives routing with no explicit argument
+ok - run wrapper: an unrecognized or absent source takes the helm rather than skipping it
+ok - run wrapper: ordinary ineligible opens stay silent-zero and Pi preflight gets an explicit silent stand-down
+ok - run wrapper: a fresh primary checkout gets its missing state dir created, a linked worktree still does not
+ok - run wrapper: a fresh primary that cannot create its state dir says so on stderr, then stands down
+ok - run wrapper: a session start that cannot take the lock still opens the session and says so
+ok - Pi distinguishes header-proven restored CLI sessions from named create-if-missing startups
+ok - Pi provider preflight owns one generation-bound startup prerequisite with deterministic fallback, replacement, cancellation, timeout, and truncation
+ok - Pi reload shutdown releases its exit listener and stale startup generation
+ok - Pi retains a bounded digest prefix and loudly marks oversized preflight delivery
+FM_TEST_END 2026-10-01T00:52:23Z tests/fm-sessionstart-nudge.test.sh exit=0 duration_ms=246601 gate_skip=false
+FM_TEST_SUMMARY total=5 failed=2 skipped_gate=0 duration_ms=1042007
+FM_TEST_SUMMARY_FAMILY family=session-bootstrap count=2 duration_ms=496591 failed=1
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=55342 failed=0
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=2 duration_ms=489276 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-watch-arm.test.sh duration_ms=297857
+FM_TEST_SLOWEST rank=2 script=tests/fm-startup-network.test.sh duration_ms=249990
+FM_TEST_SLOWEST rank=3 script=tests/fm-sessionstart-nudge.test.sh duration_ms=246601
+FM_TEST_SLOWEST rank=4 script=tests/fm-watcher-lock.test.sh duration_ms=191419
+FM_TEST_SLOWEST rank=5 script=tests/fm-codex-session-lock.test.sh duration_ms=55342
+fm-test-run: wrote timing artifact: /home/ubuntu/.no-mistakes/evidence/01M3T84JP9X8B71Q5FT96AR7D2/watcher-targeted-tests.json

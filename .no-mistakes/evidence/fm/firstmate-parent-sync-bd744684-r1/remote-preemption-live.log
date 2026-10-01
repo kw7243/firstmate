@@ -1,0 +1,37 @@
+Real Firstmate remote job worker and reply relay, with isolated local SSH transport fixture.
+registered: remote-reply-ios (remote-reply)
+armed: remote-reply-ios offset=0
+
+Before interruption: listener pid=960910
+SOURCE                       ADAPTER      OWNER      PENDING
+remote-reply-ios             remote-reply live       0
+
+Run non-poll remote job against the same home to preempt its waiting read:
+# Detailed remote answer
+
+The build is green.
+
+After interruption: same listener pid=960910 polls=2; no caught-up watermark
+SOURCE                       ADAPTER      OWNER      PENDING
+remote-reply-ios             remote-reply live       0
+reconciled: published=0 started=0 stopped=0 uncertain=0 failed=0
+
+Mirrored status after preemption:
+working [corr=abcdefabcdefabcd]: reply after preemption
+
+Durable result:
+schema=fm-remote-delta.v1
+status=delta
+path=state/parent-replies.status
+from_offset=0
+to_offset=56
+from_prefix_sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+to_prefix_sha256=01913404f3d2e494687b050f810619ac1a053994880f68c74f1d7807f99e5333
+payload_sha256=01913404f3d2e494687b050f810619ac1a053994880f68c74f1d7807f99e5333
+payload_bytes=56
+reason=
+
+working [corr=abcdefabcdefabcd]: reply after preemption
+retired: remote-reply-ios
+swept: attempted=1
+Cleanup: scoped source swept; EXIT trap stops private worker tree and removes fixture home.

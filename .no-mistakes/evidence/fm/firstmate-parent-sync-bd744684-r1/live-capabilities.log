@@ -1,0 +1,20 @@
+claude: absent on PATH
+pi: absent on PATH
+omp: absent on PATH
+opencode: absent on PATH
+cursor-agent: absent on PATH
+grok: absent on PATH
+codex: available on PATH
+tmux: available on PATH
+$ codex --version
+codex-cli 0.153.4
+exit=0
+$ tmux -V
+tmux 3.4
+exit=0
+$ unshare -rpf --mount-proc true
+unshare: write failed /proc/self/uid_map: Operation not permitted
+exit=1
+$ unshare --pid --fork true
+unshare: unshare failed: Operation not permitted
+exit=1

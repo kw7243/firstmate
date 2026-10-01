@@ -1,0 +1,59 @@
+$ git --version
+git version 2.43.0
+[exit 0]
+$ git init -q /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-main/live/repo
+[exit 0]
+$ git commit --allow-empty -qm 'Initial fixture'
+[exit 0]
+$ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-git-strip-ai-trailers.sh install /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-main/live/launch-hooks /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-main/live/repo
+[exit 0]
+$ git config core.hooksPath ''
+[exit 0]
+$ git commit --allow-empty -m 'Empty hooksPath remains usable' --trailer 'Co-authored-by: Cursor <cursoragent@cursor.com>' --trailer 'Co-authored-by: Jane Doe <jane@example.invalid>'
+[master d833421] Empty hooksPath remains usable
+[exit 0]
+$ git show -s '--format=%an <%ae>%n%B'
+Validation User <validation@example.invalid>
+Empty hooksPath remains usable
+
+Co-authored-by: Jane Doe <jane@example.invalid>
+
+[exit 0]
+Observed: commit created with human attribution preserved, AI attribution stripped, no repository hook run, and empty stderr.
+$ git rev-parse HEAD
+d8334212fd12ce72aeef0da625da28ccdb204cce
+[exit 0]
+$ git config core.hooksPath '~fm-no-such-user-6171/hooks'
+[exit 0]
+$ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-main/live/launch-hooks/pre-commit
+fatal: failed to expand user dir in: '~fm-no-such-user-6171/hooks'
+fm-git-strip-ai-trailers: cannot resolve this repository's hooks directory; refusing to skip its pre-commit hook
+[exit 1]
+$ git config --file /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-main/live/repo/.git/config --unset-all core.hooksPath
+[exit 0]
+$ git rev-parse HEAD
+d8334212fd12ce72aeef0da625da28ccdb204cce
+[exit 0]
+Observed: malformed path refused by installed wrapper, diagnostic emitted exactly once, HEAD unchanged after restoration.
+$ git commit --allow-empty -m 'Should be rejected by repository hook'
+[exit 1]
+$ git rev-parse HEAD
+d8334212fd12ce72aeef0da625da28ccdb204cce
+[exit 0]
+Repository hook marker: repository hook ran
+Observed: configured repository hook still ran and blocked the commit.
+$ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-dispatch-resolve.sh /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-main/live/home/brief.md
+error: malformed rules file: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-main/live/home/config/crew-dispatch.json - use profiles whose harness lacks one authoritative provider family require provider: opencode; use profiles whose harness lacks one authoritative provider family require provider: rovo; default profiles whose harness lacks one authoritative provider family require provider: pi
+[exit 2]
+$ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-dispatch-resolve.sh /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-main/live/home/brief.md
+dispatch-resolve: off (TYPESAFE_API_KEY absent from the environment and /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-main/live/home/.env)
+[exit 0]
+Observed: all ambiguous providers reported in one diagnostic; absent opt-in key leaves dispatch off.
+$ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-quota-choose.sh --snapshot /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-main/live/home/quota.json --candidate codex:gpt-test
+codex gpt-test
+[exit 0]
+$ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-quota-choose.sh --snapshot /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-main/live/home/quota.json --candidate claude:model-test
+none
+[exit 1]
+Observed: local snapshot selects measured positive quota and refuses unmeasured provider.
+Cleanup: fixture repositories, hooks and homes removed.

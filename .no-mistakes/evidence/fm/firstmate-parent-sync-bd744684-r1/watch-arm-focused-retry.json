@@ -1,0 +1,31 @@
+{
+  "families": [
+    {
+      "count": 1,
+      "duration_ms": 101103,
+      "failed": 0,
+      "name": "unclassified"
+    }
+  ],
+  "finished_at": "2026-10-01T00:48:40Z",
+  "run_id": "fm-test-run-1790815618932-1064272",
+  "scripts": [
+    {
+      "duration_ms": 101103,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/.watch-arm-repro.test.sh"
+    }
+  ],
+  "selection": "scripts;jobs=1",
+  "started_at": "2026-10-01T00:46:58Z",
+  "summary": {
+    "duration_ms": 101460,
+    "failed": 0,
+    "skipped_gate": 0,
+    "total": 1
+  }
+}

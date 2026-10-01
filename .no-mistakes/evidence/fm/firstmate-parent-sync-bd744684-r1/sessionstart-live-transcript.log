@@ -1,0 +1,292 @@
+Real fresh-primary sessionstart CLI from exact HEAD snapshot under actual current Codex ancestry. No new vendor CLI or tmux server is launched. No test seam or gate bypass.
+$ bin/fm-lab-home.sh create /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-watcher-validation/fresh-primary-lab
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-watcher-validation/fresh-primary-lab
+exit=0 elapsed=0.05s
+$ git rev-parse HEAD
+f560c406994acc99228a9b2b131ccd49af094816
+exit=0 elapsed=0.029s
+$ git init -q -b main
+exit=0 elapsed=0.01s
+$ git add -A
+exit=0 elapsed=3.129s
+$ git -c core.hooksPath=/dev/null -c commit.gpgsign=false commit -qm Disposable live-validation snapshot
+exit=0 elapsed=0.088s
+Fresh snapshot source HEAD=f560c406994acc99228a9b2b131ccd49af094816; state directory absent=True
+$ bin/fm-sessionstart-run.sh --source startup
+
+================================================================================
+SESSION START - /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-watcher-validation/fresh-primary-lab
+================================================================================
+
+LOCK
+--------------------------------------------------------------------------------
+lock acquired: harness pid 92590
+
+BOOTSTRAP
+--------------------------------------------------------------------------------
+PRESENTATION_UNAVAILABLE: lavish-axi (requires >=0.1.77; install: npm install -g lavish-axi && lavish-axi setup hooks) - nonvisual work may proceed with plain-text decisions and reports; install or upgrade before using Lavish
+
+WAKE QUEUE
+--------------------------------------------------------------------------------
+(no queued wakes)
+================================================================================
+SUPERVISION OPERATING INSTRUCTIONS - primary harness: unknown
+================================================================================
+Current state:
+- Lock: held by this session; this session owns normal supervision unless away mode says otherwise.
+- Away/quiet mode: inactive.
+- X mode: inactive; use the default watcher cadence.
+- Ordinary wake: follow the continuation in the harness protocol below; do not use shell &.
+
+Mode: Unknown harness fallback.
+
+This primary harness does not have a verified watcher wake adapter.
+Follow the generic supervision contract in `AGENTS.md`.
+First cycle: drain queued wakes, then choose a supervision wait that the harness can actually wake from.
+Ordinary wake: drain, handle all emitted wakes, reconcile open decisions and unread status lines, and run the exact `--ack-through` command printed as `WAKE_ACK_REQUIRED`, then repeat that verified wait while supervision is still required.
+Before that acknowledgement, interruption leaves the work durable for idempotent re-handling.
+Use `bin/fm-watch-arm.sh` only when the harness has a tracked background mechanism that survives the tool call and notifies the model on process exit.
+Use a bounded foreground wait over `bin/fm-watch.sh` when that wake mechanism is not verified.
+Never use shell `&` for watcher supervision.
+Failure or missing cycle only: inspect the failure and restore the same verified wait shape.
+
+Record new verification evidence before promoting an unknown harness to a named snippet.
+
+
+================================================================================
+READ-ONCE CONTRACT
+================================================================================
+Everything below is printed in full for this session start: every state/*.meta,
+a compact data/backlog.md listing, a bounded tail of every state/*.status,
+data/projects.md, data/secondmates.md, data/captain.md, data/captain-shared.md,
+and data/learnings.md.
+Do NOT re-read any of them after reading this digest, and do NOT bulk-read
+data/backlog.md or state/*.status: re-reading everything defeats the entire
+point of this command.
+
+Go to a source directly only when:
+  - this digest flagged it ABSENT (then rebuild or create it per AGENTS.md),
+  - its contents looked unparseable or corrupt,
+  - an individual full status log is needed for older wake-event history, or a
+    status line was capped and its tail matters (each task's full log path is
+    printed with its tail),
+  - a full task body is needed (bin/fm-tasks-axi.sh show <id> --full, or data/backlog.md),
+  - the backlog listing disclosed omitted queued items and this turn needs them,
+  - the NETWORK CHECKS section reported its checks still IN PROGRESS and this
+    turn needs their verdict (bin/fm-startup-network.sh report),
+  - or a STARTUP TRUNCATED banner named the stage that would have printed it, in
+    which case that stage's sources were never emitted and must be reconciled.
+
+================================================================================
+FLEET STATE
+================================================================================
+
+data/backlog.md
+--------------------------------------------------------------------------------
+ABSENT
+
+Work under way (state/*.meta)
+--------------------------------------------------------------------------------
+(none)
+
+Orphan status logs (state/*.status without matching .meta)
+--------------------------------------------------------------------------------
+(none)
+
+AFK
+--------------------------------------------------------------------------------
+absent
+
+================================================================================
+NETWORK CHECKS
+================================================================================
+completed off the startup path in 4s: GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation.
+NEEDS_GH_AUTH
+These ran AFTER the sections above were composed, so re-read any record a line here names.
+
+================================================================================
+CONTEXT
+================================================================================
+
+data/projects.md
+--------------------------------------------------------------------------------
+ABSENT
+
+data/secondmates.md
+--------------------------------------------------------------------------------
+ABSENT
+
+data/captain.md
+--------------------------------------------------------------------------------
+ABSENT
+
+data/captain-shared.md (shared, main-authoritative, read-only in secondmate homes)
+--------------------------------------------------------------------------------
+ABSENT
+
+data/learnings.md
+--------------------------------------------------------------------------------
+ABSENT
+
+================================================================================
+NEXT STEP
+================================================================================
+Follow the supervision operating instructions block above for harness 'unknown'.
+This script never starts supervision itself.
+
+The digest above is complete for this session start. The READ-ONCE CONTRACT
+section near the top of it governs what may still be read from disk.
+exit=0 elapsed=26.458s
+State created by the real wrapper; startup completion record:
+codex:01a0f4e2-552a-7132-b9b5-eb9c67e846d0
+
+$ bin/fm-sessionstart-run.sh --source compact
+
+================================================================================
+SESSION START (CONTEXT RE-EMIT) - /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-watcher-validation/fresh-primary-lab
+================================================================================
+This session already took the helm at its own startup and has only lost its
+context. Lock ownership is re-verified and the durable records below are
+reprinted, but the sweeps startup already reconciled - project clone refresh,
+secondmate convergence and liveness, pending remote handoff
+retry, X-mode artifact writes, and stale Herdr child cleanup - are NOT repeated.
+Queued wakes ARE still drained: they arrived after startup and are this turn work.
+
+LOCK
+--------------------------------------------------------------------------------
+lock acquired: harness pid 92590
+
+BOOTSTRAP
+--------------------------------------------------------------------------------
+PRESENTATION_UNAVAILABLE: lavish-axi (requires >=0.1.77; install: npm install -g lavish-axi && lavish-axi setup hooks) - nonvisual work may proceed with plain-text decisions and reports; install or upgrade before using Lavish
+
+WAKE QUEUE
+--------------------------------------------------------------------------------
+(no queued wakes)
+================================================================================
+SUPERVISION OPERATING INSTRUCTIONS - primary harness: unknown
+================================================================================
+Current state:
+- Lock: held by this session; this session owns normal supervision unless away mode says otherwise.
+- Away/quiet mode: inactive.
+- X mode: inactive; use the default watcher cadence.
+- Ordinary wake: follow the continuation in the harness protocol below; do not use shell &.
+
+Mode: Unknown harness fallback.
+
+This primary harness does not have a verified watcher wake adapter.
+Follow the generic supervision contract in `AGENTS.md`.
+First cycle: drain queued wakes, then choose a supervision wait that the harness can actually wake from.
+Ordinary wake: drain, handle all emitted wakes, reconcile open decisions and unread status lines, and run the exact `--ack-through` command printed as `WAKE_ACK_REQUIRED`, then repeat that verified wait while supervision is still required.
+Before that acknowledgement, interruption leaves the work durable for idempotent re-handling.
+Use `bin/fm-watch-arm.sh` only when the harness has a tracked background mechanism that survives the tool call and notifies the model on process exit.
+Use a bounded foreground wait over `bin/fm-watch.sh` when that wake mechanism is not verified.
+Never use shell `&` for watcher supervision.
+Failure or missing cycle only: inspect the failure and restore the same verified wait shape.
+
+Record new verification evidence before promoting an unknown harness to a named snippet.
+
+
+================================================================================
+READ-ONCE CONTRACT
+================================================================================
+Everything below is printed in full for this session start: every state/*.meta,
+a compact data/backlog.md listing, a bounded tail of every state/*.status,
+data/projects.md, data/secondmates.md, data/captain.md, data/captain-shared.md,
+and data/learnings.md.
+Do NOT re-read any of them after reading this digest, and do NOT bulk-read
+data/backlog.md or state/*.status: re-reading everything defeats the entire
+point of this command.
+
+Go to a source directly only when:
+  - this digest flagged it ABSENT (then rebuild or create it per AGENTS.md),
+  - its contents looked unparseable or corrupt,
+  - an individual full status log is needed for older wake-event history, or a
+    status line was capped and its tail matters (each task's full log path is
+    printed with its tail),
+  - a full task body is needed (bin/fm-tasks-axi.sh show <id> --full, or data/backlog.md),
+  - the backlog listing disclosed omitted queued items and this turn needs them,
+  - the NETWORK CHECKS section reported its checks still IN PROGRESS and this
+    turn needs their verdict (bin/fm-startup-network.sh report),
+  - or a STARTUP TRUNCATED banner named the stage that would have printed it, in
+    which case that stage's sources were never emitted and must be reconciled.
+
+================================================================================
+FLEET STATE
+================================================================================
+
+data/backlog.md
+--------------------------------------------------------------------------------
+ABSENT
+
+Work under way (state/*.meta)
+--------------------------------------------------------------------------------
+(none)
+
+Orphan status logs (state/*.status without matching .meta)
+--------------------------------------------------------------------------------
+(none)
+
+AFK
+--------------------------------------------------------------------------------
+absent
+
+================================================================================
+NETWORK CHECKS
+================================================================================
+completed off the startup path in 1s: GitHub authentication.
+NEEDS_GH_AUTH
+These ran AFTER the sections above were composed, so re-read any record a line here names.
+
+================================================================================
+CONTEXT
+================================================================================
+
+data/projects.md
+--------------------------------------------------------------------------------
+ABSENT
+
+data/secondmates.md
+--------------------------------------------------------------------------------
+ABSENT
+
+data/captain.md
+--------------------------------------------------------------------------------
+ABSENT
+
+data/captain-shared.md (shared, main-authoritative, read-only in secondmate homes)
+--------------------------------------------------------------------------------
+ABSENT
+
+data/learnings.md
+--------------------------------------------------------------------------------
+ABSENT
+
+================================================================================
+NEXT STEP
+================================================================================
+Follow the supervision operating instructions block above for harness 'unknown'.
+This script never starts supervision itself.
+
+The digest above is complete for this session start. The READ-ONCE CONTRACT
+section near the top of it governs what may still be read from disk.
+exit=0 elapsed=30.91s
+$ bin/fm-startup-network.sh wait 60
+exit=0 elapsed=0.101s
+Final deferred worker record:
+state=done
+pid=828650
+pid_namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026531836]
+pid_starttime=379780653
+started=1790815460
+finished=1790815461
+rc=0
+locked=0
+phases=probe
+generation=1790815460.828160.795808
+lock_pid=codex:01a0f4e2-552a-7132-b9b5-eb9c67e846d0
+report_published=1
+
+Deferred worker no longer executing: gone
+
+Driver correction: the first attempt incorrectly required compact to retain the deferred worker generation. Its actual and documented contract is a new read-only probe (locked=0, phases=probe); completion was retained. The startup and compact output above succeeded. The full corrected re-drive is in sessionstart-live-retry-transcript.log. No product code changed.

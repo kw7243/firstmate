@@ -1,0 +1,17 @@
+$ bin/fm-procevent.sh register lavish idle-lavish -- /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-watcher-validation/lavish-repro-retry/lavish-source.sh /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-watcher-validation/lavish-repro-retry/result-ready
+registered: idle-lavish (lavish)
+exit=0 elapsed=1.178
+$ bin/fm-procevent.sh reconcile
+reconciled: published=0 started=1 stopped=0 uncertain=0 failed=0
+exit=0 elapsed=3.684
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+idle-lavish                  lavish       live       0
+exit=0 elapsed=1.22
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+idle-lavish                  lavish       live       0
+exit=0 elapsed=0.976
+$ bin/fm-procevent.sh retire idle-lavish
+retired: idle-lavish
+exit=0 elapsed=0.992

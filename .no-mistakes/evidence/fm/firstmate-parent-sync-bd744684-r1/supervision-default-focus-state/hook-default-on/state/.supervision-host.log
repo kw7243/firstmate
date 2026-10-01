@@ -1,0 +1,4 @@
+1790815691	start	gen=host-1165446-1790815689	primary=claude
+1790815715	handled	turn=host-1165446-1790815689.1	posture=attended	rc=0	reports=1	error=0 cost=0.25 conversation_cost=0.25 input=5 cache_read=100 cache_write=10 output=20 turns=3	signal: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-supervision/tmp/fm-supervision-host.DWg47T/hook-default-on/state/demo.status
+1790815718	start	gen=host-1204240-1790815717	primary=claude
+1790815722	pass-through	attended	main-only	check: rearm-resurface

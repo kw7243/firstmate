@@ -1,0 +1,41 @@
+Real deferred startup through fm-startup-network.sh and fm-bootstrap.sh, isolated empty lab, no mocked tools; GH_CONFIG_DIR empty and all credential tokens unset.
+$ bin/fm-lab-home.sh create /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-watcher-validation/startup-lab
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-watcher-validation/startup-lab
+exit=0 elapsed=0.055s
+$ bin/fm-startup-network.sh start --locked 1 --harvest-pid 0
+NETWORK_CHECKS: requested checks were not scheduled: GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation
+exit=1 elapsed=0.127s
+A locked-stage request without a verified home lock was rejected before a worker record was created.
+$ bin/fm-lock.sh
+lock acquired: harness pid 92590
+exit=0 elapsed=2.915s
+$ bin/fm-startup-network.sh start --locked 1 --harvest-pid 0
+exit=0 elapsed=1.265s
+Status immediately after start returned:
+state=running
+pid=287601
+pid_namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026531836]
+pid_starttime=379740593
+started=1790815059
+locked=1
+phases=probe,sweeps
+generation=1790815059.286299.0
+lock_pid=codex:01a0f4e2-552a-7132-b9b5-eb9c67e846d0
+
+$ bin/fm-startup-network.sh wait 40
+exit=0 elapsed=4.802s
+$ bin/fm-startup-network.sh report
+completed off the startup path in 5s: GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation.
+NEEDS_GH_AUTH
+These ran AFTER the sections above were composed, so re-read any record a line here names.
+TIMINGS - where the deferred network checks spent their time (ms):
+  phase       gh-auth                                    start=+1677    elapsed=357
+  phase       secondmate-liveness                        start=+2177    elapsed=25
+  phase       secondmate-sync                            start=+2279    elapsed=151
+  phase       handoff-delivery                           start=+2496    elapsed=8
+  phase       fleet-sync                                 start=+2112    elapsed=2093
+  stage       network-checks probe_sweeps                start=+280     elapsed=4023
+  slowest: stage network-checks probe_sweeps 4023ms, phase fleet-sync 2093ms, phase gh-auth 357ms
+exit=0 elapsed=0.142s
+
+Driver setup note: this first attempt completed state=done and printed the successful human report above; my driver incorrectly asserted that the human report must contain the literal word done. The corrected assertion uses completed off the startup path. The complete re-drive including durable wake and child exit evidence is in startup-live-retry-transcript.log. No product source was changed.

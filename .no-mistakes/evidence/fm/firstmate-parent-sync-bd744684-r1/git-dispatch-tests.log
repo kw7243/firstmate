@@ -1,0 +1,114 @@
+FM_TEST_BEGIN 2026-10-01T00:35:09Z tests/fm-git-strip-ai-trailers.test.sh family=backend-dispatch expected_gate_skip=none
+ok - a Cursor --trailer commit object has no AI co-author and keeps the captain identity
+ok - a human Co-authored-by trailer survives next to a stripped Cursor trailer
+ok - a human co-author at a vendor domain survives; only the exact bot address is stripped
+ok - a hook manager resolving the pane hooks dir fails instead of displacing the strip
+ok - a relaunch reinstall replaces the read-only strip dir and still strips
+ok - install chains the previous commit-msg hook after stripping
+ok - a relative project core.hooksPath resolves against the worktree and still runs
+ok - an inherited GIT_CONFIG hooksPath does not become the chained previous hooks
+ok - a project hook that appears after install still runs for the rest of the task
+ok - a pane GIT_CONFIG hooksPath still chains the repository git is actually in
+ok - an empty project core.hooksPath runs no repository hook and still strips the trailer
+ok - an unresolvable project core.hooksPath still refuses the pre-commit hook
+ok - a valueless project core.hooksPath still refuses the pre-commit hook
+ok - the repository's pre-push runs and can refuse under every hooksPath override channel
+ok - a git -c hooksPath override still strips the trailer and chains the project's hooks
+ok - commit-msg file mode strips the trailer and keeps the subject
+# all fm-git-strip-ai-trailers tests passed
+FM_TEST_END 2026-10-01T00:35:17Z tests/fm-git-strip-ai-trailers.test.sh exit=0 duration_ms=8447 gate_skip=false
+FM_TEST_BEGIN 2026-10-01T00:35:17Z tests/fm-quota-choose.test.sh family=standalone expected_gate_skip=none
+ok - help renders the complete header only
+ok - first positive candidate wins
+ok - exhausted provider is skipped
+ok - no positive candidate returns none and exit 1
+ok - positional candidates work
+ok - specific model scope bounds generic quota
+ok - omp openai-codex prefix matches the bare codex model scope
+ok - omp without a mapped prefix fails closed
+ok - default model uses provider-wide quota
+ok - fractional positive quota is eligible
+ok - unknown harness fails closed
+ok - all candidates are validated before selection
+ok - malformed provider data fails closed
+ok - multiple JSON values fail closed
+ok - known-empty quota fails closed
+ok - semantics and availability statuses must agree
+ok - exhausted runway vetoes unknown headroom
+ok - unknown headroom is not positive quota
+ok - partial semantics accept mixed availability
+ok - stdin snapshot is accepted
+ok - empty model candidate fails closed
+ok - bare harness maps to default model
+ok - default TOON snapshot is accepted
+ok - renderer-shaped TOON snapshot is accepted
+ok - malformed nonzero TOON envelopes fail closed
+ok - zero-row TOON has no positive quota
+ok - empty-array TOON has no positive quota
+ok - inline attention TOON has no positive quota
+ok - TOON attention identities fail closed
+ok - truncated zero-row TOON fails closed
+ok - malformed zero-row TOON fails closed
+ok - zero-row TOON rejects leading garbage
+ok - counted TOON rows require every declared field
+ok - TOON conversion preserves unknown-headroom exhaustion
+ok - trailing empty TOON fields fail closed
+ok - quoted TOON scope vetoes dispatch
+ok - provider-level unknown quota is not positive
+ok - Muse candidate is accepted
+ok - Muse uses Meta quota
+ok - Agy remains resolver-only
+ok - duplicate providers fail closed
+ok - empty quota scopes fail closed
+ok - whitespace quota identities fail closed
+ok - out-of-range quota fails closed
+ok - invalid runway status fails closed
+ok - missing applicable quota is not positive
+ok - any exhausted applicable scope vetoes dispatch
+ok - named model quota matches exact identity only
+ok - invalid availability status fails closed
+ok - native Codex never infers an account from a Pi lane
+ok - native Codex binds to codex-home before default, independently of model and row order
+ok - the same path still selects from a schema 5 snapshot by provider alone
+ok - schema 6 requires accountKey on every row and uniqueness on provider + accountKey
+ok - schema 6 TOON with the accountKey column is accepted
+ok - helper reuses the captured quota snapshot
+ok - provider-table lookup writes nothing to stderr when SIGPIPE is ignored
+ok - provider-table lookup reads the whole table before answering
+ok - provider-table lookup prints the provider when called directly under set -e
+# all fm-quota-choose tests passed
+FM_TEST_END 2026-10-01T00:35:28Z tests/fm-quota-choose.test.sh exit=0 duration_ms=10321 gate_skip=false
+FM_TEST_BEGIN 2026-10-01T00:35:28Z tests/fm-dispatch-resolve.test.sh family=standalone expected_gate_skip=none
+ok - absent key is off: one stderr line, exit 0, no network call
+ok - TYPESAFE_API_KEY= in .env activates the tool; environment and config overrides work
+ok - clear: one rule Choice request, key on the fd header only, spendPriority argmax over every candidate
+ok - never-send list withholds the request on a match or a bad list, and never prints the value
+ok - rules snapshots and shell quoting preserve the profile protocol
+ok - no-rule fallback, Agy, Gemini, and documented configurations resolve
+ok - ambiguous: confidence below the fixed floor hands the decision back
+ok - per-rule confidence floors fall to the most probable runner-up that clears its own floor
+ok - only the brief's task sections and scout tag reach the model, with a whole-brief fallback
+ok - escalate: a rule declared approval: captain never yields a profile
+ok - rule floor: known shortfall falls through while unavailable evidence escalates
+ok - declared provider and profile floor evidence are applied in code
+ok - nonnumeric spendPriority evidence is never ranked
+ok - partial and missing quota evidence remain eligible but unranked
+ok - provider-wide and exact quota rows combine into one limiting candidate
+ok - default: no rule matched resolves among the default profiles
+ok - tie: equal spendPriority never breaks by array order
+ok - no rankable candidate: the tool escalates instead of guessing
+ok - native Codex binds to codex-home before default, independently of Pi accounts and row order
+ok - Pi native adapters bind to codex-home with existing fallbacks and schema 5 compatibility
+ok - schema 6: each candidate binds to its account row; schema 5 is unchanged
+ok - quota evidence comes from one quota-axi --json read, and its failure is an error outcome
+ok - API, transport, and response failures are error outcomes with exit 0
+ok - configuration errors exit 2 before any network call
+# all fm-dispatch-resolve tests passed
+FM_TEST_END 2026-10-01T00:36:04Z tests/fm-dispatch-resolve.test.sh exit=0 duration_ms=36203 gate_skip=false
+FM_TEST_SUMMARY total=3 failed=0 skipped_gate=0 duration_ms=55346
+FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=1 duration_ms=8447 failed=0
+FM_TEST_SUMMARY_FAMILY family=standalone count=2 duration_ms=46524 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-dispatch-resolve.test.sh duration_ms=36203
+FM_TEST_SLOWEST rank=2 script=tests/fm-quota-choose.test.sh duration_ms=10321
+FM_TEST_SLOWEST rank=3 script=tests/fm-git-strip-ai-trailers.test.sh duration_ms=8447
+fm-test-run: wrote timing artifact: /home/ubuntu/.no-mistakes/evidence/01M3T84JP9X8B71Q5FT96AR7D2/git-dispatch-tests.json

@@ -1,0 +1,3 @@
+Direct real remote entrypoint probe with disposable home nested in original code root. Expected guard refusal.
+exit: 64
+error: remote root and home must be separate, non-overlapping directories

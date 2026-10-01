@@ -1,0 +1,25 @@
+Native Codex ancestor: 92590
+Verified native tool identity: codex:01a0f4e2-552a-7132-b9b5-eb9c67e846d0
+Namespace: 2033171b-9858-4767-ad27-2c59662487fa/pid:[4026531836]
+Acquire disposable home lock:
+lock acquired: harness pid 92590
+lock: held by live harness pid 92590
+Persisted ownership record:
+92590
+codex:01a0f4e2-552a-7132-b9b5-eb9c67e846d0
+codex-owner-v1 92590 2033171b-9858-4767-ad27-2c59662487fa/pid:[4026531836] 379716654 process
+Self ownership verified
+Spoofed descendant CODEX_THREAD_ID refusal: refused
+Reenter from a separate native tool call:
+lock acquired: harness pid 92590
+Stable session generation: codex:01a0f4e2-552a-7132-b9b5-eb9c67e846d0
+Live process owned by different recorded thread:
+lock: held by live harness pid 92590
+error: another live firstmate session holds the lock (pid 92590, session codex:99999999-9999-4999-8999-999999999999); operate read-only until resolved
+Acquisition refused as required
+Owner record preserved after refusal
+Foreign namespace record with matching live numeric PID:
+lock: unknown (pid 92590 cannot be verified in this process view)
+error: session owner cannot be verified in this process view; preserve the lock and operate read-only until resolved
+Acquisition refused as required
+Unknown owner record preserved after refusal

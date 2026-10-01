@@ -1,0 +1,50 @@
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-supervision/host-report/home
+Detected real harness: codex
+Away posture recorded at 2026-10-01T00:38:05Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-10-01T00:38:05Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Review the isolated outcome fixture.
+1
+2
+
+$ bin/fm-afk-return.sh begin
+fm-afk-launch: away-posture record archived at /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-supervision/host-report/home/state/afk-contracts/1790815085.afk-contract
+fm-afk-launch: away mode stopped; no daemon terminal was running, .afk cleared, and the posture record archived
+=== Return brief (away 2026-10-01T00:38:05Z -> 2026-10-01T00:38:14Z, 9s) ===
+Supervisor health:
+  - GAP: the watcher beat was 999999s old at return (grace 300s)
+Your instructions:
+  your words at entry:
+    Review the isolated outcome fixture.
+  the away session took no action under them.
+Waiting on you:
+  1 captain outcome(s) escalated by the away session, presented in the drain's BRANCH OUTCOMES section
+Tried and failed, or could not be fixed:
+  (nothing)
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  2 outcome(s) handled by the away session (1 routine, 1 escalated above)
+  the drain's BRANCH OUTCOMES section presents the visible outcomes: each task's captain outcomes on one line until you acknowledge them, visible routine notes once, past its limit as a count
+Cost: 2 supervision outcome(s) recorded (1 routine, 1 captain); 0 task(s) live at return.
+catch-up health: GAP: the watcher beat was 999999s old at return (grace 300s)
+catch-up wake: BRANCH OUTCOMES (captain outcomes the supervision session recorded for you, one line per task, oldest first; each says what was true when it was recorded, so check the task's current state first, including its still-open decisions listed above under OPEN DECISIONS, and sort them into still open and already settled, such as a decision since answered, a PR since merged, or a task since finished - process the still-open ones as firstmate: tell the captain, land or merge what is ready, answer or escalate a decision, or act on a blocker; your reply to the captain covers only those, as if the settled ones had never been listed, and a settled one needs only the acknowledgement):
+catch-up wake: [seq 2, recorded 0m ago] demo: Synthetic captain decision
+catch-up wake: BRANCH OUTCOMES: after processing them run bin/fm-branch-outcome.sh mark-processed --through 2; until then every drain presents them again
+catch-up wake: BRANCH OUTCOMES, ROUTINE (handled by the supervision session since your last drain; for your awareness, nothing to acknowledge):
+catch-up wake: [seq 1] demo: Synthetic routine note
+fm-afk-return: catch-up clear; ordinary captain work may proceed
+
+$ cat state/.branch-outcomes-cursor
+2
+
+$ bin/fm-wake-drain.sh
+BRANCH OUTCOMES (captain outcomes the supervision session recorded for you, one line per task, oldest first; each says what was true when it was recorded, so check the task's current state first, including its still-open decisions listed above under OPEN DECISIONS, and sort them into still open and already settled, such as a decision since answered, a PR since merged, or a task since finished - process the still-open ones as firstmate: tell the captain, land or merge what is ready, answer or escalate a decision, or act on a blocker; your reply to the captain covers only those, as if the settled ones had never been listed, and a settled one needs only the acknowledgement):
+[seq 2, recorded 0m ago] demo: Synthetic captain decision
+BRANCH OUTCOMES: after processing them run bin/fm-branch-outcome.sh mark-processed --through 2; until then every drain presents them again
+
+Confirmed: visible notes appear once at return, the routine note does not replay, and the unacknowledged captain outcome remains visible.

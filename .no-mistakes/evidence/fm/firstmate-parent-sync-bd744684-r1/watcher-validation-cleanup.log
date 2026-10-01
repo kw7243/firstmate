@@ -1,0 +1,9 @@
+.test-watcher-validation/fresh-primary-lab/state/.startup-network.status: stage=done pid=828650 process=gone
+.test-watcher-validation/startup-lab-retry/state/.startup-network.status: stage=done pid=345174 process=gone
+.test-watcher-validation/startup-lab/state/.startup-network.status: stage=done pid=287601 process=gone
+.test-watcher-validation/fresh-primary-lab-retry/state/.startup-network.status: stage=done pid=1043450 process=gone
+.test-watcher-validation/xdg-state/firstmate/procevent-claims/idle-lavish.claim: owned source pid=806036 process=gone
+Owned manual watcher pid=227395: gone
+Owned manual watcher pid=265247: gone
+Owned manual watcher pid=432331: gone
+Removed only .test-watcher-validation and tests/.watch-arm-repro.test.sh and tests/.startup-network-repro.test.sh; kept the intentional tests/fm-watch-arm.test.sh edit and all evidence.

@@ -1,0 +1,24 @@
+Real watcher and arm; hard-stall boundary using SIGSTOP against our own recorded child process.
+$ bin/fm-lab-home.sh create /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-watcher-validation/stall-lab
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-watcher-validation/stall-lab
+exit=0
+watcher: started pid=432331 (beacon fresh)
+watcher: attached pid=432331 (beacon 1s)
+Paused actual watcher pid=432331
+Attached arm terminal output:
+watcher: attached pid=432331 (beacon 1s)
+watcher: FAILED - attached watcher pid=432331 stalled (beacon 10s at or past hard bound 10s)
+
+Attached arm exit=1
+$ ps -p 432331 -o pid=,stat=,comm=
+ 432331 T    bash
+exit=0
+Actual holder remains stopped and alive: attached arm reported failure without signaling it.
+Cycle ledger:
+arm_pid=434702	watcher_pid=432331	origin=attached	started_at=1790815168	ended_at=1790815177	exit_code=unknown	signal=unknown	reason=attached-holder-stalled	beacon_age=10	lock_before=pid:432331|identity:linux-starttime=379751234 cmdline-hex=62617368002f686f6d652f7562756e74752f2e6e6f2d6d697374616b65732f776f726b74726565732f3963343565663136656632632f30314d335438344a5039583842373151354654393641523744322f62696e2f666d2d77617463682e736800	lock_after=pid:432331|identity:linux-starttime=379751234 cmdline-hex=62617368002f686f6d652f7562756e74752f2e6e6f2d6d697374616b65732f776f726b74726565732f3963343565663136656632632f30314d335438344a5039583842373151354654393641523744322f62696e2f666d2d77617463682e736800	successor=none
+
+RESULT: hard-bound stall has an explicit nonzero failure and classified lifecycle record.
+$ bin/fm-watch-arm.sh --stop
+watcher: stopped pid=432331
+exit=0
+All owned watcher/arm processes stopped and reaped.

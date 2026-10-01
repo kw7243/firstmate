@@ -1,0 +1,28 @@
+FM_TEST_BEGIN 2026-10-01T00:37:01Z tests/fm-remote-reply.test.sh family=secondmate expected_gate_skip=none
+ok - a blocking non-destructive remote delta reaches durable process-event capture
+ok - a captured delta is applied, acknowledged, and re-armed without a handler
+ok - ingest appends one validated line, fetches its document, and advances the cursor
+ok - replayed capture has one deduplicated append and one durable handling identity
+ok - later generations cannot invalidate an unacknowledged ingested result
+ok - the remote status and decision model mirrors and the cursor advances
+ok - a remote mate's new decision folds open exactly as a local mate's does
+ok - a replayed mirrored delta is idempotent in both the stream and the cursor
+ok - transported control bytes are normalized in place and never stop the stream
+ok - payload protocol-field names cannot collide with transport metadata
+ok - NUL bytes are normalized in place before shell line processing
+ok - local document storage failures remain retryable until delivery succeeds
+ok - a structured pointer must end at its token boundary
+ok - adjacent pointers are fetched while malformed tokens remain unchanged
+ok - a rejected candidate never gives the following text a false leading boundary
+ok - nested remote reports relay while an undeliverable foreign pointer fails open
+ok - the reported incident raises no standing decision and still delivers the report
+ok - an undeliverable structured offer fails open with one note and never a decision
+ok - a remote refusal surfaces its own reason without opening a decision
+ok - a failed pointer extraction never commits a partial delta
+ok - a failed mirror write never drops status content or advances the cursor
+not ok - the replay-identity whole-log recapture was not captured
+FM_TEST_END 2026-10-01T00:43:50Z tests/fm-remote-reply.test.sh exit=1 duration_ms=408750 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=409111
+FM_TEST_SUMMARY_FAMILY family=secondmate count=1 duration_ms=408750 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-remote-reply.test.sh duration_ms=408750
+fm-test-run: wrote timing artifact: /home/ubuntu/.no-mistakes/evidence/01M3T84JP9X8B71Q5FT96AR7D2/remote-reply-isolated.json

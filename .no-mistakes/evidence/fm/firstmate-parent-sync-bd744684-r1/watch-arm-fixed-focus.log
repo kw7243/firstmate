@@ -1,0 +1,13 @@
+FM_TEST_BEGIN 2026-10-01T00:49:30Z tests/.watch-arm-repro.test.sh family=unclassified expected_gate_skip=none
+reconciled: published=0 started=1 stopped=0 uncertain=0 failed=0
+ok - watch-arm: an idle Lavish source stays quiet and its real result wakes promptly
+ok - watch-arm: appending work reopens an announced empty recovery
+ok - watch-arm: a watcher close during handling keeps the printed acknowledgement valid
+ok - watch-arm: a moved recovery generation consumes handled rows and names its remedy
+ok - watch-arm: downtime marker publication does not follow symlinks
+ok - watch-arm: --stop ends only this home's watcher, publishes downtime, and reports when none runs
+FM_TEST_END 2026-10-01T00:50:41Z tests/.watch-arm-repro.test.sh exit=0 duration_ms=70795 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=70942
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=70795 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/.watch-arm-repro.test.sh duration_ms=70795
+fm-test-run: wrote timing artifact: /home/ubuntu/.no-mistakes/evidence/01M3T84JP9X8B71Q5FT96AR7D2/watch-arm-fixed-focus.json

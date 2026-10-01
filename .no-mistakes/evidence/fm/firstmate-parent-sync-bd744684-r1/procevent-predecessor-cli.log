@@ -1,0 +1,24 @@
+Same-home control: the real listener remains alive while a new ordinary registration is armed. Lavish poll is a local blocking connector fixture; no external server is used.
+
+$ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-procevent-lavish.sh arm /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/predecessor/board.html 
+registered: lavish-80379cb0e3773ca0 (lavish)
+armed: lavish-80379cb0e3773ca0
+artifact: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/predecessor/board.html
+
+$ env FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=1 /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-procevent-lavish.sh arm /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/predecessor/board.html 
+registered: lavish-80379cb0e3773ca0 (lavish)
+still-listening: lavish-80379cb0e3773ca0
+artifact: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/predecessor/board.html
+note: an earlier listener is still live and serving this board; this registration takes effect only after the source is retired and armed again
+
+$ /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-procevent.sh list 
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-80379cb0e3773ca0      lavish       live       0
+
+$ cat /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/predecessor/polls 
+poll started
+Observed: same-home predecessor accepted, original real listener retained, one poll only.
+retired: lavish-80379cb0e3773ca0
+swept: attempted=1
+Cleanup: no claims remain
+Cleanup: predecessor fixture removed

@@ -1,0 +1,18 @@
+Restored exact captured payload: 2230 bytes; SHA-256 verified.
+Restored prior parent status; source ledger reconstructed from already-mirrored normalized source lines.
+
+Replay real handle against the saved whole-log result; evidence-only 180-second process bound.
+ingested: ios appended=0 offset=2230
+registered: remote-reply-ios (remote-reply)
+armed: remote-reply-ios offset=2230
+handled: remote-reply-ios 22
+handle exit=0 duration_seconds=43
+Observed: parent status bytes unchanged; replay decision was not duplicated or reopened.
+Delivered replay document:
+# replay decision report
+Committed cursor:
+schema=fm-remote-reply-cursor.v1
+offset=2230
+prefix_sha256=687c6e6af8358054d302d2f9b625d52e47aac7f12145abc17c148bbdd30d93ae
+retired: remote-reply-ios
+swept: attempted=1

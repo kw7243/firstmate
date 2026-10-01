@@ -1,0 +1,8 @@
+{
+  "script": "tests/fm-afk-return.test.sh",
+  "pid": 109013,
+  "state": "Z",
+  "wait_status": 0,
+  "exit_code": 0,
+  "note": "Child completed while runner was paused to prevent its later unisolated tmux suite. Remaining suites run separately with isolated HOME and TMUX_TMPDIR."
+}

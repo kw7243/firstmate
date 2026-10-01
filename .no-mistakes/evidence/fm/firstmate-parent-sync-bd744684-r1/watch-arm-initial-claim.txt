@@ -1,0 +1,18 @@
+Initial watch-arm failed reconcile retained a successfully published claim in its isolated XDG root.
+Claim modified UTC: 2026-10-01T00:44:05.527132+00:00
+Claimed worker current state: gone
+Recorded fixture state still exists: False
+
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-watcher-validation/tmp/fm-watch-arm-tests.enrcuO/idle-lavish-source/home
+806036
+.claim.SfBvh0-806036
+linux-starttime=379779021 cmdline-hex=62617368002f686f6d652f7562756e74752f2e6e6f2d6d697374616b65732f776f726b74726565732f3963343565663136656632632f30314d335438344a5039583842373151354654393641523744322f62696e2f666d2d70726f636576656e742e7368005f73746172740069646c652d6c617669736800
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-watcher-validation/tmp/fm-watch-arm-tests.enrcuO/idle-lavish-source/state/procevent
+64769:5253010
+active
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-watcher-validation/tmp/fm-watch-arm-tests.enrcuO/idle-lavish-source/state
+64769
+5257582
+1000
+755
+2033171b-9858-4767-ad27-2c59662487fa/pid:[4026531836]

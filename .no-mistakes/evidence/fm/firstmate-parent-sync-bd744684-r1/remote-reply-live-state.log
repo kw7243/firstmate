@@ -1,0 +1,40 @@
+Product state from unchanged tests/fm-remote-reply.test.sh. SSH is a local transport fixture; fm-on, remote entrypoint, remote job worker, process-event runner, ingest and acknowledgement are real product executables. No shared service or external host was used.
+
+remote/state/parent-replies.status
+done [corr=0123456789abcdef] [at=1700000000]: build verified report=data/reply/report.md
+working [corr=1111111111111111]: second generation
+
+parent/state/procevent-inbox/remote-reply-ios.1.result
+schema=fm-remote-delta.v1
+status=delta
+path=state/parent-replies.status
+from_offset=0
+to_offset=89
+from_prefix_sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+to_prefix_sha256=4ab72b1c7765aa3b67339c46eb05f1cfb52f6de0aa2992efdc767bdc9aa95a7f
+payload_sha256=4ab72b1c7765aa3b67339c46eb05f1cfb52f6de0aa2992efdc767bdc9aa95a7f
+payload_bytes=89
+reason=
+
+done [corr=0123456789abcdef] [at=1700000000]: build verified report=data/reply/report.md
+
+parent/state/procevent-inbox/remote-reply-ios.1.handled
+
+parent/state/ios.status
+done [corr=0123456789abcdef] [at=1700000000]: build verified report=data/remote-secondmates/ios/data/reply/report.md
+working [corr=1111111111111111]: second generation
+
+parent/data/remote-secondmates/ios/data/reply/report.md
+# Detailed remote answer
+
+The build is green.
+
+start-one.out
+autohandled: remote-reply-ios
+cannot retire terminal source; it remains registered: remote-reply-ios
+captured: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/remote-tmp/fm-remote-reply.IS9PuS/parent/state/procevent-inbox/remote-reply-ios.1.result
+
+handle-arm-fail.out
+ingested: ios appended=0 offset=89
+mkdir: cannot create directory ‘/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/remote-tmp/fm-remote-reply.IS9PuS/parent/state/procevent’: File exists
+error: cannot publish the registration

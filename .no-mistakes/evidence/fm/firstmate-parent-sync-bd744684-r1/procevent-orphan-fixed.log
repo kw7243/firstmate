@@ -1,0 +1,5 @@
+ok - a detached listener starts reparented, with a live descendant tree under it
+ok - a listener whose owning session is gone stops itself and its whole process group
+ok - reaping the listener stops the process churn under it
+ok - an identical listener in a home whose session is still there is untouched
+ok - retiring a source reaps its reparented listener and every descendant under it

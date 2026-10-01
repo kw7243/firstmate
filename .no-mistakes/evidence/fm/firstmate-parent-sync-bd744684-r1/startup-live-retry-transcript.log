@@ -1,0 +1,62 @@
+Real deferred startup through fm-startup-network.sh and fm-bootstrap.sh, isolated empty lab, no mocked tools; GH_CONFIG_DIR empty and all credential tokens unset.
+$ bin/fm-lab-home.sh create /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-watcher-validation/startup-lab-retry
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-watcher-validation/startup-lab-retry
+exit=0 elapsed=0.043s
+$ bin/fm-startup-network.sh start --locked 1 --harvest-pid 0
+NETWORK_CHECKS: requested checks were not scheduled: GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation
+exit=1 elapsed=0.1s
+A locked-stage request without a verified home lock was rejected before a worker record was created.
+$ bin/fm-lock.sh
+lock acquired: harness pid 92590
+exit=0 elapsed=3.253s
+$ bin/fm-startup-network.sh start --locked 1 --harvest-pid 0
+exit=0 elapsed=1.51s
+Status immediately after start returned:
+state=running
+pid=345174
+pid_namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026531836]
+pid_starttime=379744714
+started=1790815100
+locked=1
+phases=probe,sweeps
+generation=1790815100.343538.0
+lock_pid=codex:01a0f4e2-552a-7132-b9b5-eb9c67e846d0
+
+$ bin/fm-startup-network.sh wait 40
+exit=0 elapsed=4.866s
+$ bin/fm-startup-network.sh report
+completed off the startup path in 5s: GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation.
+NEEDS_GH_AUTH
+These ran AFTER the sections above were composed, so re-read any record a line here names.
+TIMINGS - where the deferred network checks spent their time (ms):
+  phase       gh-auth                                    start=+1673    elapsed=189
+  phase       secondmate-liveness                        start=+2001    elapsed=24
+  phase       secondmate-sync                            start=+2091    elapsed=135
+  phase       handoff-delivery                           start=+2324    elapsed=2
+  phase       fleet-sync                                 start=+1946    elapsed=2076
+  stage       network-checks probe_sweeps                start=+354     elapsed=3833
+  slowest: stage network-checks probe_sweeps 3833ms, phase fleet-sync 2076ms, phase gh-auth 189ms
+exit=0 elapsed=0.23s
+Published completion record:
+state=done
+pid=345174
+pid_namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026531836]
+pid_starttime=379744714
+started=1790815100
+finished=1790815105
+rc=0
+locked=1
+phases=probe,sweeps
+generation=1790815100.343538.0
+lock_pid=codex:01a0f4e2-552a-7132-b9b5-eb9c67e846d0
+report_published=1
+
+Durable late actionable wake:
+1790815120	1	check	startup-network	check: startup-network: deferred startup network checks finished (done); read them with /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-startup-network.sh report
+
+$ bin/fm-wake-drain.sh
+1790815120	1	check	startup-network	check: startup-network: deferred startup network checks finished (done); read them with /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-startup-network.sh report
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 345174.1790815120.zlHMwI
+exit=0 elapsed=3.115s
+Detached worker is no longer executing: gone
+RESULT: unowned mutating start refused; verified-owner deferred start returned during running state, completed probe+sweeps, retained isolated no-credentials diagnostic and queued it for the operator.

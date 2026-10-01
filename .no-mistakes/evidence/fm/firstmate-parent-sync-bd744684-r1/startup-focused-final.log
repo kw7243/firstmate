@@ -1,0 +1,14 @@
+FM_TEST_BEGIN 2026-10-01T00:53:05Z tests/.startup-network-repro.test.sh family=unclassified expected_gate_skip=none
+takeover evidence: elapsed=2s rc=1 output=error: the prior session's bounded startup sweep is finishing; operate read-only until it releases the fleet lock
+ok - fm-startup-network: fleet-lock takeover cannot overlap a mutating sweep
+ok - fm-startup-network: same-session entry succeeds without changing an active sweep's owner
+ok - fm-startup-network: timing records share one origin so their offsets form a timeline
+ok - fm-startup-network: timings are durable and printed only on demand
+ok - fm-startup-network: a timed-out run still publishes the partial timings it recorded
+ok - fm-startup-network: the timing artifact cannot carry a command line or forge records
+ok - fm-startup-network: a held publish lock ends the worker inside its budget with a failed-rerun record
+FM_TEST_END 2026-10-01T00:53:58Z tests/.startup-network-repro.test.sh exit=0 duration_ms=53138 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=53304
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=53138 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/.startup-network-repro.test.sh duration_ms=53138
+fm-test-run: wrote timing artifact: /home/ubuntu/.no-mistakes/evidence/01M3T84JP9X8B71Q5FT96AR7D2/startup-focused-final.json

@@ -1,0 +1,61 @@
+Real Firstmate watcher + arm + durable drain; no mocked backend or product executable.
+The tmux adapter points to a private absent socket; this home has no fleet panes.
+$ bin/fm-lab-home.sh create /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-watcher-validation/watch-lab
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-watcher-validation/watch-lab
+exit=0
+Owning arm: watcher: started pid=227395 (beacon fresh)
+Actual watcher process and ownership record:
+$ ps -p 227395 -o pid=,ppid=,stat=,comm=
+ 227395  227297 S    bash
+exit=0
+pid=227395
+pid-identity=linux-starttime=379736170 cmdline-hex=62617368002f686f6d652f7562756e74752f2e6e6f2d6d697374616b65732f776f726b74726565732f3963343565663136656632632f30314d335438344a5039583842373151354654393641523744322f62696e2f666d2d77617463682e736800
+pid-namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026531836]
+fm-home=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-watcher-validation/watch-lab
+watcher-path=/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/bin/fm-watch.sh
+Attached arm: watcher: attached pid=227395 (beacon 0s)
+Paused the real watcher to exceed its 3s freshness grace without reaching its 60s stall bound.
+Beacon age=7s; attached_arm_returncode=None
+Resumed real watcher and wrote a needs-decision status.
+Owning arm output:
+watcher: started pid=227395 (beacon fresh)
+signal: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-watcher-validation/watch-lab/state/demo.status
+
+Attached arm output:
+watcher: attached pid=227395 (beacon 0s)
+signal: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-watcher-validation/watch-lab/state/demo.status
+
+Durable wake queue before any drain:
+1790815025	1	signal	demo.status	needs-decision: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-watcher-validation/watch-lab/state/demo.status
+1790815026	2	signal	demo.status	needs-decision: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-watcher-validation/watch-lab/state/demo.status
+
+Unacknowledged watcher completion survives another arm:
+watcher: started pid=265247 (beacon fresh)
+check: rearm-resurface
+
+$ bin/fm-wake-drain.sh
+1790815026	2	signal	demo.status	needs-decision: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-watcher-validation/watch-lab/state/demo.status
+wake annotation: latest wake-EVENT observed at drain, not current state: demo.status: needs-decision: choose export format for live validation
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+demo needs-decision: choose export format for live validation
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 227395.1790815025.6UF44i
+exit=0
+Durable queue after presentation:
+1790815025	1	signal	demo.status	needs-decision: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-watcher-validation/watch-lab/state/demo.status
+1790815026	2	signal	demo.status	needs-decision: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-watcher-validation/watch-lab/state/demo.status
+
+$ bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 227395.1790815025.6UF44i
+exit=0
+Durable queue after exact acknowledgement:
+
+Watch cycle lifecycle ledger:
+arm_pid=227297	watcher_pid=227395	origin=started	started_at=1790815015	ended_at=1790815028	exit_code=0	signal=none	reason=actionable-signal	beacon_age=11	lock_before=pid:227395|identity:linux-starttime=379736170 cmdline-hex=62617368002f686f6d652f7562756e74752f2e6e6f2d6d697374616b65732f776f726b74726565732f3963343565663136656632632f30314d335438344a5039583842373151354654393641523744322f62696e2f666d2d77617463682e736800	lock_after=pid:none|identity:none	successor=none
+arm_pid=230079	watcher_pid=227395	origin=attached	started_at=1790815017	ended_at=1790815043	exit_code=unknown	signal=unknown	reason=attached-delivered-wake	beacon_age=26	lock_before=pid:227395|identity:linux-starttime=379736170 cmdline-hex=62617368002f686f6d652f7562756e74752f2e6e6f2d6d697374616b65732f776f726b74726565732f3963343565663136656632632f30314d335438344a5039583842373151354654393641523744322f62696e2f666d2d77617463682e736800	lock_after=pid:none|identity:none	successor=none
+arm_pid=265130	watcher_pid=265247	origin=started	started_at=1790815043	ended_at=1790815046	exit_code=0	signal=none	reason=actionable-check	beacon_age=1	lock_before=pid:265247|identity:linux-starttime=379738987 cmdline-hex=62617368002f686f6d652f7562756e74752f2e6e6f2d6d697374616b65732f776f726b74726565732f3963343565663136656632632f30314d335438344a5039583842373151354654393641523744322f62696e2f666d2d77617463682e736800	lock_after=pid:none|identity:none	successor=none
+
+RESULT: slow attached watcher preserved its cycle, delivered its real status to both arms, and rearm recovered durable unacknowledged work.
+$ bin/fm-watch-arm.sh --stop
+watcher: none running
+exit=0
+All owned watcher/arm processes reaped.

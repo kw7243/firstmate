@@ -1,0 +1,12 @@
+{
+  "root_fixture_processes": [],
+  "root_scratch_removed": true,
+  "production_diff": [],
+  "tracked_changes": [
+    "tests/fm-contributions.test.sh",
+    "tests/fm-procevent.test.sh",
+    "tests/fm-remote-reply.test.sh",
+    "tests/fm-supervision-host.test.sh",
+    "tests/fm-watch-arm.test.sh"
+  ]
+}

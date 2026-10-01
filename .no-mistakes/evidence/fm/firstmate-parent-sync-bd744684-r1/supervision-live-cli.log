@@ -1,0 +1,208 @@
+
+$ bin/fm-lab-home.sh create /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-supervision/manual/home
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-supervision/manual/home
+[exit 0; expected 0]
+
+SCENARIO: default and explicit supervision-host opt-out
+
+$ bash bin/fm-supervision-engine-lib.sh enabled /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-supervision/manual/home/config claude
+[exit 0; expected 0]
+
+$ bash bin/fm-supervision-engine-lib.sh enabled /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-supervision/manual/home/config codex
+[exit 1; expected 1]
+
+$ bash bin/fm-supervision-engine-lib.sh enabled /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-supervision/manual/home/config codex
+[exit 0; expected 0]
+
+$ bash bin/fm-supervision-engine-lib.sh enabled /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-supervision/manual/home/config claude
+[exit 1; expected 1]
+
+$ bash bin/fm-supervision-engine-lib.sh enabled /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-supervision/manual/home/config codex
+[exit 1; expected 1]
+
+$ bash bin/fm-supervision-engine-lib.sh enabled /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-supervision/manual/home/config claude
+[exit 1; expected 1]
+
+SCENARIO: quiet posture becomes away; away cannot silently become quiet
+
+$ env FM_AFK_MODE=quiet bin/fm-afk-launch.sh enter --words Continue\ the\ assigned\ review.
+Quiet mode recorded at 2026-10-01T00:36:25Z: you are present, so nothing waits for your return: every action you ask for, a local landing or a merge included, proceeds now under ordinary attended authority, and quiet mode changes only which updates reach this conversation. Only an explicit /quiet off ends it.
+Quiet mode (recorded):
+  entered: 2026-10-01T00:36:25Z
+  holds: none - you are present, so nothing waits for your return: every action you ask for, a local landing or a merge included, proceeds now under ordinary attended authority, and quiet mode changes only which updates reach this conversation.
+  your words (verbatim):
+    Continue the assigned review.
+[exit 0; expected 0]
+
+$ bin/fm-afk-contract.sh mode
+quiet
+[exit 0; expected 0]
+
+$ bin/fm-afk-launch.sh enter
+fm-afk-contract: quiet mode became the away posture; the quiet record is archived at /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-supervision/manual/home/state/afk-contracts/1790814985-superseded-1790814986.afk-contract
+Away posture recorded at 2026-10-01T00:36:26Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. No away instructions were recorded; the away session acts on standing authority only, and anything that needs you waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-10-01T00:36:26Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words: (none)
+[exit 0; expected 0]
+
+$ bin/fm-afk-contract.sh mode
+away
+[exit 0; expected 0]
+
+$ env FM_AFK_MODE=quiet bin/fm-afk-contract.sh enter
+fm-afk-contract: away posture already recorded at 2026-10-01T00:36:26Z; a refresh leaves it untouched
+Away posture recorded at 2026-10-01T00:36:26Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. No away instructions were recorded; the away session acts on standing authority only, and anything that needs you waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-10-01T00:36:26Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words: (none)
+[exit 0; expected 0]
+
+$ bin/fm-afk-contract.sh mode
+away
+[exit 0; expected 0]
+
+$ bin/fm-afk-return.sh begin
+fm-afk-launch: away-posture record archived at /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-supervision/manual/home/state/afk-contracts/1790814986.afk-contract
+fm-afk-launch: away mode stopped; no daemon terminal was running, .afk cleared, and the posture record archived
+=== Return brief (away 2026-10-01T00:36:26Z -> 2026-10-01T00:36:36Z, 10s) ===
+Supervisor health:
+  - GAP: the watcher beat was 999999s old at return (grace 300s)
+Your instructions:
+  (no away instructions recorded)
+  the away session took no action under them.
+Waiting on you:
+  (nothing)
+Tried and failed, or could not be fixed:
+  (nothing)
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  0 outcome(s) handled by the away session (0 routine, 0 escalated above)
+  (no routine outcomes recorded in the store for this window)
+Cost: 0 supervision outcome(s) recorded (0 routine, 0 captain); 0 task(s) live at return.
+catch-up health: GAP: the watcher beat was 999999s old at return (grace 300s)
+fm-afk-return: catch-up clear; ordinary captain work may proceed
+[exit 0; expected 0]
+
+SCENARIO: away return reports real durable outcomes and blocks on unresolved work
+
+$ bin/fm-afk-launch.sh enter --words Review\ the\ synthetic\ change\ and\ wait\ on\ uncertain\ decisions.
+Away posture recorded at 2026-10-01T00:36:37Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+Away posture (recorded):
+  entered: 2026-10-01T00:36:37Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    Review the synthetic change and wait on uncertain decisions.
+[exit 0; expected 0]
+
+$ bin/fm-branch-outcome.sh append --task demo --verdict routine --summary per\ your\ away\ instructions:\ reviewed\ the\ synthetic\ change
+1
+[exit 0; expected 0]
+
+$ bin/fm-branch-outcome.sh append --task demo --verdict captain --summary Synthetic\ decision\ still\ needs\ an\ answer
+2
+[exit 0; expected 0]
+
+$ bin/fm-afk-return.sh begin
+fm-afk-launch: away-posture record archived at /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-supervision/manual/home/state/afk-contracts/1790814997.afk-contract
+fm-afk-launch: away mode stopped; no daemon terminal was running, .afk cleared, and the posture record archived
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+=== Return brief (away 2026-10-01T00:36:37Z -> 2026-10-01T00:36:48Z, 11s) ===
+Supervisor health:
+  - GAP: the watcher beat was 999999s old at return (grace 300s)
+Your instructions:
+  your words at entry:
+    Review the synthetic change and wait on uncertain decisions.
+  the away session acted on them:
+    - demo: per your away instructions: reviewed the synthetic change
+Waiting on you:
+  escalated by the away session:
+    - demo: Synthetic decision still needs an answer
+Tried and failed, or could not be fixed:
+  - demo [key=synthetic-token] still blocked, firstmate remediates before ordinary work: synthetic local token needs replacement
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  2 outcome(s) handled by the away session (1 routine, 1 escalated above)
+  1 routine outcome(s) recorded; the latest visible:
+    - demo: per your away instructions: reviewed the synthetic change
+Cost: 2 supervision outcome(s) recorded (1 routine, 1 captain); 1 task(s) live at return.
+fm-afk-return: catch-up must finish before the captain request
+catch-up health: GAP: the watcher beat was 999999s old at return (grace 300s)
+catch-up wake: OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+catch-up wake: demo [key=synthetic-token] blocked: synthetic local token needs replacement
+catch-up wake: OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+firstmate-actionable blocker: demo [key=synthetic-token] synthetic local token needs replacement
+fm-afk-return: handle each blocker now, or close it with resolved [key=...] and append a durable reclassification reason, then run bin/fm-afk-return.sh check
+[exit 3; expected 3]
+
+$ bin/fm-afk-return.sh guard
+fm-afk-return: return catch-up is pending; remediate or durably reclassify every listed blocker, then run bin/fm-afk-return.sh check
+firstmate-actionable blocker: demo [key=synthetic-token] synthetic local token needs replacement
+[exit 4; expected 4]
+
+$ bin/fm-afk-return.sh catchup-summary
+1	
+[exit 0; expected 0]
+
+$ bin/fm-afk-return.sh check
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+=== Return brief (away 2026-10-01T00:36:37Z -> 2026-10-01T00:36:56Z, 19s) ===
+Supervisor health:
+  - GAP: the watcher beat was 999999s old at return (grace 300s)
+Your instructions:
+  your words at entry:
+    Review the synthetic change and wait on uncertain decisions.
+  the away session acted on them:
+    - demo: per your away instructions: reviewed the synthetic change
+Waiting on you:
+  escalated by the away session:
+    - demo: Synthetic decision still needs an answer
+Tried and failed, or could not be fixed:
+  (nothing)
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  2 outcome(s) handled by the away session (1 routine, 1 escalated above)
+  1 routine outcome(s) recorded; the latest visible:
+    - demo: per your away instructions: reviewed the synthetic change
+Cost: 2 supervision outcome(s) recorded (1 routine, 1 captain); 1 task(s) live at return.
+catch-up health: GAP: the watcher beat was 999999s old at return (grace 300s)
+catch-up wake: OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+catch-up wake: demo [key=synthetic-token] blocked: synthetic local token needs replacement
+catch-up wake: OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+fm-afk-return: catch-up clear; ordinary captain work may proceed
+[exit 0; expected 0]
+
+$ bin/fm-afk-return.sh guard
+[exit 0; expected 0]
+
+Persisted outcome store after return:
+{"seq":1,"epoch":1790814998,"task":"demo","wake":"","verdict":"routine","summary":"per your away instructions: reviewed the synthetic change","silent":false,"statusEndpoint":0,"statusIdent":"-"}
+{"seq":2,"epoch":1790814998,"task":"demo","wake":"","verdict":"captain","summary":"Synthetic decision still needs an answer","silent":false,"statusEndpoint":0,"statusIdent":"-"}
+
+SCENARIO: missing live primary CLI refuses before creating a lab
+
+$ bin/fm-live-lab.sh up --harness claude --source /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2 --ref HEAD --timeout 1 /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-supervision/manual/claude-lab
+fm-live-lab: claude is required and was not found on PATH
+[exit 1; expected 1]
+
+$ bin/fm-live-lab.sh up --harness pi --source /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2 --ref HEAD --timeout 1 /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-supervision/manual/pi-lab
+fm-live-lab: pi is required and was not found on PATH
+[exit 1; expected 1]
+Neither refused lab created a directory.

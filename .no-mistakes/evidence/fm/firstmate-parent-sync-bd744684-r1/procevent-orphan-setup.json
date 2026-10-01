@@ -1,0 +1,39 @@
+[
+  {
+    "path": "output",
+    "mtime_ns": 1790815725076450231,
+    "last_line": "not ok - the listener under test was not reparented away from its session (ppid )"
+  },
+  {
+    "path": "tmp/fm-procevent-tests.ovSNxl/orphan-dead-owner/state/procevent/.owner-lease",
+    "mtime_ns": 1790815719677444094,
+    "content": "3798065.893293"
+  },
+  {
+    "path": "tmp/fm-procevent-tests.ovSNxl/orphan-live-owner/state/procevent/.owner-lease",
+    "mtime_ns": 1790815722190446951,
+    "content": "3798068.400955"
+  },
+  {
+    "path": "tmp/fm-procevent-tests.ovSNxl/orphan-dead-owner/state/procevent/orphan-src.runner",
+    "mtime_ns": 1790815722182446942,
+    "content": "1208596",
+    "process_now": ""
+  },
+  {
+    "path": "tmp/fm-procevent-tests.ovSNxl/orphan-live-owner/state/procevent/keep-src.runner",
+    "mtime_ns": 1790815724955450093,
+    "content": "1212830",
+    "process_now": ""
+  },
+  {
+    "path": "tmp/fm-procevent-tests.ovSNxl/orphan-dead.descendant",
+    "mtime_ns": 1790815722760447598,
+    "content": "1212520"
+  },
+  {
+    "path": "tmp/fm-procevent-tests.ovSNxl/orphan-live.descendant",
+    "mtime_ns": 1790815725292450476,
+    "content": "1216610"
+  }
+]

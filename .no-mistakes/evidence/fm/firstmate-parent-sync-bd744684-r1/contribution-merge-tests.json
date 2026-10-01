@@ -1,0 +1,46 @@
+{
+  "families": [
+    {
+      "count": 1,
+      "duration_ms": 1096089,
+      "failed": 0,
+      "name": "pr-forge"
+    },
+    {
+      "count": 1,
+      "duration_ms": 293177,
+      "failed": 1,
+      "name": "snapshot-bearings"
+    }
+  ],
+  "finished_at": "2026-10-01T00:59:53Z",
+  "run_id": "fm-test-run-1790815004220-212419",
+  "scripts": [
+    {
+      "duration_ms": 293177,
+      "exit": 2,
+      "expected_gate_skip": "optional-binary",
+      "family": "snapshot-bearings",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-contributions.test.sh"
+    },
+    {
+      "duration_ms": 1096089,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pr-forge",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-pr-merge.test.sh"
+    }
+  ],
+  "selection": "scripts;jobs=1",
+  "started_at": "2026-10-01T00:36:44Z",
+  "summary": {
+    "duration_ms": 1389562,
+    "failed": 1,
+    "skipped_gate": 0,
+    "total": 2
+  }
+}

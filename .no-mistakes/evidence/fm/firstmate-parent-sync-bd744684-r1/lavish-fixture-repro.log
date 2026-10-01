@@ -1,0 +1,6 @@
+$ bin/fm-procevent.sh register lavish idle-lavish -- /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-watcher-validation/lavish-repro/lavish-source.sh /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-watcher-validation/lavish-repro/result-ready
+error: process-event state root is not a private directory
+exit=1 elapsed=0.322
+$ bin/fm-procevent.sh retire idle-lavish
+error: process-event state root is not a private directory
+exit=1 elapsed=0.314

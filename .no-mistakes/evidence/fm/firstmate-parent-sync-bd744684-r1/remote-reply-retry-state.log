@@ -1,0 +1,590 @@
+Remote-reply retry final fixture state; test exit 1
+
+await-remote-reply-ios.2.result.out
+autohandled: remote-reply-ios
+cannot retire terminal source; it remains registered: remote-reply-ios
+captured: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/remote-tmp/fm-remote-reply.YDateb/parent/state/procevent-inbox/remote-reply-ios.2.result
+autohandled: remote-reply-ios
+cannot retire terminal source; it remains registered: remote-reply-ios
+captured: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/remote-tmp/fm-remote-reply.YDateb/parent/state/procevent-inbox/remote-reply-ios.3.result
+autohandled: remote-reply-ios
+cannot retire terminal source; it remains registered: remote-reply-ios
+captured: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/remote-tmp/fm-remote-reply.YDateb/parent/state/procevent-inbox/remote-reply-ios.4.result
+
+await-remote-reply-ios.22.result.out
+
+await-remote-reply-ios.5.result.out
+autohandled: remote-reply-ios
+cannot retire terminal source; it remains registered: remote-reply-ios
+captured: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/remote-tmp/fm-remote-reply.YDateb/parent/state/procevent-inbox/remote-reply-ios.5.result
+autohandled: remote-reply-ios
+cannot retire terminal source; it remains registered: remote-reply-ios
+captured: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/remote-tmp/fm-remote-reply.YDateb/parent/state/procevent-inbox/remote-reply-ios.6.result
+
+await-remote-reply-ios.7.result.out
+autohandled: remote-reply-ios
+cannot retire terminal source; it remains registered: remote-reply-ios
+captured: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/remote-tmp/fm-remote-reply.YDateb/parent/state/procevent-inbox/remote-reply-ios.7.result
+
+await-remote-reply-ios.9.result.out
+autohandled: remote-reply-ios
+cannot retire terminal source; it remains registered: remote-reply-ios
+captured: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/remote-tmp/fm-remote-reply.YDateb/parent/state/procevent-inbox/remote-reply-ios.9.result
+autohandled: remote-reply-ios
+cannot retire terminal source; it remains registered: remote-reply-ios
+captured: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/remote-tmp/fm-remote-reply.YDateb/parent/state/procevent-inbox/remote-reply-ios.10.result
+autohandled: remote-reply-ios
+cannot retire terminal source; it remains registered: remote-reply-ios
+captured: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/remote-tmp/fm-remote-reply.YDateb/parent/state/procevent-inbox/remote-reply-ios.11.result
+autohandled: remote-reply-ios
+cannot retire terminal source; it remains registered: remote-reply-ios
+captured: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/remote-tmp/fm-remote-reply.YDateb/parent/state/procevent-inbox/remote-reply-ios.12.result
+autohandled: remote-reply-ios
+cannot retire terminal source; it remains registered: remote-reply-ios
+captured: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/remote-tmp/fm-remote-reply.YDateb/parent/state/procevent-inbox/remote-reply-ios.13.result
+autohandled: remote-reply-ios
+cannot retire terminal source; it remains registered: remote-reply-ios
+captured: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/remote-tmp/fm-remote-reply.YDateb/parent/state/procevent-inbox/remote-reply-ios.14.result
+autohandled: remote-reply-ios
+cannot retire terminal source; it remains registered: remote-reply-ios
+captured: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/remote-tmp/fm-remote-reply.YDateb/parent/state/procevent-inbox/remote-reply-ios.15.result
+autohandled: remote-reply-ios
+cannot retire terminal source; it remains registered: remote-reply-ios
+captured: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/remote-tmp/fm-remote-reply.YDateb/parent/state/procevent-inbox/remote-reply-ios.16.result
+autohandled: remote-reply-ios
+cannot retire terminal source; it remains registered: remote-reply-ios
+captured: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/remote-tmp/fm-remote-reply.YDateb/parent/state/procevent-inbox/remote-reply-ios.17.result
+autohandled: remote-reply-ios
+
+extract-fail.out
+error: cannot extract remote document pointers
+
+handle-arm-fail.out
+ingested: ios appended=0 offset=89
+mkdir: cannot create directory ‘/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/remote-tmp/fm-remote-reply.YDateb/parent/state/procevent’: File exists
+error: cannot publish the registration
+
+handle-local-document-failure.out
+error: could not store referenced remote document: data/reply/retry.md
+
+handle-mirror.out
+ingested: ios appended=0 offset=508
+registered: remote-reply-ios (remote-reply)
+armed: remote-reply-ios offset=508
+already-handled: remote-reply-ios 4
+
+handle-two-unacked.out
+ingested: ios appended=0 offset=140
+registered: remote-reply-ios (remote-reply)
+armed: remote-reply-ios offset=140
+error: cannot durably record handling: remote-reply-ios 2
+
+start-one.out
+autohandled: remote-reply-ios
+cannot retire terminal source; it remains registered: remote-reply-ios
+captured: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/remote-tmp/fm-remote-reply.YDateb/parent/state/procevent-inbox/remote-reply-ios.1.result
+
+claims/remote-reply-ios.claim
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/remote-tmp/fm-remote-reply.YDateb/parent
+1373515
+.claim.jxNC0T-1373515
+linux-starttime=379819156 cmdline-hex=62617368002f686f6d652f7562756e74752f2e6e6f2d6d697374616b65732f776f726b74726565732f3963343565663136656632632f30314d335438344a5039583842373151354654393641523744322f2e746573742d70726f636576656e742d76616c69646174696f6e2f72656d6f74652d636f64652f62696e2f666d2d70726f636576656e742e7368005f73746172740072656d6f74652d7265706c792d696f7300
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/remote-tmp/fm-remote-reply.YDateb/parent/state/procevent
+64769:5248364
+active
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/remote-tmp/fm-remote-reply.YDateb/parent/state
+64769
+5258752
+1000
+755
+2033171b-9858-4767-ad27-2c59662487fa/pid:[4026531836]
+
+parent/state/procevent/remote-reply-ios.source
+adapter=remote-reply
+argc=3
+argv:
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3T84JP9X8B71Q5FT96AR7D2/.test-procevent-validation/remote-code/bin/fm-procevent-remote-reply.sh
+source
+ios
+
+parent/state/procevent-inbox/remote-reply-ios.1.result
+schema=fm-remote-delta.v1
+status=delta
+path=state/parent-replies.status
+from_offset=0
+to_offset=89
+from_prefix_sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+to_prefix_sha256=4ab72b1c7765aa3b67339c46eb05f1cfb52f6de0aa2992efdc767bdc9aa95a7f
+payload_sha256=4ab72b1c7765aa3b67339c46eb05f1cfb52f6de0aa2992efdc767bdc9aa95a7f
+payload_bytes=89
+reason=
+
+done [corr=0123456789abcdef] [at=1700000000]: build verified report=data/reply/report.md
+
+parent/state/procevent-inbox/remote-reply-ios.10.result
+schema=fm-remote-delta.v1
+status=delta
+path=state/parent-replies.status
+from_offset=769
+to_offset=932
+from_prefix_sha256=4b6e0601cdb873af827d0e515822da2ed8f9d1e02dc3eba29a08f96fcd18ce95
+to_prefix_sha256=162e58e47564a9cd2a72a1010d9bd28149fdd0caad7e44c9a3146ff9996aa7f3
+payload_sha256=06155aecf73bf81d8d38676205038f041a1a745fd93ff2707d2bf280e7a44c95
+payload_bytes=163
+reason=
+
+done [key=adjacent-reports]: report=data/reply/adjacent-a.md,report=data/reply/adjacent-b.md report=data/reply/result.md alongside report=data/reply/result.md.bak
+
+parent/state/procevent-inbox/remote-reply-ios.11.result
+schema=fm-remote-delta.v1
+status=delta
+path=state/parent-replies.status
+from_offset=932
+to_offset=1028
+from_prefix_sha256=162e58e47564a9cd2a72a1010d9bd28149fdd0caad7e44c9a3146ff9996aa7f3
+to_prefix_sha256=efb08650b7de36beabc49cb5ed92453fb606a4701137732ba52b1edc30b39154
+payload_sha256=d8647bef575d678a09a5092f179b32e4d5aff505314a6a8a3936f28a189b20a7
+payload_bytes=96
+reason=
+
+working [key=glued-pointers]: glued report=data/reply/glued-prefix.mdreport=data/reply/glued.md
+
+parent/state/procevent-inbox/remote-reply-ios.12.result
+schema=fm-remote-delta.v1
+status=delta
+path=state/parent-replies.status
+from_offset=1028
+to_offset=1186
+from_prefix_sha256=efb08650b7de36beabc49cb5ed92453fb606a4701137732ba52b1edc30b39154
+to_prefix_sha256=aeecaf413f4e3427210ac5efb7b4e50dde646ba4bb3f47140124ddda28780947
+payload_sha256=13e33aeff1edb2b7d9c3ce31083d1ca775ca85238662208f9fb197aa3f0188fc
+payload_bytes=158
+reason=
+
+done [key=nested-remote]: nested report=data/remote-secondmates/nested/data/reply/report.md foreign report=data/remote-secondmates/other/data/reply/report.md
+
+parent/state/procevent-inbox/remote-reply-ios.13.result
+schema=fm-remote-delta.v1
+status=delta
+path=state/parent-replies.status
+from_offset=1186
+to_offset=1316
+from_prefix_sha256=aeecaf413f4e3427210ac5efb7b4e50dde646ba4bb3f47140124ddda28780947
+to_prefix_sha256=72a3a4b24896b86d8128ffa4faccab0856bb838a6ac51179639914f0e96074ff
+payload_sha256=aeafda69251e79caf8f7df80bcddad7fb244f79eb9d2f893522b2202a743597d
+payload_bytes=130
+reason=
+
+reply [corr=3333333333333333]: dispatched the voice scout, report path data/reply/voice-scout-report.md, will relay on completion
+
+parent/state/procevent-inbox/remote-reply-ios.14.result
+schema=fm-remote-delta.v1
+status=delta
+path=state/parent-replies.status
+from_offset=1316
+to_offset=1580
+from_prefix_sha256=72a3a4b24896b86d8128ffa4faccab0856bb838a6ac51179639914f0e96074ff
+to_prefix_sha256=3b69a58111108b7c725d750a49abcefa10dc2491fcabced6e49ff98224c89ab5
+payload_sha256=d87624d16febe4ba0c9561884aa98a1336ea9593551350aabd6404dca3cd7d85
+payload_bytes=264
+reason=
+
+reply [corr=3333333333333333]: No report to transfer YET - data/reply/voice-scout-report.md is NOT yet written; nothing is lost
+reply [corr=3333333333333333]: same - the report does not exist yet (scout still working, data/reply/voice-scout-report.md not written)
+
+parent/state/procevent-inbox/remote-reply-ios.15.result
+schema=fm-remote-delta.v1
+status=delta
+path=state/parent-replies.status
+from_offset=1580
+to_offset=1720
+from_prefix_sha256=3b69a58111108b7c725d750a49abcefa10dc2491fcabced6e49ff98224c89ab5
+to_prefix_sha256=b429bc419cacf8a0de21ae53fb94e847299e4f4609e61a2591a1b6c924e6d8be
+payload_sha256=3d52bb9d060d7c7b4ecc0c60e4340b1da0b1744e732261253d4c27d2716766c2
+payload_bytes=140
+reason=
+
+done [key=child-outcome-voice-scout-done-ab12cd34]: child voice-scout done: report ready mode=scout report=data/reply/voice-scout-report.md
+
+parent/state/procevent-inbox/remote-reply-ios.16.result
+schema=fm-remote-delta.v1
+status=delta
+path=state/parent-replies.status
+from_offset=1720
+to_offset=1805
+from_prefix_sha256=b429bc419cacf8a0de21ae53fb94e847299e4f4609e61a2591a1b6c924e6d8be
+to_prefix_sha256=da81246378933c307600569cbe0b48da62a715d2c002a4e23b24cff0ed308e15
+payload_sha256=020eb2c85f5c476e4c8f52152911de792a81cdefed6f533def1b35250d853b72
+payload_bytes=85
+reason=
+
+reply [corr=4444444444444444]: dispatched a scout report=data/reply/never-written.md
+
+parent/state/procevent-inbox/remote-reply-ios.17.result
+schema=fm-remote-delta.v1
+status=delta
+path=state/parent-replies.status
+from_offset=1805
+to_offset=1957
+from_prefix_sha256=da81246378933c307600569cbe0b48da62a715d2c002a4e23b24cff0ed308e15
+to_prefix_sha256=b03563548dbce83791fb9ecfad435055be3bffa2239d510d61e796bbb4317c2f
+payload_sha256=bb399d899d2b18d492061cba148509a2fd30c7d584a3b7db15624a0230d0a1b8
+payload_bytes=152
+reason=
+
+reply [corr=4444444444444444]: still writing report=data/reply/never-written.md
+reply [corr=4444444444444444]: same, report=data/reply/never-written.md
+
+parent/state/procevent-inbox/remote-reply-ios.18.result
+schema=fm-remote-delta.v1
+status=delta
+path=state/parent-replies.status
+from_offset=1957
+to_offset=2026
+from_prefix_sha256=b03563548dbce83791fb9ecfad435055be3bffa2239d510d61e796bbb4317c2f
+to_prefix_sha256=12692f31add7a43682f9b343069a927f50903fb589b5b176caba4e1eb2ae20e5
+payload_sha256=1820e91dce2c2730d7d5b5604a7d76c5c4603ad84b2e2e0954e67682cb3f8ff6
+payload_bytes=69
+reason=
+
+done [key=big-report]: oversize deliverable report=data/reply/big.md
+
+parent/state/procevent-inbox/remote-reply-ios.19.result
+schema=fm-remote-delta.v1
+status=delta
+path=state/parent-replies.status
+from_offset=2026
+to_offset=2096
+from_prefix_sha256=12692f31add7a43682f9b343069a927f50903fb589b5b176caba4e1eb2ae20e5
+to_prefix_sha256=5d6853f4bab50cefeded43da9853a774f9fb1d9583a93f9e89b1bed94d22d7fd
+payload_sha256=4afe6a6f42ecb035155402ea71625a3d7f5dcf3b446401138c530487e8019db9
+payload_bytes=70
+reason=
+
+done [key=extraction-failure]: probe report=data/reply/extractfail.md
+
+parent/state/procevent-inbox/remote-reply-ios.2.result
+schema=fm-remote-delta.v1
+status=delta
+path=state/parent-replies.status
+from_offset=89
+to_offset=140
+from_prefix_sha256=4ab72b1c7765aa3b67339c46eb05f1cfb52f6de0aa2992efdc767bdc9aa95a7f
+to_prefix_sha256=011c593d4974402aa01b67cace9c5b02c98d758273971d88adb426945d709bfc
+payload_sha256=457b2ef0ad11d97d576e7c518e75c649e1e2e2b4f0847ae0b9720e9bb6825a99
+payload_bytes=51
+reason=
+
+working [corr=1111111111111111]: second generation
+
+parent/state/procevent-inbox/remote-reply-ios.20.result
+schema=fm-remote-delta.v1
+status=delta
+path=state/parent-replies.status
+from_offset=2096
+to_offset=2159
+from_prefix_sha256=5d6853f4bab50cefeded43da9853a774f9fb1d9583a93f9e89b1bed94d22d7fd
+to_prefix_sha256=5055703c92374418528db9f03c7732a35bcf6803f9dd5d12cee9aab383eb09de
+payload_sha256=aeb5f64e816477c8f9083ded61b457d5df9bab9619c98b1a14db14824ee6020c
+payload_bytes=63
+reason=
+
+done [key=write-failure]: probe report=data/reply/writefail.md
+
+parent/state/procevent-inbox/remote-reply-ios.21.result
+schema=fm-remote-delta.v1
+status=delta
+path=state/parent-replies.status
+from_offset=2159
+to_offset=2230
+from_prefix_sha256=5055703c92374418528db9f03c7732a35bcf6803f9dd5d12cee9aab383eb09de
+to_prefix_sha256=687c6e6af8358054d302d2f9b625d52e47aac7f12145abc17c148bbdd30d93ae
+payload_sha256=7c94acac896ff9ea9ddf7bc682f6830fd9cda73014dd78df0ea2c20f114d7e67
+payload_bytes=71
+reason=
+
+needs-decision [key=replay-decision]: pick report=data/reply/replay.md
+
+parent/state/procevent-inbox/remote-reply-ios.22.result
+schema=fm-remote-delta.v1
+status=delta
+path=state/parent-replies.status
+from_offset=0
+to_offset=2230
+from_prefix_sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+to_prefix_sha256=687c6e6af8358054d302d2f9b625d52e47aac7f12145abc17c148bbdd30d93ae
+payload_sha256=687c6e6af8358054d302d2f9b625d52e47aac7f12145abc17c148bbdd30d93ae
+payload_bytes=2230
+reason=
+
+done [corr=0123456789abcdef] [at=1700000000]: build verified report=data/reply/report.md
+working [corr=1111111111111111]: second generation
+done [corr=2222222222222222]: third generation
+working [key=version-audit]: family --version audit complete (data/reply/prose-only.md)
+needs-decision [key=rough-cut-version]: implement --version or retire the tool
+needs-decision [at=1700000000]: which base branch?
+needs-decision [at=1700086400]: which base branch?
+done [corr=08d71c8f73ed98d1]: release chain audited
+blocked [key=ctl]: escape [31mhere[0m bell  café end
+status=delta
+working [key=nul-byte]: before after
+done [key=retry-document]: retry local storage report=data/reply/retry.md
+working [key=malformed-report]: malformed offer report=data/reply/result.md.bak
+done [key=adjacent-reports]: report=data/reply/adjacent-a.md,report=data/reply/adjacent-b.md report=data/reply/result.md alongside report=data/reply/result.md.bak
+working [key=glued-pointers]: glued report=data/reply/glued-prefix.mdreport=data/reply/glued.md
+done [key=nested-remote]: nested report=data/remote-secondmates/nested/data/reply/report.md foreign report=data/remote-secondmates/other/data/reply/report.md
+reply [corr=3333333333333333]: dispatched the voice scout, report path data/reply/voice-scout-report.md, will relay on completion
+reply [corr=3333333333333333]: No report to transfer YET - data/reply/voice-scout-report.md is NOT yet written; nothing is lost
+reply [corr=3333333333333333]: same - the report does not exist yet (scout still working, data/reply/voice-scout-report.md not written)
+done [key=child-outcome-voice-scout-done-ab12cd34]: child voice-scout done: report ready mode=scout report=data/reply/voice-scout-report.md
+reply [corr=4444444444444444]: dispatched a scout report=data/reply/never-written.md
+reply [corr=4444444444444444]: still writing report=data/reply/never-written.md
+reply [corr=4444444444444444]: same, report=data/reply/never-written.md
+done [key=big-report]: oversize deliverable report=data/reply/big.md
+done [key=extraction-failure]: probe report=data/reply/extractfail.md
+done [key=write-failure]: probe report=data/reply/writefail.md
+needs-decision [key=replay-decision]: pick report=data/reply/replay.md
+
+parent/state/procevent-inbox/remote-reply-ios.3.result
+schema=fm-remote-delta.v1
+status=delta
+path=state/parent-replies.status
+from_offset=140
+to_offset=187
+from_prefix_sha256=011c593d4974402aa01b67cace9c5b02c98d758273971d88adb426945d709bfc
+to_prefix_sha256=fb1ebcac413c51f8a6fd4d18941ea57300ebc6a586b71ae1e17ce91f6e37f7c7
+payload_sha256=7341139e22b7862e269b36e19bfc5acd81d8b57e4db9c747feedaa15270f1ea7
+payload_bytes=47
+reason=
+
+done [corr=2222222222222222]: third generation
+
+parent/state/procevent-inbox/remote-reply-ios.4.result
+schema=fm-remote-delta.v1
+status=delta
+path=state/parent-replies.status
+from_offset=187
+to_offset=508
+from_prefix_sha256=fb1ebcac413c51f8a6fd4d18941ea57300ebc6a586b71ae1e17ce91f6e37f7c7
+to_prefix_sha256=b84976364b255b63d8266edb37a23d92c098e696d4d1a5a032b4bb678b7a3ae5
+payload_sha256=8d94ca8d9d48469f84c704ca364ec17db58306f89a89f534f802f1784be1de31
+payload_bytes=321
+reason=
+
+working [key=version-audit]: family --version audit complete (data/reply/prose-only.md)
+needs-decision [key=rough-cut-version]: implement --version or retire the tool
+needs-decision [at=1700000000]: which base branch?
+needs-decision [at=1700086400]: which base branch?
+done [corr=08d71c8f73ed98d1]: release chain audited
+
+parent/state/procevent-inbox/remote-reply-ios.5.result
+schema=fm-remote-delta.v1
+status=delta
+path=state/parent-replies.status
+from_offset=508
+to_offset=565
+from_prefix_sha256=b84976364b255b63d8266edb37a23d92c098e696d4d1a5a032b4bb678b7a3ae5
+to_prefix_sha256=a1518cb20c7769a9cc985e4d11f64fc9cef04cb9c0dd1a70779f1c2bdb56ce6e
+payload_sha256=881693ca88f29e2b43000eee24bce70d129e51fe913838846679666c9257215f
+payload_bytes=57
+reason=
+
+blocked [key=ctl]: escape [31mhere[0m bell  café end
+
+parent/state/procevent-inbox/remote-reply-ios.6.result
+schema=fm-remote-delta.v1
+status=delta
+path=state/parent-replies.status
+from_offset=565
+to_offset=578
+from_prefix_sha256=a1518cb20c7769a9cc985e4d11f64fc9cef04cb9c0dd1a70779f1c2bdb56ce6e
+to_prefix_sha256=ceaaf2838e63cd8e8875a1acf03df41b21094f1d57a46131efbe87fc64a67348
+payload_sha256=722d1fd0c6cbb05105da5e8dedff7c8784d58d03df345f59076ea87cad08c6a5
+payload_bytes=13
+reason=
+
+status=delta
+
+parent/state/procevent-inbox/remote-reply-ios.7.result
+schema=fm-remote-delta.v1
+status=delta
+path=state/parent-replies.status
+from_offset=578
+to_offset=615
+from_prefix_sha256=ceaaf2838e63cd8e8875a1acf03df41b21094f1d57a46131efbe87fc64a67348
+to_prefix_sha256=f395ffc3dfaa75beeab332dbf3716d4dfb52f8fd9d8e3735ada3e9d4695916ce
+payload_sha256=f6bc045f7e73f067f574766efdd3f110f3cec40557a6d00b5e4849c0706449e5
+payload_bytes=37
+reason=
+
+working [key=nul-byte]: before after
+
+parent/state/procevent-inbox/remote-reply-ios.8.result
+schema=fm-remote-delta.v1
+status=delta
+path=state/parent-replies.status
+from_offset=615
+to_offset=689
+from_prefix_sha256=f395ffc3dfaa75beeab332dbf3716d4dfb52f8fd9d8e3735ada3e9d4695916ce
+to_prefix_sha256=3c65592a1a2519acc003647539fd225d3e1809144880b56fa2503bb10a1bc7d7
+payload_sha256=2c21e9ea122c0a192b5688e9d701bee52b35873ae409c5d136307924b50e2872
+payload_bytes=74
+reason=
+
+done [key=retry-document]: retry local storage report=data/reply/retry.md
+
+parent/state/procevent-inbox/remote-reply-ios.9.result
+schema=fm-remote-delta.v1
+status=delta
+path=state/parent-replies.status
+from_offset=689
+to_offset=769
+from_prefix_sha256=3c65592a1a2519acc003647539fd225d3e1809144880b56fa2503bb10a1bc7d7
+to_prefix_sha256=4b6e0601cdb873af827d0e515822da2ed8f9d1e02dc3eba29a08f96fcd18ce95
+payload_sha256=4c48f7527c99017e499a561a2c88956fd770db3d65d4871966eb6e4dd54de203
+payload_bytes=80
+reason=
+
+working [key=malformed-report]: malformed offer report=data/reply/result.md.bak
+
+parent/state/procevent-inbox/remote-reply-ios.1.handled
+
+parent/state/procevent-inbox/remote-reply-ios.10.handled
+
+parent/state/procevent-inbox/remote-reply-ios.11.handled
+
+parent/state/procevent-inbox/remote-reply-ios.12.handled
+
+parent/state/procevent-inbox/remote-reply-ios.13.handled
+
+parent/state/procevent-inbox/remote-reply-ios.14.handled
+
+parent/state/procevent-inbox/remote-reply-ios.15.handled
+
+parent/state/procevent-inbox/remote-reply-ios.16.handled
+
+parent/state/procevent-inbox/remote-reply-ios.17.handled
+
+parent/state/procevent-inbox/remote-reply-ios.18.handled
+
+parent/state/procevent-inbox/remote-reply-ios.19.handled
+
+parent/state/procevent-inbox/remote-reply-ios.2.handled
+
+parent/state/procevent-inbox/remote-reply-ios.20.handled
+
+parent/state/procevent-inbox/remote-reply-ios.21.handled
+
+parent/state/procevent-inbox/remote-reply-ios.3.handled
+
+parent/state/procevent-inbox/remote-reply-ios.4.handled
+
+parent/state/procevent-inbox/remote-reply-ios.5.handled
+
+parent/state/procevent-inbox/remote-reply-ios.6.handled
+
+parent/state/procevent-inbox/remote-reply-ios.7.handled
+
+parent/state/procevent-inbox/remote-reply-ios.8.handled
+
+parent/state/procevent-inbox/remote-reply-ios.9.handled
+
+parent/state/remote-replies/ios.1.ingested
+result_sha256=bc033b6b6de6f1989f26fb0ae9b5bd1f4d45e9ee10acd23ae28efbe5466bae14
+
+parent/state/remote-replies/ios.10.ingested
+result_sha256=4920573121520c5a8a86b11caca381278a3185a9a0033c424019cd7f443c86d2
+
+parent/state/remote-replies/ios.11.ingested
+result_sha256=b5acf5bbb0862eb6fcbec251f751a994e81b87cbf1bd28d828c986425e162a3e
+
+parent/state/remote-replies/ios.12.ingested
+result_sha256=21ab5cf9018f78c3c6b9b4c67f564dc410233a4445ee42da2bcb6d007f020884
+
+parent/state/remote-replies/ios.13.ingested
+result_sha256=d65625ea05867e37ea0e26119ee07e817abec416e1b4d2087abdbd46f06ebabd
+
+parent/state/remote-replies/ios.14.ingested
+result_sha256=4553a68565c9dc21540448154191cd44463b7d42ad7a7e4127ed8d6766518bb2
+
+parent/state/remote-replies/ios.15.ingested
+result_sha256=a72683b0e319793c9ad87e41fb3f4eea6a12236981c3e25ab6c04696537dc129
+
+parent/state/remote-replies/ios.16.ingested
+result_sha256=bda398890ba8212f4efc61031aaae4dff7d038a3983d3cac9a4ea3defcdbc13a
+
+parent/state/remote-replies/ios.17.ingested
+result_sha256=8b0ee6e622e4a4a9f617b589f23aae99cb5760c08b25a41804968da4a187f564
+
+parent/state/remote-replies/ios.18.ingested
+result_sha256=84c7634d32b9d99a79b5ee29337cd0b4294f2fd745c295714886624f5cbb0883
+
+parent/state/remote-replies/ios.19.ingested
+result_sha256=cc422c2c3e1ccd3dde067205181d834602895d713310d77347172e619473cbfe
+
+parent/state/remote-replies/ios.2.ingested
+result_sha256=33e6ecaa6a403b3ef1cacaed84ecfd90b61ef669b6a5ba2206b8a41b032b6b90
+
+parent/state/remote-replies/ios.20.ingested
+result_sha256=11f3728dd021f4bca7891e5dd56acfed4137fd06df96fc5fdaeb13ab42f719e9
+
+parent/state/remote-replies/ios.21.ingested
+result_sha256=f4a5678373fd4b992d08009c4f0c59f12968d04a041451220e3be207240158ed
+
+parent/state/remote-replies/ios.3.ingested
+result_sha256=762bdb942e3bf699c27ce2701c56ce4bc3872b5ac8ecf42418c679678b4f1783
+
+parent/state/remote-replies/ios.4.ingested
+result_sha256=7b6825bbc1c24a33bf96d0375720f226448074bcea5e121f108bd553859cebbf
+
+parent/state/remote-replies/ios.5.ingested
+result_sha256=f263c62c05cd80bb2cc47f3ea64937d9c126027ff581766faca07ee638b3f3ce
+
+parent/state/remote-replies/ios.6.ingested
+result_sha256=f6dae598c85086f876046fd1c07faf522520a79882adfa64c0f60cf320c2a61f
+
+parent/state/remote-replies/ios.7.ingested
+result_sha256=e95de82be9e36d8e8b1ef532ab426dcf9e22451677a048a1952f32041fe9007d
+
+parent/state/remote-replies/ios.8.ingested
+result_sha256=caf9ccc28edea3fe789f720497fcf7a328a414cbfda22b6a87ddf50312dcc7aa
+
+parent/state/remote-replies/ios.9.ingested
+result_sha256=5a8b722a351ff51134d227a25c6724e5c0c5152c68d54edaec73b53314c941e6
+
+parent/state/ios.status
+done [corr=0123456789abcdef] [at=1700000000]: build verified report=data/remote-secondmates/ios/data/reply/report.md
+working [corr=1111111111111111]: second generation
+done [corr=2222222222222222]: third generation
+working [key=version-audit]: family --version audit complete (data/reply/prose-only.md)
+needs-decision [key=rough-cut-version]: implement --version or retire the tool
+needs-decision [at=1700000000]: which base branch?
+needs-decision [at=1700086400]: which base branch?
+done [corr=08d71c8f73ed98d1]: release chain audited
+blocked [key=ctl]: escape ?[31mhere?[0m bell ? café end
+status=delta
+working [key=nul-byte]: before?after
+done [key=retry-document]: retry local storage report=data/remote-secondmates/ios/data/reply/retry.md
+working [key=malformed-report]: malformed offer report=data/reply/result.md.bak
+done [key=adjacent-reports]: report=data/remote-secondmates/ios/data/reply/adjacent-a.md,report=data/remote-secondmates/ios/data/reply/adjacent-b.md report=data/remote-secondmates/ios/data/reply/result.md alongside report=data/reply/result.md.bak
+working [key=glued-pointers]: glued report=data/reply/glued-prefix.mdreport=data/reply/glued.md
+done [key=nested-remote]: nested report=data/remote-secondmates/ios/data/remote-secondmates/nested/data/reply/report.md foreign report=data/remote-secondmates/other/data/reply/report.md
+note [at=1790815714]: remote document did not transfer for ios: data/remote-secondmates/other/data/reply/report.md - file parent is unavailable
+reply [corr=3333333333333333]: dispatched the voice scout, report path data/reply/voice-scout-report.md, will relay on completion
+reply [corr=3333333333333333]: No report to transfer YET - data/reply/voice-scout-report.md is NOT yet written; nothing is lost
+reply [corr=3333333333333333]: same - the report does not exist yet (scout still working, data/reply/voice-scout-report.md not written)
+done [key=child-outcome-voice-scout-done-ab12cd34]: child voice-scout done: report ready mode=scout report=data/remote-secondmates/ios/data/reply/voice-scout-report.md
+reply [corr=4444444444444444]: dispatched a scout report=data/reply/never-written.md
+note [at=1790815765]: remote document did not transfer for ios: data/reply/never-written.md - file is not a non-symlink regular file
+reply [corr=4444444444444444]: still writing report=data/reply/never-written.md
+reply [corr=4444444444444444]: same, report=data/reply/never-written.md
+done [key=big-report]: oversize deliverable report=data/reply/big.md
+note [at=1790815790]: remote document did not transfer for ios: data/reply/big.md - file exceeds max-bytes
+done [key=extraction-failure]: probe report=data/remote-secondmates/ios/data/reply/extractfail.md
+done [key=write-failure]: probe report=data/remote-secondmates/ios/data/reply/writefail.md
+needs-decision [key=replay-decision]: pick report=data/reply/replay.md
+note [at=1790815838]: remote document did not transfer for ios: data/reply/replay.md - file is not a non-symlink regular file
+resolved [key=replay-decision]: selection complete
+
+remote-jobs/jobs/job-lDgwOT/state
+done
