@@ -4869,6 +4869,48 @@ refused_out=$(PATH="$REPLY_FAIL/bin:$PATH" FM_HOME="$REPLY_FAIL/home" \
 assert_contains "$refused_out" "would reach no endpoint" \
   "the endpointless arm was refused for an unexpected reason: $refused_out"
 [ ! -s "$REPLY_FAIL/replies" ] || fail "a refused arm posted its reply to the board: $(cat "$REPLY_FAIL/replies")"
+
+reply_owner_claim="$FM_PROCEVENT_CLAIM_ROOT/$reply_fail_id.claim"
+cp "$reply_owner_claim" "$REPLY_FAIL/owner.claim"
+for foreign_scope in home state; do
+  foreign_home="$REPLY_FAIL/foreign-$foreign_scope"
+  new_home "$foreign_home"
+  new_task_endpoint "$foreign_home" worker-intruder
+  fm_test_track_procevent_home "$foreign_home"
+  foreign_state="$foreign_home/state"
+  [ "$foreign_scope" != state ] || foreign_home="$REPLY_FAIL/home"
+  refused_rc=0
+  refused_out=$(PATH="$REPLY_FAIL/bin:$PATH" FM_HOME="$foreign_home" FM_STATE_OVERRIDE="$foreign_state" \
+    "$ROOT/bin/fm-procevent-lavish.sh" arm "$reply_fail_art" --for worker-intruder \
+    --agent-reply-file "$REPLY_FAIL/foreign-reply" 2>&1) || refused_rc=$?
+  [ "$refused_rc" -ne 0 ] || fail "a foreign $foreign_scope arm with a reply was not refused"
+  assert_contains "$refused_out" "owned by home $REPLY_FAIL/home at state $REPLY_FAIL/home/state" \
+    "the foreign $foreign_scope refusal did not name the retained claim's owner: $refused_out"
+  [ ! -s "$REPLY_FAIL/replies" ] || fail "a foreign $foreign_scope arm posted its reply"
+  [ ! -e "$foreign_state/procevent/$reply_fail_id.source" ] \
+    || fail "a foreign $foreign_scope arm published a task registration"
+  [ "$(cat "$REPLY_FAIL/foreign-reply")" = 'foreign reply' ] \
+    || fail "a foreign $foreign_scope refusal consumed the original reply"
+  cmp -s "$reply_owner_claim" "$REPLY_FAIL/owner.claim" \
+    || fail "a foreign $foreign_scope arm changed the existing claim"
+
+  refused_rc=0
+  refused_out=$(PATH="$REPLY_FAIL/bin:$PATH" FM_HOME="$foreign_home" FM_STATE_OVERRIDE="$foreign_state" \
+    FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=1 \
+    "$ROOT/bin/fm-procevent-lavish.sh" arm "$reply_fail_art" 2>&1) || refused_rc=$?
+  [ "$refused_rc" -ne 0 ] || fail "an ordinary arm accepted a foreign $foreign_scope listener as its predecessor"
+  assert_not_contains "$refused_out" 'still-listening:' \
+    "an ordinary arm reported a foreign $foreign_scope predecessor as its own"
+  assert_not_contains "$refused_out" 'armed:' \
+    "an ordinary arm reported a foreign $foreign_scope listener as ready"
+  cmp -s "$reply_owner_claim" "$REPLY_FAIL/owner.claim" \
+    || fail "an ordinary foreign $foreign_scope arm changed the existing claim"
+  FM_HOME="$foreign_home" FM_STATE_OVERRIDE="$foreign_state" \
+    "$ROOT/bin/fm-procevent.sh" retire "$reply_fail_id" >/dev/null \
+    || fail "could not retire the foreign $foreign_scope registration"
+done
+pass "foreign homes and state roots neither post replies nor count another owner's live listener"
+
 PATH="$REPLY_FAIL/bin:$PATH" FM_HOME="$REPLY_FAIL/home" \
   "$ROOT/bin/fm-procevent-lavish.sh" retire "$reply_fail_art" >/dev/null 2>&1 || true
 touch "$REPLY_FAIL/release"

@@ -573,6 +573,16 @@ cmd_register_task() {
     || die "cannot own a board for task $task; its captured feedback would reach no endpoint"
   (umask 077; mkdir -p "$REG") || die "cannot prepare the process-event registry"
   fm_procevent_source_lock_acquire "$id" || die "cannot lock the source"
+  if [ -e "$(fm_procevent_claim_path "$id")" ] || [ -L "$(fm_procevent_claim_path "$id")" ]; then
+    if ! fm_procevent_claim_load_locked "$id" 2>/dev/null; then
+      fm_procevent_source_lock_release "$id"
+      die "cannot safely read source ownership: $id"
+    fi
+    if ! fm_procevent_claim_owned_by_state "$STATE" "$FM_HOME"; then
+      fm_procevent_source_lock_release "$id"
+      die "cannot arm source $id owned by home $FM_PROCEVENT_CLAIM_HOME at state ${FM_PROCEVENT_CLAIM_STATE_ROOT:-$FM_PROCEVENT_CLAIM_HOME/state}"
+    fi
+  fi
   if [ -e "$(source_file "$id")" ] || [ -L "$(source_file "$id")" ]; then
     if [ "$(source_kind "$id" 2>/dev/null || true)" != task-owned ]; then
       fm_procevent_source_lock_release "$id"
@@ -1928,7 +1938,7 @@ generation_is_listening() {  # <source-id> <registration-identity>
   fm_procevent_source_lock_try_acquire "$id" || return 1
   fm_procevent_claim_state_locked "$id"
   state=$?
-  if [ "$state" -eq 0 ]; then
+  if [ "$state" -eq 0 ] && fm_procevent_claim_owned_by_state "$STATE" "$FM_HOME"; then
     result=3
     [ "$FM_PROCEVENT_CLAIM_REG_IDENTITY" != "$identity" ] || result=0
   fi
