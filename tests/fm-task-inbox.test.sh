@@ -26,6 +26,9 @@
 #   6. Dead panes: the doorbell line is a shell no-op when executed by a bare
 #      shell, the ring skips an agent the backend classifies dead, and the
 #      watcher surfaces such a record exactly once instead of re-ringing.
+#   7. A fire-and-forget record stays outside the ladder, but one whose first
+#      ring did not land gets exactly one retry ring and never escalates. The
+#      retry waits while the worker has an open decision of its own.
 set -u
 
 # shellcheck source=tests/wake-helpers.sh
@@ -78,6 +81,10 @@ case "${1:-}" in
       printf '%s\n' "${1:-}" >> "${FM_SEND_LOG:-/dev/null}"
       if [ -n "${FM_ACK_RECORD:-}" ] && [ -f "$FM_ACK_RECORD" ]; then
         mv "$FM_ACK_RECORD" "${FM_ACK_RECORD%/*}/handled/"
+      fi
+      # A concurrent fire-and-forget send marking its newer record mid-ring.
+      if [ -n "${FM_RING_MARKS_RETRY:-}" ]; then
+        printf '%s\n' "${FM_RING_MARKS_RETRY##*/}" > "${FM_RING_MARKS_RETRY%/*}/.retry-ring"
       fi
     fi
     exit 0 ;;
@@ -162,9 +169,10 @@ test_write_is_durable_and_exact() {
   doorbell2=$(inbox_lib "$state" fm_task_inbox_doorbell_line "$rec2")
   [ "$doorbell" = "$doorbell2" ] \
     || fail "every record in one inbox should ring the same drain-all doorbell"
-  assert_contains "$doorbell" "'$state/t1.inbox'/*.msg" "doorbell should quote and name all unhandled records"
+  assert_contains "$doorbell" "list \"\$FM_TASK_INBOX\"/*.msg" "doorbell should list all unhandled records through FM_TASK_INBOX"
+  assert_contains "$doorbell" "'t1.inbox' steering inbox" "doorbell should quote and name the inbox"
   assert_contains "$doorbell" "numeric order" "doorbell should require ordered processing"
-  assert_contains "$doorbell" "'$state/t1.inbox'/handled/" "doorbell should quote and name the handled dir"
+  assert_contains "$doorbell" "handled/" "doorbell should name the handled dir"
   assert_contains "$doorbell" "Firstmate instruction waiting" "doorbell should be self-describing"
   case "$doorbell" in
     *$'\n'*) fail "the doorbell must be a single line" ;;
@@ -181,69 +189,70 @@ test_write_is_durable_and_exact() {
 # command line. Execute the real line in real shells and assert it is inert:
 # exit 0, no output, and nothing in the inbox touched.
 test_doorbell_is_a_shell_noop() {
-  local state rec doorbell sh out before after marker
-  state="$TMP_ROOT/noop/x; touch marker; #'s space/state"
+  local state task rec doorbell sh out before after marker
+  state="$TMP_ROOT/noop/state"
+  task="x; touch marker; #'s space"
   marker="$state/marker"
   mkdir -p "$state"
-  rec=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "please continue")
+  rec=$(inbox_lib "$state" fm_task_inbox_write "$state" "$task" "please continue")
   doorbell=$(inbox_lib "$state" fm_task_inbox_doorbell_line "$rec")
   case "$doorbell" in
     ': '*) ;;
     *) fail "the doorbell must start with the shell no-op prefix, got: $doorbell" ;;
   esac
-  assert_contains "$doorbell" "'\\''s space/state/t1.inbox'" \
-    "the doorbell should escape an embedded single quote in its quoted path"
-  before=$(ls -R "$state/t1.inbox")
+  assert_contains "$doorbell" "'\\''s space.inbox'" \
+    "the doorbell should escape an embedded single quote in its quoted inbox name"
+  before=$(ls -R "$state/$task.inbox")
   for sh in sh bash zsh; do
     command -v "$sh" >/dev/null 2>&1 || continue
-    out=$(cd "$state" && "$sh" -c "$doorbell" 2>&1) \
+    out=$(cd "$state" && FM_TASK_INBOX="$state/$task.inbox" "$sh" -c "$doorbell" 2>&1) \
       || fail "$sh executed the hostile-path doorbell with a non-zero status: $out"
     [ -z "$out" ] || fail "$sh produced output while executing the hostile-path doorbell: $out"
-    [ ! -e "$marker" ] || fail "$sh executed shell syntax embedded in the inbox path"
+    [ ! -e "$marker" ] || fail "$sh executed shell syntax embedded in the inbox name"
   done
   # An interactive-style zsh with the line fed on stdin, the closest portable
   # stand-in for a dead pane's login shell reading typed keystrokes.
   if command -v zsh >/dev/null 2>&1; then
-    out=$(cd "$state" && printf '%s\n' "$doorbell" | zsh -s 2>&1) \
+    out=$(cd "$state" && printf '%s\n' "$doorbell" | FM_TASK_INBOX="$state/$task.inbox" zsh -s 2>&1) \
       || fail "zsh reading the hostile-path doorbell from stdin failed: $out"
     [ -z "$out" ] || fail "zsh printed while reading the hostile-path doorbell: $out"
     [ ! -e "$marker" ] || fail "zsh executed shell syntax from the stdin doorbell"
   fi
-  after=$(ls -R "$state/t1.inbox")
+  after=$(ls -R "$state/$task.inbox")
   [ "$before" = "$after" ] || fail "executing the doorbell changed the inbox:"$'\n'"$after"
   [ -f "$rec" ] || fail "executing the doorbell removed the unhandled record"
-  pass "inbox: a hostile-path doorbell executes as a no-op in bare shells"
+  pass "inbox: a hostile-name doorbell executes as a no-op in bare shells"
 }
 
 test_doorbell_rejects_terminal_controls() {
-  local dir state rec doorbell control label log marker rc
+  local dir state task rec doorbell control label log marker rc
   dir="$TMP_ROOT/control-path"
+  state="$dir/state"
   marker="$dir/marker"
-  mkdir -p "$dir"
+  mkdir -p "$state"
   make_watch_stubs "$dir" >/dev/null
   for label in etx esc; do
     case "$label" in
       etx) control=$'\003' ;;
       esc) control=$'\033' ;;
     esac
-    state="$dir/${control}touch marker; # $label/state"
-    mkdir -p "$state"
-    rec=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "please continue")
+    task="${control}touch marker; # $label"
+    rec=$(inbox_lib "$state" fm_task_inbox_write "$state" "$task" "please continue")
     doorbell=
     rc=0
     doorbell=$(inbox_lib "$state" fm_task_inbox_doorbell_line "$rec") || rc=$?
-    [ "$rc" -ne 0 ] || fail "a $label path should make doorbell construction fail"
-    [ -z "$doorbell" ] || fail "a rejected $label path emitted doorbell bytes"
+    [ "$rc" -ne 0 ] || fail "a $label inbox name should make doorbell construction fail"
+    [ -z "$doorbell" ] || fail "a rejected $label inbox name emitted doorbell bytes"
     log="$dir/$label.send.log"; : > "$log"
     rc=0
     PATH="$dir/fakebin:$PATH" FM_SEND_LOG="$log" \
       inbox_lib "$state" fm_task_inbox_ring tmux sess:fm-t1 "$rec" fm-t1 || rc=$?
-    [ "$rc" = 2 ] || fail "a rejected $label path should return send-failed status 2, got $rc"
-    [ ! -s "$log" ] || fail "a $label path reached send-keys:"$'\n'"$(cat "$log")"
-    [ ! -e "$marker" ] || fail "a $label path executed its crafted command"
-    [ -f "$rec" ] || fail "rejecting a $label path removed the durable record"
+    [ "$rc" = 2 ] || fail "a rejected $label inbox name should return send-failed status 2, got $rc"
+    [ ! -s "$log" ] || fail "a $label inbox name reached send-keys:"$'\n'"$(cat "$log")"
+    [ ! -e "$marker" ] || fail "a $label inbox name executed its crafted command"
+    [ -f "$rec" ] || fail "rejecting a $label inbox name removed the durable record"
   done
-  pass "inbox: terminal-control paths are rejected without typing"
+  pass "inbox: terminal-control inbox names are rejected without typing"
 }
 
 # fm_task_inbox_ring against a backend whose agent classifies dead or missing:
@@ -546,6 +555,206 @@ test_fire_and_forget_records_never_enter_the_ladder() {
   pass "inbox: fire-and-forget records stay durable and outside the ladder"
 }
 
+test_fire_and_forget_retry_is_owed_once() {
+  local state fire tracked action
+  state="$TMP_ROOT/faf-retry/state"; mkdir -p "$state" "$TMP_ROOT/faf-retry/config"
+  : > "$TMP_ROOT/faf-retry/config/wait-no-turns"
+  export FM_CONFIG_OVERRIDE="$TMP_ROOT/faf-retry/config"
+  fire=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "one-shot steer" fire-and-forget)
+  age_path "$fire"
+  inbox_lib "$state" fm_task_inbox_mark_retry "$state" t1 "$fire"
+  action=$(FM_TASK_INBOX_GRACE_SECS=3600 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
+  [ "$action" = quiet ] || fail "a retry inside grace should be quiet, got: $action"
+  age_path "$state/t1.inbox/.retry-ring"
+  action=$(FM_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
+  [ "$action" = "retry $fire" ] || fail "an aged retry mark should be due its ring, got: $action"
+  # An ordinary record's ladder rings the same inbox, so the retry waits behind it.
+  tracked=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "tracked steer")
+  age_path "$tracked"
+  action=$(FM_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
+  [ "$action" = "ring $tracked" ] || fail "a pending ordinary record should own the ring, got: $action"
+  mv "$tracked" "$state/t1.inbox/handled/"
+  action=$(FM_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
+  [ "$action" = "retry $fire" ] || fail "the retry should resume once the ordinary record is handled, got: $action"
+  # Once spent, the record is quiet for good: no second retry and no escalation.
+  inbox_lib "$state" fm_task_inbox_clear_retry "$state" t1 "$fire"
+  action=$(FM_TASK_INBOX_GRACE_SECS=0 FM_TASK_INBOX_RING_MAX=0 \
+    inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
+  [ "$action" = quiet ] || fail "a spent retry rang or escalated again: $action"
+  # An acknowledged record drops its mark.
+  inbox_lib "$state" fm_task_inbox_mark_retry "$state" t1 "$fire"
+  age_path "$state/t1.inbox/.retry-ring"
+  mv "$fire" "$state/t1.inbox/handled/"
+  action=$(FM_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
+  [ "$action" = quiet ] || fail "an acknowledged record's retry should be dropped, got: $action"
+  [ ! -e "$state/t1.inbox/.retry-ring" ] || fail "an acknowledged record kept its retry mark"
+  unset FM_CONFIG_OVERRIDE
+  pass "inbox: a fire-and-forget record whose ring did not land is owed exactly one retry"
+}
+
+# A retry mark is ignored while config/wait-no-turns is absent.
+test_fire_and_forget_retry_is_quiet_without_the_flag() {
+  local state fire action
+  state="$TMP_ROOT/faf-retry-off/state"; mkdir -p "$state" "$TMP_ROOT/faf-retry-off/config"
+  export FM_CONFIG_OVERRIDE="$TMP_ROOT/faf-retry-off/config"
+  fire=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "one-shot steer" fire-and-forget)
+  age_path "$fire"
+  inbox_lib "$state" fm_task_inbox_mark_retry "$state" t1 "$fire"
+  age_path "$state/t1.inbox/.retry-ring"
+  action=$(FM_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
+  [ "$action" = quiet ] || fail "an absent flag still owed a retry ring, got: $action"
+  [ -e "$state/t1.inbox/.retry-ring" ] || fail "an absent flag removed a retry mark it should have left"
+  unset FM_CONFIG_OVERRIDE
+  pass "inbox: without config/wait-no-turns a fire-and-forget retry mark stays quiet"
+}
+
+test_retry_publication_orders_pending_sequences() {
+  local state older newer
+  state="$TMP_ROOT/retry-sequence/state"
+  mkdir -p "$state"
+  older=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "older steer" fire-and-forget)
+  mv "$older" "$state/t1.inbox/999.msg"
+  older="$state/t1.inbox/999.msg"
+  newer=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "newer steer" fire-and-forget)
+  [ "${newer##*/}" = 1000.msg ] || fail "retry sequence fixture did not cross the padding boundary"
+  inbox_lib "$state" fm_task_inbox_mark_retry "$state" t1 "$newer"
+  inbox_lib "$state" fm_task_inbox_mark_retry "$state" t1 "$older"
+  [ "$(cat "$state/t1.inbox/.retry-ring")" = 1000.msg ] \
+    || fail "a delayed older retry replaced the newer numeric sequence"
+  mv "$older" "$state/t1.inbox/handled/"
+  inbox_lib "$state" fm_task_inbox_mark_retry "$state" t1 "$state/t1.inbox/handled/999.msg"
+  [ "$(cat "$state/t1.inbox/.retry-ring")" = 1000.msg ] \
+    || fail "an already-handled record replaced the newer pending retry"
+  inbox_lib "$state" fm_task_inbox_clear_retry "$state" t1 "$newer"
+  inbox_lib "$state" fm_task_inbox_mark_retry "$state" t1 "$older"
+  [ ! -e "$state/t1.inbox/.retry-ring" ] || fail "a delayed handled record recreated a spent retry"
+  pass "inbox: retry publication orders numeric sequences and ignores handled records"
+}
+
+test_retry_cleanup_preserves_concurrent_publication() {
+  local mode dir state fire newer action
+  for mode in clear handled missing invalid; do
+    dir="$TMP_ROOT/retry-cleanup-$mode"
+    state="$dir/state"
+    mkdir -p "$state" "$dir/config"
+    : > "$dir/config/wait-no-turns"
+    fire=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "older steer" fire-and-forget)
+    newer=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "newer steer" fire-and-forget)
+    inbox_lib "$state" fm_task_inbox_mark_retry "$state" t1 "$fire"
+    case "$mode" in
+      handled) mv "$fire" "$state/t1.inbox/handled/" ;;
+      missing) rm "$fire" ;;
+      invalid) printf 'invalid\n' > "$state/t1.inbox/.retry-ring" ;;
+    esac
+
+    FM_STATE_OVERRIDE="$state" FM_CONFIG_OVERRIDE="$dir/config" bash -c '
+      set -e
+      . "$1"
+      state=$2 fire=$3 newer=$4 mode=$5
+      mkfifo "$state/paused" "$state/release" "$state/publisher-ready"
+      exec 7<> "$state/paused" 8<> "$state/release" 9<> "$state/publisher-ready"
+      cleaner= publisher=
+      trap '\''kill ${cleaner:-} ${publisher:-} 2>/dev/null || true; wait 2>/dev/null || true'\'' EXIT
+      (
+        rm() {
+          local arg signal
+          for arg in "$@"; do
+            if [ "$arg" = "$state/t1.inbox/.retry-ring" ]; then
+              printf "paused\n" >&7
+              IFS= read -r -t 10 signal <&8 || return 1
+              break
+            fi
+          done
+          command rm "$@"
+        }
+        if [ "$mode" = clear ]; then
+          fm_task_inbox_clear_retry "$state" t1 "$fire"
+        else
+          fm_task_inbox_due_action "$state" t1 > "$state/cleanup-action"
+        fi
+      ) &
+      cleaner=$!
+      IFS= read -r -t 10 signal <&7
+      (
+        announced=0
+        sleep() {
+          if [ "$announced" = 0 ]; then
+            printf "contended\n" >&9
+            announced=1
+          fi
+          command sleep "$@"
+        }
+        fm_task_inbox_mark_retry "$state" t1 "$newer"
+        [ "$announced" = 1 ] || printf "published\n" >&9
+      ) &
+      publisher=$!
+      IFS= read -r -t 10 signal <&9
+      printf "release\n" >&8
+      wait "$cleaner"
+      cleaner=
+      wait "$publisher"
+      publisher=
+    ' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$state" "$fire" "$newer" "$mode" \
+      || fail "retry $mode cleanup/publication race did not complete"
+
+    [ "$(cat "$state/t1.inbox/.retry-ring" 2>/dev/null)" = "${newer##*/}" ] \
+      || fail "retry $mode cleanup erased a concurrently published newer mark"
+    action=$(FM_CONFIG_OVERRIDE="$dir/config" FM_TASK_INBOX_GRACE_SECS=0 \
+      inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
+    [ "$action" = "retry $newer" ] || fail "retry $mode cleanup lost the newer retry: $action"
+    inbox_lib "$state" fm_task_inbox_clear_retry "$state" t1 "$newer" \
+      || fail "retry $mode cleanup left the inbox locked"
+    [ ! -e "$state/t1.inbox/.retry-ring" ] || fail "the newer retry could not be spent"
+  done
+  pass "inbox: conditional and stale retry cleanup preserve concurrent publication"
+}
+
+test_retry_reader_waits_for_publication() {
+  local dir state fire newer action
+  dir="$TMP_ROOT/retry-publication"
+  state="$dir/state"
+  mkdir -p "$state" "$dir/config"
+  : > "$dir/config/wait-no-turns"
+  fire=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "older steer" fire-and-forget)
+  newer=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "newer steer" fire-and-forget)
+  inbox_lib "$state" fm_task_inbox_mark_retry "$state" t1 "$fire"
+
+  FM_STATE_OVERRIDE="$state" FM_CONFIG_OVERRIDE="$dir/config" bash -c '
+    set -e
+    . "$1"
+    state=$2 newer=$3
+    mkfifo "$state/paused" "$state/release"
+    exec 7<> "$state/paused" 8<> "$state/release"
+    publisher=
+    trap '\''kill ${publisher:-} 2>/dev/null || true; wait 2>/dev/null || true'\'' EXIT
+    (
+      printf() {
+        local signal
+        if [ "${1:-}" = "%s\\n" ] && [ "${2:-}" = "${newer##*/}" ]; then
+          builtin printf "paused\n" >&7
+          IFS= read -r -t 10 signal <&8 || return 1
+        fi
+        builtin printf "$@"
+      }
+      fm_task_inbox_mark_retry "$state" t1 "$newer"
+    ) &
+    publisher=$!
+    IFS= read -r -t 10 signal <&7
+    FM_TASK_INBOX_LOCK_WAIT_SECS=0 fm_task_inbox_due_action "$state" t1 > "$state/read-action" || true
+    printf "release\n" >&8
+    wait "$publisher"
+    publisher=
+  ' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$state" "$newer" \
+    || fail "retry publication/read race did not complete"
+
+  [ "$(cat "$state/t1.inbox/.retry-ring" 2>/dev/null)" = "${newer##*/}" ] \
+    || fail "a retry reader removed the marker during publication"
+  action=$(FM_CONFIG_OVERRIDE="$dir/config" FM_TASK_INBOX_GRACE_SECS=0 \
+    inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
+  [ "$action" = "retry $newer" ] || fail "the published retry was lost: $action"
+  pass "inbox: retry readers cannot remove a marker during publication"
+}
+
 test_ring_ladder_policy() {
   local state rec action
   state="$TMP_ROOT/ladder/state"; mkdir -p "$state"
@@ -616,7 +825,7 @@ test_watcher_rerings_idle_pane_quietly() {
     sleep 0.1
     i=$((i + 1))
   done
-  grep -qF "Firstmate instruction waiting: list '$state/t1.inbox'/*.msg" "$log" \
+  grep -qF "Firstmate instruction waiting: list \"\$FM_TASK_INBOX\"/*.msg in your 't1.inbox' steering inbox" "$log" \
     || { kill "$pid" 2>/dev/null; fail "the watcher never re-rang the doorbell:"$'\n'"$(cat "$log")"; }
   kill -0 "$pid" 2>/dev/null \
     || fail "a healthy re-ring must not wake firstmate (watcher exited):"$'\n'"$(cat "$out")"
@@ -723,6 +932,101 @@ test_watcher_surfaces_unwritable_ladder() {
   pass "watcher: unwritable ladder bookkeeping surfaces a stale wake after the doorbell"
 }
 
+test_watcher_pays_fire_and_forget_retry_once() {
+  local dir state out log pid fire rings i=0
+  dir=$(setup_watch_case faf-retry)
+  mkdir -p "$dir/config"
+  : > "$dir/config/wait-no-turns"
+  state="$dir/state"; out="$dir/watch.out"; log="$dir/send.log"; : > "$log"
+  fire=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "one-shot steer" fire-and-forget)
+  age_path "$fire"
+  inbox_lib "$state" fm_task_inbox_mark_retry "$state" t1 "$fire"
+  age_path "$state/t1.inbox/.retry-ring"
+  watch_bg "$state" "$dir/fakebin" "$out" \
+    FM_CONFIG_OVERRIDE="$dir/config" \
+    FM_SEND_LOG="$log" FM_FAKE_TMUX_CAPTURE="$(idle_capture "$dir")" \
+    FM_TASK_INBOX_RING_MAX=1
+  pid=$!
+  while [ "$i" -lt 100 ]; do
+    grep -qF 'Firstmate instruction waiting' "$log" 2>/dev/null && break
+    kill -0 "$pid" 2>/dev/null || break
+    sleep 0.1
+    i=$((i + 1))
+  done
+  sleep 3
+  kill -0 "$pid" 2>/dev/null \
+    || fail "a fire-and-forget retry must not wake firstmate (watcher exited):"$'\n'"$(cat "$out")"
+  kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+  rings=$(grep -cF 'Firstmate instruction waiting' "$log" || true)
+  [ "$rings" = 1 ] || fail "expected exactly one retry ring, got $rings:"$'\n'"$(cat "$log")"
+  [ ! -s "$state/.wake-queue" ] || fail "a fire-and-forget retry queued a wake:"$'\n'"$(cat "$state/.wake-queue")"
+  [ ! -e "$state/t1.inbox/.retry-ring" ] || fail "the watcher did not spend the retry mark"
+  [ ! -e "$state/t1.inbox/.ring-state" ] || fail "a fire-and-forget retry entered the re-ring ladder"
+  [ -f "$fire" ] || fail "the retry ring removed the durable record"
+  pass "watcher: a fire-and-forget record's owed retry rings exactly once and never escalates"
+}
+
+# One watcher inbox check against an idle pane, through the production watcher
+# functions, so a status log the case writes is not also read as a wake.
+steer_check_once() {  # <case-dir>
+  PATH="$1/fakebin:$PATH" FM_STATE_OVERRIDE="$1/state" FM_SEND_LOG="$1/send.log" \
+    FM_FAKE_TMUX_CAPTURE="$(idle_capture "$1")" FM_TASK_INBOX_GRACE_SECS=1 \
+    bash -c '. "$1" && inbox_steer_check sess:fm-t1 t1' _ "$WATCH" >/dev/null 2>&1
+}
+
+test_watcher_holds_retry_while_the_worker_decides() {
+  local dir state log fire rings
+  dir=$(setup_watch_case faf-retry-decision)
+  mkdir -p "$dir/config"
+  : > "$dir/config/wait-no-turns"
+  export FM_CONFIG_OVERRIDE="$dir/config"
+  state="$dir/state"; log="$dir/send.log"; : > "$log"
+  fire=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "one-shot steer" fire-and-forget)
+  age_path "$fire"
+  inbox_lib "$state" fm_task_inbox_mark_retry "$state" t1 "$fire"
+  age_path "$state/t1.inbox/.retry-ring"
+  printf 'needs-decision [key=pick]: ship alpha or beta?\n' > "$state/t1.status"
+  steer_check_once "$dir"
+  steer_check_once "$dir"
+  [ ! -s "$log" ] || fail "the retry rang a worker waiting on its own decision:"$'\n'"$(cat "$log")"
+  [ -e "$state/t1.inbox/.retry-ring" ] || fail "the held retry lost its mark"
+
+  printf 'resolved [key=pick]: alpha\n' >> "$state/t1.status"
+  steer_check_once "$dir"
+  steer_check_once "$dir"
+  rings=$(grep -cF 'Firstmate instruction waiting' "$log" || true)
+  [ "$rings" = 1 ] || fail "expected exactly one retry ring once the decision closed, got $rings:"$'\n'"$(cat "$log")"
+  [ ! -e "$state/t1.inbox/.retry-ring" ] || fail "the watcher did not spend the retry mark"
+  unset FM_CONFIG_OVERRIDE
+  pass "watcher: a fire-and-forget retry waits out the worker's own decision, then rings once"
+}
+
+test_watcher_retry_keeps_a_newer_mark() {
+  local dir state log fire newer rings
+  dir=$(setup_watch_case faf-retry-newer)
+  mkdir -p "$dir/config"
+  : > "$dir/config/wait-no-turns"
+  export FM_CONFIG_OVERRIDE="$dir/config"
+  state="$dir/state"; log="$dir/send.log"; : > "$log"
+  fire=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "one-shot steer" fire-and-forget)
+  age_path "$fire"
+  inbox_lib "$state" fm_task_inbox_mark_retry "$state" t1 "$fire"
+  age_path "$state/t1.inbox/.retry-ring"
+  newer=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "newer steer" fire-and-forget)
+  FM_RING_MARKS_RETRY="$newer" steer_check_once "$dir"
+  rings=$(grep -cF 'Firstmate instruction waiting' "$log" || true)
+  [ "$rings" = 1 ] || fail "expected the owed retry to ring once, got $rings:"$'\n'"$(cat "$log")"
+  [ "$(cat "$state/t1.inbox/.retry-ring" 2>/dev/null)" = "${newer##*/}" ] \
+    || fail "the spent retry removed a newer record's mark written during its ring"
+  age_path "$state/t1.inbox/.retry-ring"
+  steer_check_once "$dir"
+  rings=$(grep -cF 'Firstmate instruction waiting' "$log" || true)
+  [ "$rings" = 2 ] || fail "the newer record's retry did not ring, got $rings:"$'\n'"$(cat "$log")"
+  [ ! -e "$state/t1.inbox/.retry-ring" ] || fail "the watcher did not spend the newer retry mark"
+  unset FM_CONFIG_OVERRIDE
+  pass "watcher: spending a retry keeps a newer record's mark written during its ring"
+}
+
 test_watcher_escalates_once_after_budget() {
   local dir state out log pid rec rings
   dir=$(setup_watch_case escalate)
@@ -810,12 +1114,20 @@ test_concurrent_writers_never_clobber
 test_writer_retries_after_a_vanished_lock_collision
 test_ladder_writes_ignore_vanished_inbox
 test_fire_and_forget_records_never_enter_the_ladder
+test_fire_and_forget_retry_is_owed_once
+test_fire_and_forget_retry_is_quiet_without_the_flag
+test_retry_publication_orders_pending_sequences
+test_retry_cleanup_preserves_concurrent_publication
+test_retry_reader_waits_for_publication
 test_ring_ladder_policy
 test_watcher_rerings_idle_pane_quietly
 test_watcher_waits_on_busy_pane
 test_watcher_quiet_on_healthy_inbox
 test_watcher_ack_silences_unwritable_ladder
 test_watcher_surfaces_unwritable_ladder
+test_watcher_pays_fire_and_forget_retry_once
+test_watcher_holds_retry_while_the_worker_decides
+test_watcher_retry_keeps_a_newer_mark
 test_watcher_escalates_once_after_budget
 test_watcher_dead_pane_escalates_once_without_ringing
 test_watcher_dead_pane_ignores_stale_busy_state

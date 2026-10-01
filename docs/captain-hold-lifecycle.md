@@ -140,6 +140,7 @@ After cleanup, and still under the task's own lock, teardown does three things:
 
 - It records one `Deliverable of the finished work: ...` line at the end of the task body.
 - It copies a supported pull request or canonical `data/<id>/report.md` into the row's structured artifact fields.
+  A Gerrit change URL is not a pull request tasks-axi accepts, so it appears only in the deliverable line.
 - It runs `tasks-axi reopen`.
 
 The row returns to Queued with its hold intact.
@@ -152,6 +153,7 @@ That record carries the retention intent as a `mode=retain` line.
 An interrupted cleanup therefore replays the retention at the next session start through the same record, validator, and lock as an ordinary close, and never closes the row.
 
 If the captain answers before replay, `answer` validates that record and copies any supported retained pull request or report into the row before closing it.
+A retained Gerrit change URL is instead recorded as a `Gerrit change <url>` note on that close.
 Replay then retires the record.
 
 ### Known retained-delivery gaps
@@ -159,9 +161,9 @@ Replay then retires the record.
 Two retained-delivery gaps remain bounded by tasks-axi 0.2.6.
 They are recorded for separate upstream work rather than representing defects introduced by this branch.
 
-- A retained local-only delivery cannot reach the row.
+- A retained local-only delivery reaches the row's body, but not its structured delivery evidence.
   `--note` exists on `tasks-axi done` but not on `tasks-axi update`, while the durable pending-close record carrying that note is retired when retention completes.
-- A relocated retained report cannot reach the row, because tasks-axi accepts only `data/<id>/report.md`.
+- A relocated retained report reaches the row's body, but not its structured report field, because tasks-axi accepts only `data/<id>/report.md` there.
   `done` reports `Task report link must be a data/<id>/report.md path`, and `update` reports `--report must be a data/<id>/report.md path`.
 
 When an interrupted retention leaves such a relocated report in the validated pending-close record, `answer` skips only that known-unsupported row artifact and closes normally.

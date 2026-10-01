@@ -44,7 +44,7 @@
 # An existing destination must be a regular, non-symlinked file; a missing one
 # is created with its directory.
 #
-# Return codes, shared by every entry point that resolves the channel:
+# Return codes for fm_parent_channel_destination and fm_parent_channel_report:
 #   0  resolved, or appended / already present
 #   1  this is a main home (no .fm-secondmate-home marker): nothing to report
 #   2  the identity marker exists but is unusable (symlink, NUL, bad id)
@@ -121,6 +121,28 @@ fm_parent_channel_destination() {  # <home> <state>
       ;;
     *) return 3 ;;
   esac
+}
+
+# The outbound parent-channel status path that lives INSIDE <state>, printed,
+# when <home> is a remote mate; non-zero for a main home, a local mate, or an
+# unusable identity or binding. Only the remote route resolves the channel into
+# the mate's own state dir, so parent-replies.status there is the mate's parent
+# channel rather than a self-home task status file: a home's own status scans
+# and decision folds exclude exactly this resolved path (the same special case
+# fm-pending-reply-lib.sh's wrong-home detection applies). A local mate's
+# channel lives in the parent home's state/<id>.status, which the parent's
+# scans must keep classifying, so only the remote route resolves here.
+fm_parent_channel_outbound_status() {  # <home> <state>
+  local home=$1 state=$2 destination rc=0
+  destination=$(fm_parent_channel_destination "$home" "$state") || rc=$?
+  [ "$rc" -eq 0 ] || return 1
+  # The substitution above ran the resolver in a subshell, so its route global
+  # died with it; resolve once more in this shell (stdout discarded, the same
+  # shape fm-pending-reply-lib.sh's wrong-home detection uses) so the route
+  # check reads the resolver's own verdict rather than re-deriving it.
+  fm_parent_channel_destination "$home" "$state" >/dev/null || return 1
+  [ "$FM_PARENT_CHANNEL_ROUTE" = remote ] || return 1
+  printf '%s\n' "$destination"
 }
 
 # Fold <text> onto one bounded line, so a note copied from a child ledger or a
