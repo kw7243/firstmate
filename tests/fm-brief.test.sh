@@ -855,6 +855,7 @@ test_pause_verb_override_renders_all_brief_scaffolds() {
     brief="$home/data/$id/brief.md"
     if [ "$kind" != secondmate ]; then
       waiting=$(awk '/^# Waiting$/ { waiting=1; next } /^# / { waiting=0 } waiting' "$brief")
+      # shellcheck disable=SC2016 # Match literal backticks in the generated interface.
       declarations=$(printf '%s\n' "$waiting" | grep -o '`[^`]*:`' | tail -n 2 | tr -d '`')
       [ "$(printf '%s\n' "$declarations" | wc -l | tr -d ' ')" = 2 ] \
         || fail "$kind Waiting section did not emit both wait declarations"

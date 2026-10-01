@@ -293,7 +293,7 @@ test_fire_and_forget_retry_stays_off_without_the_flag() {
 }
 
 test_delayed_fire_and_forget_retry_publication() (
-  local mode dir state sender= holder= signal expected action real_sleep
+  local mode dir state sender='' holder='' signal expected action real_sleep
   real_sleep=$(command -v sleep)
   trap 'kill ${sender:-} ${holder:-} 2>/dev/null || true; wait 2>/dev/null || true' EXIT
   for mode in contention pending handled newer-handled; do
