@@ -415,8 +415,8 @@ can=$(printf '%s' "$ready" | python3 -c 'import json,sys; print(json.load(sys.st
   || fail "unknown lock must not claim can_receive true (got $can)"
 
 human_lock=$(run_lock "$home" status) || fail "lock status should succeed"
-assert_contains "$human_lock" "stale (pid $$ dead or not a harness)" \
-  "human lock status keeps its historical stale wording"
+assert_contains "$human_lock" "unknown (pid $$ cannot be verified in this process view)" \
+  "human lock status agrees that an unverified live pid is unknown"
 
 # Dead pid is stale, not held.
 home=$(make_home ready-stale)

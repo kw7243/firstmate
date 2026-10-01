@@ -1092,6 +1092,8 @@ record_live_watcher_fixture() {
   printf '%s\n' "$home" > "$home/state/.watch.lock/fm-home"
   printf '%s\n' "$ROOT/bin/fm-watch.sh" > "$home/state/.watch.lock/watcher-path"
   printf '%s\n' "$identity" > "$home/state/.watch.lock/pid-identity"
+  FM_STATE_OVERRIDE="$home/state" bash -c '. "$1"; fm_lock_write_namespace "$2"' _ \
+    "$ROOT/bin/fm-wake-lib.sh" "$home/state/.watch.lock" || fail "could not record the live watcher fixture namespace"
   touch "$home/state/.last-watcher-beat"
 }
 

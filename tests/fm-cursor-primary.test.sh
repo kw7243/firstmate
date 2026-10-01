@@ -15,7 +15,7 @@
 #   SESSION     - bin/fm-sessionstart-cursor.sh, which injects the digest at
 #                 sessionStart.
 #
-# The park runs as a child of a fake harness (a bash symlink named cursor-agent)
+# The park runs as a child of a fake harness (an executable named cursor-agent)
 # whose pid holds the fixture home's session lock, so the real Cursor ancestry
 # path in bin/fm-session-lock-lib.sh is exercised rather than stubbed.
 # tests/fm-cursor-primary-live-e2e.test.sh is the opt-in guard against a real
@@ -135,12 +135,12 @@ SH
   chmod +x "$dir/bin/fm-watch-arm.sh"
 }
 
-# The park's child body: claim the home lock as this fake harness process, then
+# The park's child body: claim the home lock as the fake harness parent, then
 # run the adapter as its child, so the real Cursor ancestry path decides lock
 # ownership on every platform. Keep the fake harness process alive: Linux
 # changes the process identity when an exec reaches the adapter's shebang.
 PARK_CHILD='
-  printf "%s\n" "$$" > "$FM_HOME/state/.lock"
+  printf "%s\n" "$PPID" > "$FM_HOME/state/.lock"
   "$FM_HOME/bin/fm-turnend-guard-cursor.sh"
 '
 
@@ -163,7 +163,7 @@ run_session() {  # <dir> <event> <source> [session-id]
   local dir=$1 event=$2 source=$3 session_id=${4:-sess-cursor} payload
   payload=$(printf '{"hook_event_name":"%s","session_id":"%s","cursor_version":"x"}' "$event" "$session_id")
   printf '%s' "$payload" | FM_HOME="$dir" FM_SESSION_SOURCE="$source" "$FAKE_CURSOR" -c '
-    printf "%s\n" "$$" > "$FM_HOME/state/.lock"
+    printf "%s\n" "$PPID" > "$FM_HOME/state/.lock"
     "$FM_HOME/bin/fm-sessionstart-cursor.sh" --source "$FM_SESSION_SOURCE"
   ' 2>/dev/null
 }
@@ -210,7 +210,7 @@ test_autoarm_stands_down_on_cursor_payload() {
   : > "$dir/state/task1.meta"
   write_arm_fixture "$dir" actionable
   printf '%s' "$CURSOR_PAYLOAD" | FM_HOME="$dir" "$FAKE_CURSOR" -c '
-      printf "%s\n" "$$" > "$FM_HOME/state/.lock"
+      printf "%s\n" "$PPID" > "$FM_HOME/state/.lock"
       exec "$FM_HOME/bin/fm-claude-stop-autoarm.sh"
     ' >/dev/null 2>&1
   status=$?
