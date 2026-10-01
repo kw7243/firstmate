@@ -1,0 +1,27 @@
+run:
+  id: 36912228174
+  title: Sync kunchenguid/firstmate through b5d906129ab50eedb3f006791372872dcc01146e into kw7243/firstmate
+  status: completed
+  conclusion: success
+  workflow: CI
+  branch: fm/firstmate-parent-sync-b5d9061-r1
+  created: 1h ago
+jobs[18]{id,name,status,conclusion}:
+  110537427028,Behavior tests (Herdr),completed,success
+  110537427274,Lint 2,completed,success
+  110537427280,Test coverage guard,completed,success
+  110537427297,Stock macOS Bash snapshot compatibility,completed,success
+  110537427347,Behavior portable serial 9,completed,success
+  110537427367,Repo invariants,completed,success
+  110537427380,Behavior portable serial 1,completed,success
+  110537427389,Behavior portable parallel 1,completed,success
+  110537427407,Lint 1,completed,success
+  110537427434,Behavior portable serial 3,completed,success
+  110537427478,Behavior portable serial 6,completed,success
+  110537427597,Behavior portable serial 2,completed,success
+  110537427601,Behavior portable serial 5,completed,success
+  110537427606,Behavior portable serial 4,completed,success
+  110537427609,Behavior portable parallel 2,completed,success
+  110537427662,Behavior portable serial 8,completed,success
+  110537427932,Behavior portable serial 7,completed,success
+  110547895693,Behavior timing aggregate,completed,success

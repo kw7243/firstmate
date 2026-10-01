@@ -1,0 +1,44 @@
+                                                                                                                                                                                   │
+[Extensions]                                                                                                                                                                       │
+  fm-calm-e2e-inject.ts, fm-calm.ts, fm-primary-pi-watch.ts, fm-primary-turnend-guard.ts                                                                                           │
+                                                                                                                                                                                   ┃
+                                                                                                                                                                                   ┃
+ Warning: fd not found. Offline mode enabled, skipping download.                                                                                                                   ┃
+                                                                                                                                                                                   ┃
+                                                                                                                                                                                   ┃
+ Show a deterministic tool example.                                                                                                                                                ┃
+                                                                                                                                                                                   ┃
+                                                                                                                                                                                   ┃
+ Thinking...                                                                                                                                                                       ┃
+                                                                                                                                                                                   ┃
+ I will run one command.                                                                                                                                                           ┃
+                                                                                                                                                                                   ┃
+                                                                                                                                                                                   ┃
+ $ printf 'CALM_E2E_OUTPUT                                                                                                                                                         ┃
+ '                                                                                                                                                                                 ┃
+                                                                                                                                                                                   ┃
+ CALM_E2E_OUTPUT                                                                                                                                                                   ┃
+                                                                                                                                                                                   ┃
+                                                                                                                                                                                   │
+ Thinking...                                                                                                                                                                       │
+                                                                                                                                                                                   │
+                                                                                                                                                                                   │
+ grep /CALM_EXPORT_GREP/ in .                                                                                                                                                      │
+                                                                                                                                                                                   │
+ sample.txt:1:CALM_EXPORT_GREP                                                                                                                                                     │
+                                                                                                                                                                                   │
+                                                                                                                                                                                   │
+                                                                                                                                                                                   │
+ find CALM_EXPORT_FIND* in .                                                                                                                                                       │
+                                                                                                                                                                                   │
+ CALM_EXPORT_FIND.txt                                                                                                                                                              │
+                                                                                                                                                                                   │
+                                                                                                                                                                                   │
+ Thinking...                                                                                                                                                                       │
+                                                                           ↓ Jump to latest message · End                                                                          │
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3WKBBGW6603Q1A28DA55CZQ/.calm-validation/tmp/fm-calm-pi-extension.sTGpVE/e2e-project (main)
+↑7 ↓4 0.1%/4.1k (auto)                                                                                                                                                       delayed

@@ -1,0 +1,837 @@
+Behavior portable serial 6	Set up job	﻿2026-10-01T19:09:45.7952102Z Current runner version: '2.337.0'
+Behavior portable serial 6	Set up job	2026-10-01T19:09:45.7977998Z ##[group]Runner Image Provisioner
+Behavior portable serial 6	Set up job	2026-10-01T19:09:45.7978925Z Hosted Compute Agent
+Behavior portable serial 6	Set up job	2026-10-01T19:09:45.7979580Z Version: 20260901.588
+Behavior portable serial 6	Set up job	2026-10-01T19:09:45.7980246Z Commit: f88ec8081b781fac6c440065ac7ff9e710ce3d0b
+Behavior portable serial 6	Set up job	2026-10-01T19:09:45.7981009Z Build Date: 2026-09-01T19:56:44Z
+Behavior portable serial 6	Set up job	2026-10-01T19:09:45.7981808Z Worker ID: {13290c4f-eb11-4f8f-a405-062674afaadf}
+Behavior portable serial 6	Set up job	2026-10-01T19:09:45.7982536Z Azure Region: westus
+Behavior portable serial 6	Set up job	2026-10-01T19:09:45.7983132Z ##[endgroup]
+Behavior portable serial 6	Set up job	2026-10-01T19:09:45.7984957Z ##[group]Operating System
+Behavior portable serial 6	Set up job	2026-10-01T19:09:45.7985634Z Ubuntu
+Behavior portable serial 6	Set up job	2026-10-01T19:09:45.7986251Z 24.04.5
+Behavior portable serial 6	Set up job	2026-10-01T19:09:45.7986809Z LTS
+Behavior portable serial 6	Set up job	2026-10-01T19:09:45.7987319Z ##[endgroup]
+Behavior portable serial 6	Set up job	2026-10-01T19:09:45.7987931Z ##[group]Runner Image
+Behavior portable serial 6	Set up job	2026-10-01T19:09:45.7988541Z Image: ubuntu-24.04
+Behavior portable serial 6	Set up job	2026-10-01T19:09:45.7989229Z Version: 20260927.320.1
+Behavior portable serial 6	Set up job	2026-10-01T19:09:45.7990326Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260927.320/images/ubuntu/Ubuntu2404-Readme.md
+Behavior portable serial 6	Set up job	2026-10-01T19:09:45.7992065Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260927.320
+Behavior portable serial 6	Set up job	2026-10-01T19:09:45.7993045Z ##[endgroup]
+Behavior portable serial 6	Set up job	2026-10-01T19:09:45.7994621Z ##[group]GITHUB_TOKEN Permissions
+Behavior portable serial 6	Set up job	2026-10-01T19:09:45.7996533Z Contents: read
+Behavior portable serial 6	Set up job	2026-10-01T19:09:45.7997303Z Metadata: read
+Behavior portable serial 6	Set up job	2026-10-01T19:09:45.7997879Z ##[endgroup]
+Behavior portable serial 6	Set up job	2026-10-01T19:09:45.7999868Z Secret source: Actions
+Behavior portable serial 6	Set up job	2026-10-01T19:09:45.8000959Z Cache mode: write
+Behavior portable serial 6	Set up job	2026-10-01T19:09:45.8001673Z Prepare workflow directory
+Behavior portable serial 6	Set up job	2026-10-01T19:09:45.8340353Z Prepare all required actions
+Behavior portable serial 6	Set up job	2026-10-01T19:09:45.8390392Z Getting action download info
+Behavior portable serial 6	Set up job	2026-10-01T19:09:46.2367781Z Download action repository 'actions/checkout@v6' (SHA:d23441a48e516b6c34aea4fa41551a30e30af803)
+Behavior portable serial 6	Set up job	2026-10-01T19:09:46.3374335Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+Behavior portable serial 6	Set up job	2026-10-01T19:09:46.5593754Z Complete job name: Behavior portable serial 6
+Behavior portable serial 6	Run actions/checkout@v6	﻿2026-10-01T19:09:46.6328793Z ##[group]Run actions/checkout@v6
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.6329714Z with:
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.6330156Z   fetch-depth: 0
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.6330625Z   repository: kw7243/firstmate
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.6334504Z   token: ***
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.6334960Z   ssh-strict: true
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.6335405Z   ssh-user: git
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.6335853Z   persist-credentials: true
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.6336357Z   clean: true
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.6336809Z   sparse-checkout-cone-mode: true
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.6337337Z   fetch-tags: false
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.6337785Z   show-progress: true
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.6338233Z   lfs: false
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.6338646Z   submodules: false
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.6339094Z   set-safe-directory: true
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.6339600Z   allow-unsafe-pr-checkout: false
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.6340367Z ##[endgroup]
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7371069Z Syncing repository: kw7243/firstmate
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7373682Z ##[group]Getting Git version info
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7374794Z Working directory is '/home/runner/work/firstmate/firstmate'
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7375950Z [command]/usr/bin/git version
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7461100Z git version 2.55.0
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7499801Z ##[endgroup]
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7522069Z Temporarily overriding HOME='/home/runner/work/_temp/4bacf408-f6f0-42a8-a645-374e47f72b07' before making global git config changes
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7525042Z Adding repository directory to the temporary git global config as a safe directory
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7528220Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/firstmate/firstmate
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7619442Z Deleting the contents of '/home/runner/work/firstmate/firstmate'
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7625911Z ##[group]Determining repository object format
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7627903Z ##[endgroup]
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7629175Z ##[group]Initializing the repository
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7644996Z [command]/usr/bin/git init /home/runner/work/firstmate/firstmate
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7768765Z hint: Using 'master' as the name for the initial branch. This default branch name
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7770860Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7792989Z hint: to use in all of your new repositories, which will suppress this warning,
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7794518Z hint: call:
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7795106Z hint:
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7795920Z hint: 	git config --global init.defaultBranch <name>
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7796911Z hint:
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7797846Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7799316Z hint: 'development'. The just-created branch can be renamed via this command:
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7800562Z hint:
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7801394Z hint: 	git branch -m <name>
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7802261Z hint:
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7803339Z hint: Disable this message with "git config set advice.defaultBranchName false"
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7805282Z Initialized empty Git repository in /home/runner/work/firstmate/firstmate/.git/
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7808059Z [command]/usr/bin/git remote add origin https://github.com/kw7243/firstmate
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7841866Z ##[endgroup]
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7843087Z ##[group]Disabling automatic garbage collection
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7847130Z [command]/usr/bin/git config --local gc.auto 0
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7896612Z ##[endgroup]
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7897993Z ##[group]Setting up auth
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7899204Z Removing SSH command configuration
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7900678Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.7936999Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.8348443Z Removing HTTP extra header
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.8356581Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.8395990Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.8617596Z Removing includeIf entries pointing to credentials config files
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.8624981Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.8661962Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.8906268Z [command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-d58d5a7d-8b8b-4625-9470-8ee40a4eeec4.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.8955519Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/firstmate/firstmate/.git.path /home/runner/work/_temp/git-credentials-d58d5a7d-8b8b-4625-9470-8ee40a4eeec4.config
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.8996167Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/firstmate/firstmate/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-d58d5a7d-8b8b-4625-9470-8ee40a4eeec4.config
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.9046302Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-d58d5a7d-8b8b-4625-9470-8ee40a4eeec4.config
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.9083329Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-d58d5a7d-8b8b-4625-9470-8ee40a4eeec4.config
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.9117224Z ##[endgroup]
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.9119057Z ##[group]Fetching the repository
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:46.9128226Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules origin +refs/heads/*:refs/remotes/origin/* +refs/tags/*:refs/tags/* +c8fae3415c09863ed397f75202aee770c8ec30e4:refs/remotes/pull/14/merge
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.1212541Z From https://github.com/kw7243/firstmate
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.1215146Z  * [new branch]      codex/sandbox-startup                    -> origin/codex/sandbox-startup
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.1217574Z  * [new branch]      fm/firstmate-agents-full-context-r2      -> origin/fm/firstmate-agents-full-context-r2
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.1219581Z  * [new branch]      fm/firstmate-parent-parity-r2            -> origin/fm/firstmate-parent-parity-r2
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.1221598Z  * [new branch]      fm/firstmate-parent-sync-b5d9061-r1      -> origin/fm/firstmate-parent-sync-b5d9061-r1
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.1224787Z  * [new branch]      fm/firstmate-parent-sync-bd744684-r1     -> origin/fm/firstmate-parent-sync-bd744684-r1
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.1227786Z  * [new branch]      fm/firstmate-upstream-adoption-20260928-sandbox -> origin/fm/firstmate-upstream-adoption-20260928-sandbox
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.1230603Z  * [new branch]      fm/firstmate-upstream-sync-r1            -> origin/fm/firstmate-upstream-sync-r1
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.1233089Z  * [new branch]      fm/fix-codex-stow-bearings               -> origin/fm/fix-codex-stow-bearings
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.1235993Z  * [new branch]      fm/fix-sandbox-gh-auth                   -> origin/fm/fix-sandbox-gh-auth
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.1238500Z  * [new branch]      fm/fm-child-state-reconcile-r1           -> origin/fm/fm-child-state-reconcile-r1
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.1241249Z  * [new branch]      fm/fm-coding-ladder-guideline-r1         -> origin/fm/fm-coding-ladder-guideline-r1
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.1244102Z  * [new branch]      fm/fm-parent-sync-r2                     -> origin/fm/fm-parent-sync-r2
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.1246967Z  * [new branch]      fm/fm-tmux-blesh-launch-settle-r1        -> origin/fm/fm-tmux-blesh-launch-settle-r1
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.1249553Z  * [new branch]      main                                     -> origin/main
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.1251712Z  * [new branch]      no-mistakes/evidence                     -> origin/no-mistakes/evidence
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.1254721Z  * [new branch]      research-notebook-reminder-skill         -> origin/research-notebook-reminder-skill
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.1257701Z  * [new ref]         c8fae3415c09863ed397f75202aee770c8ec30e4 -> pull/14/merge
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.1261551Z ##[endgroup]
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.1263023Z ##[group]Determining the checkout info
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.1265379Z ##[endgroup]
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.1266626Z [command]/usr/bin/git sparse-checkout disable
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.1286040Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.1319862Z ##[group]Checking out the ref
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.1324854Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/14/merge
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.2485925Z Note: switching to 'refs/remotes/pull/14/merge'.
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.2487872Z 
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.2489335Z You are in 'detached HEAD' state. You can look around, make experimental
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.2492921Z changes and commit them, and you can discard any commits you make in this
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.2496773Z state without impacting any branches by switching back to a branch.
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.2498989Z 
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.2500375Z If you want to create a new branch to retain commits you create, you may
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.2503868Z do so (now or later) by using -c with the switch command. Example:
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.2505349Z 
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.2505938Z   git switch -c <new-branch-name>
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.2506816Z 
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.2507606Z Or undo this operation with:
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.2508642Z 
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.2509177Z   git switch -
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.2509811Z 
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.2510819Z Turn off this advice by setting config variable advice.detachedHead to false
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.2512303Z 
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.2514202Z HEAD is now at c8fae34 Merge 1716b0b61b86ef1bf176ed83c7723520f4a5c17e into 7370f1567b2aa0acf54d1bc353da2c7fc8091816
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.2519381Z ##[endgroup]
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.2561183Z [command]/usr/bin/git log -1 --format=%H
+Behavior portable serial 6	Run actions/checkout@v6	2026-10-01T19:09:51.2588425Z c8fae3415c09863ed397f75202aee770c8ec30e4
+Behavior portable serial 6	Install pinned ShellCheck	﻿2026-10-01T19:09:51.2991486Z ##[group]Run set -eu
+Behavior portable serial 6	Install pinned ShellCheck	2026-10-01T19:09:51.2992813Z ^[[36;1mset -eu^[[0m
+Behavior portable serial 6	Install pinned ShellCheck	2026-10-01T19:09:51.2994848Z ^[[36;1mbin/fm-install-shellcheck.sh "$RUNNER_TEMP/bin"^[[0m
+Behavior portable serial 6	Install pinned ShellCheck	2026-10-01T19:09:51.2996598Z ^[[36;1mecho "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"^[[0m
+Behavior portable serial 6	Install pinned ShellCheck	2026-10-01T19:09:51.3282250Z shell: /usr/bin/bash -e {0}
+Behavior portable serial 6	Install pinned ShellCheck	2026-10-01T19:09:51.3283945Z ##[endgroup]
+Behavior portable serial 6	Install pinned ShellCheck	2026-10-01T19:09:51.6843849Z ShellCheck - shell script analysis tool
+Behavior portable serial 6	Install pinned ShellCheck	2026-10-01T19:09:51.6844652Z version: 0.11.0
+Behavior portable serial 6	Install pinned ShellCheck	2026-10-01T19:09:51.6845200Z license: GNU General Public License, version 3
+Behavior portable serial 6	Install pinned ShellCheck	2026-10-01T19:09:51.6845969Z website: https://www.shellcheck.net
+Behavior portable serial 6	Install pinned actionlint	﻿2026-10-01T19:09:51.6955534Z ##[group]Run set -eu
+Behavior portable serial 6	Install pinned actionlint	2026-10-01T19:09:51.6955907Z ^[[36;1mset -eu^[[0m
+Behavior portable serial 6	Install pinned actionlint	2026-10-01T19:09:51.6956246Z ^[[36;1mbin/fm-install-actionlint.sh "$RUNNER_TEMP/bin"^[[0m
+Behavior portable serial 6	Install pinned actionlint	2026-10-01T19:09:51.6956690Z ^[[36;1mecho "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"^[[0m
+Behavior portable serial 6	Install pinned actionlint	2026-10-01T19:09:51.7024291Z shell: /usr/bin/bash -e {0}
+Behavior portable serial 6	Install pinned actionlint	2026-10-01T19:09:51.7024616Z ##[endgroup]
+Behavior portable serial 6	Install pinned actionlint	2026-10-01T19:09:52.9425252Z 1.7.12
+Behavior portable serial 6	Install pinned actionlint	2026-10-01T19:09:52.9426491Z installed by downloading from release page
+Behavior portable serial 6	Install pinned actionlint	2026-10-01T19:09:52.9427026Z built with go1.26.1 compiler for linux/amd64
+Behavior portable serial 6	Require tmux for e2e tests	﻿2026-10-01T19:09:52.9511554Z ##[group]Run set -eu
+Behavior portable serial 6	Require tmux for e2e tests	2026-10-01T19:09:52.9511880Z ^[[36;1mset -eu^[[0m
+Behavior portable serial 6	Require tmux for e2e tests	2026-10-01T19:09:52.9512144Z ^[[36;1mcommand -v tmux >/dev/null || {^[[0m
+Behavior portable serial 6	Require tmux for e2e tests	2026-10-01T19:09:52.9512557Z ^[[36;1m  echo "::error::tmux is required for real afk injection e2e coverage"^[[0m
+Behavior portable serial 6	Require tmux for e2e tests	2026-10-01T19:09:52.9512947Z ^[[36;1m  exit 1^[[0m
+Behavior portable serial 6	Require tmux for e2e tests	2026-10-01T19:09:52.9513150Z ^[[36;1m}^[[0m
+Behavior portable serial 6	Require tmux for e2e tests	2026-10-01T19:09:52.9513342Z ^[[36;1mtmux -V^[[0m
+Behavior portable serial 6	Require tmux for e2e tests	2026-10-01T19:09:52.9579701Z shell: /usr/bin/bash -e {0}
+Behavior portable serial 6	Require tmux for e2e tests	2026-10-01T19:09:52.9579995Z ##[endgroup]
+Behavior portable serial 6	Require tmux for e2e tests	2026-10-01T19:09:53.0427961Z tmux 3.4
+Behavior portable serial 6	Install tasks-axi for backlog-handoff delegation	﻿2026-10-01T19:09:53.0477902Z ##[group]Run set -eu
+Behavior portable serial 6	Install tasks-axi for backlog-handoff delegation	2026-10-01T19:09:53.0478235Z ^[[36;1mset -eu^[[0m
+Behavior portable serial 6	Install tasks-axi for backlog-handoff delegation	2026-10-01T19:09:53.0478514Z ^[[36;1mnpm install -g tasks-axi^[[0m
+Behavior portable serial 6	Install tasks-axi for backlog-handoff delegation	2026-10-01T19:09:53.0478839Z ^[[36;1mtasks-axi --version^[[0m
+Behavior portable serial 6	Install tasks-axi for backlog-handoff delegation	2026-10-01T19:09:53.0545132Z shell: /usr/bin/bash -e {0}
+Behavior portable serial 6	Install tasks-axi for backlog-handoff delegation	2026-10-01T19:09:53.0545459Z ##[endgroup]
+Behavior portable serial 6	Install tasks-axi for backlog-handoff delegation	2026-10-01T19:09:59.5871811Z 
+Behavior portable serial 6	Install tasks-axi for backlog-handoff delegation	2026-10-01T19:09:59.5872528Z added 3 packages in 3s
+Behavior portable serial 6	Install tasks-axi for backlog-handoff delegation	2026-10-01T19:09:59.6583393Z 0.2.6
+Behavior portable serial 6	Install the Pi package for the Pi extension tests	﻿2026-10-01T19:09:59.6661851Z ##[group]Run set -eu
+Behavior portable serial 6	Install the Pi package for the Pi extension tests	2026-10-01T19:09:59.6662168Z ^[[36;1mset -eu^[[0m
+Behavior portable serial 6	Install the Pi package for the Pi extension tests	2026-10-01T19:09:59.6662448Z ^[[36;1mnpm install -g @earendil-works/pi-coding-agent^[[0m
+Behavior portable serial 6	Install the Pi package for the Pi extension tests	2026-10-01T19:09:59.6662848Z ^[[36;1mnpm ls -g --depth 0 @earendil-works/pi-coding-agent^[[0m
+Behavior portable serial 6	Install the Pi package for the Pi extension tests	2026-10-01T19:09:59.6725693Z shell: /usr/bin/bash -e {0}
+Behavior portable serial 6	Install the Pi package for the Pi extension tests	2026-10-01T19:09:59.6725986Z ##[endgroup]
+Behavior portable serial 6	Install the Pi package for the Pi extension tests	2026-10-01T19:10:02.2157036Z npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+Behavior portable serial 6	Install the Pi package for the Pi extension tests	2026-10-01T19:10:05.6655771Z 
+Behavior portable serial 6	Install the Pi package for the Pi extension tests	2026-10-01T19:10:05.6656636Z added 122 packages in 6s
+Behavior portable serial 6	Install the Pi package for the Pi extension tests	2026-10-01T19:10:05.6657072Z 
+Behavior portable serial 6	Install the Pi package for the Pi extension tests	2026-10-01T19:10:05.6657322Z 9 packages are looking for funding
+Behavior portable serial 6	Install the Pi package for the Pi extension tests	2026-10-01T19:10:05.6657891Z   run `npm fund` for details
+Behavior portable serial 6	Install the Pi package for the Pi extension tests	2026-10-01T19:10:08.7172811Z /usr/local/lib
+Behavior portable serial 6	Install the Pi package for the Pi extension tests	2026-10-01T19:10:08.7173418Z └── @earendil-works/pi-coding-agent@0.99.2
+Behavior portable serial 6	Install the Pi package for the Pi extension tests	2026-10-01T19:10:08.7173977Z 
+Behavior portable serial 6	Run portable serial shard 6	﻿2026-10-01T19:10:08.7365586Z ##[group]Run set -eu
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:10:08.7365875Z ^[[36;1mset -eu^[[0m
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:10:08.7366102Z ^[[36;1mmkdir -p "$RUNNER_TEMP/fm-test"^[[0m
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:10:08.7366526Z ^[[36;1m# The Pi package is installed above and CI provides npm and tsc, so^[[0m
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:10:08.7367037Z ^[[36;1m# any missing typecheck prerequisite is a broken lane, not a valid skip.^[[0m
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:10:08.7367500Z ^[[36;1mbin/fm-test-run.sh --lane "$FM_SERIAL_LANE" \^[[0m
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:10:08.7367952Z ^[[36;1m  --fail-on-gate-skip 'Pi extension typecheck prerequisite not found' \^[[0m
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:10:08.7368534Z ^[[36;1m  --json "$RUNNER_TEMP/fm-test/fm-test-timing-portable-serial-${FM_SERIAL_SHARD}.json"^[[0m
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:10:08.7430192Z shell: /usr/bin/bash -e {0}
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:10:08.7430447Z env:
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:10:08.7430664Z   FM_SERIAL_LANE: portable-serial-6of9
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:10:08.7430939Z   FM_SERIAL_SHARD: 6
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:10:08.7431151Z ##[endgroup]
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:10:09.9204826Z FM_TEST_BEGIN 2026-10-01T19:10:09Z tests/fm-pr-check-security.test.sh family=pr-forge expected_gate_skip=none
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:10:10.1008958Z ok - raw-byte parser accepts canonical URLs and rejects the complete adversarial matrix
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:10:23.7140365Z ok - GitLab merge requests are followed on any instance and never wake falsely
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:10:48.6025627Z ok - the Gerrit watch wakes only on an explicit merged status and never on submittability
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:10:49.4234409Z ok - Gerrit arming records no patch set revision and the merge path refuses to submit
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:10:50.6412647Z ok - Gerrit arming accepts a published HEAD only by the change's current patch set tree
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:10:52.8492475Z ok - a no-mistakes Gerrit ready report requires the pipeline's fixes recovered into the published copy
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:10:57.6959652Z ok - validated merged polls notify once and retire before the next watcher cycle
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:11:04.0747648Z ok - a repeat identical merged poll for an already-notified task is absorbed, never queued as a main-blocking row
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:11:09.3911479Z ok - a failed upward merge report keeps its poll armed for repair and retry
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:11:20.2095039Z ok - staged self-merge and poll interleavings are never silent
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:11:29.6562018Z ok - queued merges retain their away authority after captain return
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:11:36.9756838Z ok - poll distinguishes attended authorization from external landing
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:11:39.3886120Z ok - accepted merge authority refuses rebound task metadata
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:11:41.1847823Z ok - accepted merge authority persists under the lifecycle lock
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:11:46.6512759Z ok - teardown cannot race merged-poll authority consumption
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:11:55.3790279Z ok - poll retirement preserves a replacement authority record
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:12:01.9336625Z ok - a merge detected by the poll is reported upward from a secondmate home exactly once
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:12:08.1830562Z ok - a different merged PR for the same task gets its own first notification
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:12:11.0416888Z ok - a merged poll on a persistent secondmate retires silently: no outcome, marker, or wake, and every lifecycle artifact preserved
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:12:28.3714466Z ok - queue, receipt, and every fixed-path removal crash point recover without loss or repeated execution
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:12:42.6515142Z ok - open/red, closed-unmerged, malformed, and forge errors remain armed until an exact merged transition
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:12:48.3421144Z ok - replacement, nonterminal, tampered, and custom results receive no deletion authority
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:12:51.6216433Z ok - queue failure and untrusted receipts preserve canonical poll evidence
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:12:54.3132001Z ok - GitHub and GitLab exact merged results share one retirement path
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:13:43.8982469Z ok - PR and teardown entrypoints reject invalid arguments before every side effect
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:13:45.3084208Z ok - arming refuses a draft pull request, naming it, and arms a ready or unreadable one
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:13:45.3894142Z ok - fm-pr-check refuses to record a PR or arm a merge watch on a secondmate record
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:13:45.5115600Z ok - fm-pr-check refuses to register a PR whose named head is only in the worker copy
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:13:45.6343120Z ok - fm-pr-check refuses a direct-PR registration while a later commit is only in the copy
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:14:03.5521522Z ok - valid direct and merge flows record exact metadata and reject multiline head metadata
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:14:10.6194654Z ok - rejected metacharacter bytes remain inert at generation and watcher time
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:14:14.4635858Z ok - static poll is silent except for one merged line and remains watcher-bounded
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:14:14.5940379Z ok - interrupted atomic preparation cleans private temporaries and publishes nothing
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:14:22.1596605Z ok - concurrent watchers observe only complete private poll publications
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:14:23.8544049Z ok - poll publication paths refuse symlinks and directories
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:14:26.6184273Z ok - live poll and custom-check artifacts require private single-link files
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:14:32.9666569Z ok - a poll armed before a volume renumber is re-recorded under the control lock and keeps detecting merges
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:14:46.9828195Z ok - a renumbered registration is never re-recorded around a tampered artifact: swapped-check altered-check swapped-sidecar altered-sidecar altered-template-hash wrong-mode hardlinked-check split-device foreign-device, or a pending retirement
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:14:49.1633958Z ok - direct re-arm publication waits without replacing an armed poll
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:14:53.0905654Z ok - device re-record publication waits without rewriting its registration
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:03.7520421Z ok - post-rename poll validation faults revoke both names and allow a clean retry
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:04.1346787Z ok - bootstrap does not rewrite unauthenticated checks or emit retired migration diagnostics
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:05.2222902Z ok - watcher signals promptly stop custom checks and clean private state
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:08.2439647Z ok - returned custom check descendants are drained on installed and fallback timeout paths
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:14.1951043Z ok - teardown removes safe poll artifacts and refuses directory-shaped check files without traversal
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:14.7991512Z FM_TEST_END 2026-10-01T19:15:14Z tests/fm-pr-check-security.test.sh exit=0 duration_ms=304871 gate_skip=false
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:14.8224270Z FM_TEST_BEGIN 2026-10-01T19:15:14Z tests/fm-wake-queue.test.sh family=watcher-wake-lock expected_gate_skip=none
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:15.0099398Z ok - an abandoned same-process lock hold is reclaimed; a parent's live hold is not
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:15.1696407Z ok - without BASHPID a subshell cannot release or reclaim its parent lock and owns its own hold
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:15.4958546Z ok - bounded acquire hands ownership to the waiting caller after contention
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:21.5591363Z ok - presentation lock waits are bounded and retriable without weakening acknowledgement atomicity
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:23.2686034Z ok - malformed presentation locks report acquire failure instead of contention
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:23.8600499Z tests/wake-helpers.sh: line 315: 190442 Killed                  PATH="$dir/fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$dir/state" FM_FAKE_TMUX_WINDOW='firstmate:fm-mate' FM_SECONDMATE_WAKE_STALL_SECS=1 FM_SECONDMATE_LIVENESS_SECS=99999999 FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$dir/watch-$leg.out" 2> "$dir/watch-$leg.err"
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:24.5574368Z tests/wake-helpers.sh: line 315: 190973 Killed                  PATH="$dir/fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$dir/state" FM_FAKE_TMUX_WINDOW='firstmate:fm-mate' FM_SECONDMATE_WAKE_STALL_SECS=1 FM_SECONDMATE_LIVENESS_SECS=99999999 FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$dir/watch-$leg.out" 2> "$dir/watch-$leg.err"
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:26.9629354Z tests/wake-helpers.sh: line 315: 192908 Killed                  PATH="$dir/fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$dir/state" FM_FAKE_TMUX_WINDOW='firstmate:fm-mate' FM_SECONDMATE_WAKE_STALL_SECS=1 FM_SECONDMATE_LIVENESS_SECS=99999999 FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$dir/watch-$leg.out" 2> "$dir/watch-$leg.err"
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:27.7427099Z ok - foreign secondmate queue alerts once per no-progress episode without age-only or cascade noise
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:29.0034693Z ok - declared external-wait pause rows do not feed secondmate wake-loop escalation
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:31.0569743Z ok - a reprovisioned queue generation starts a fresh no-progress interval
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:35.4317937Z ok - an active turn defers the secondmate stall escalation without cancelling it
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:40.8317795Z ok - a long-lived mate mid-turn is not a stall, but a queue frozen past the busy bound still alarms
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:43.1594166Z ok - a proven-idle leftover row is rung so the child home can drain without a parent alarm
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:45.9618426Z ok - busy panes defer without a ring and unknown panes keep the parent alarm
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:49.1880714Z ok - a leftover row that survives a proven-idle ring still surfaces as a genuine stall
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:49.7647451Z ok - secondmate stall markers reject symlinks without touching their targets
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:51.5947628Z ok - stall publication acknowledgement closes the pre-marker crash window
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:55.4458584Z ok - empty prefix mate cleanup preserves another mate's stall receipt
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:56.6958418Z ok - self-announced appends suppress only their own bytes and fail toward waking
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:58.1351701Z ok - separate self-announced answers after a fold stay owned; worker decisions and later lines still wake
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:58.6476590Z ok - an unreadable status still reads as unreported, with or without owned growth
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:15:59.5974370Z ok - a worker resolved in fold lag still wakes after this home's close
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:00.9034438Z ok - owned growth suppresses the wake without hiding the turn-ended annotation
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:04.2922131Z ok - historical annotations replay nothing already announced and keep everything new
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:13.0191049Z WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 25 --recovery-generation 218247.1790882164.0gEHhq
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:15.9006945Z ok - concurrent append plus drain preserves durable records through acknowledgement
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:21.4912012Z ok - signal written while no watcher runs is caught on next run
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:22.9572859Z WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 250958.1790882182.jSlGAd
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:23.8477946Z ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:23.8478821Z ●  WATCHER DOWN - SUPERVISION IS OFF
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:23.8484024Z ●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 2s ago).
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:23.8486251Z ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:23.8488329Z ●  This is a supervision warning only; the guarded operation WILL still run.
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:23.8490919Z ●  After draining queued wakes, repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:23.8492226Z ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:23.8493122Z WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:23.8544831Z ok - stale wake is queued before suppressor state is advanced
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:25.3222081Z WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 252895.1790882184.SB82yP
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:26.1825918Z ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:26.1826571Z ●  WATCHER DOWN - SUPERVISION IS OFF
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:26.1831930Z ●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:26.1832873Z ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:26.1834092Z ●  This is a supervision warning only; the guarded operation WILL still run.
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:26.1835238Z ●  After draining queued wakes, repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:26.1836169Z ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:26.1837103Z WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:26.1889612Z ok - a not-provably-working stale wake is queued before its suppressor is advanced
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:27.4840953Z WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 254783.1790882187.PUMN5G
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:28.1356863Z ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:28.1357920Z ●  WATCHER DOWN - SUPERVISION IS OFF
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:28.1362400Z ●  1 registered custom check(s), but no live watcher process holds this home lock (last beat: 1s ago).
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:28.1363371Z ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:28.1364859Z ●  This is a supervision warning only; the guarded operation WILL still run.
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:28.1366272Z ●  After draining queued wakes, repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:28.1367663Z ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:28.1368675Z WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:28.1406337Z ok - registered custom check output is queued before cadence suppression
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:30.0834258Z ok - concurrent drains replay until one post-handling acknowledgement consumes records
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:30.6238415Z WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 257801.1790882190.nRFDey
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:31.0399356Z ok - drain collapses obvious duplicate heartbeat and signal records
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:32.3441722Z ok - drain asserts watcher liveness: warns on a lapse, stays silent for a live watcher with a fresh beacon
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:33.2371458Z WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 8 --recovery-generation 259391.1790882192.oOgZsj
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:33.7838557Z ok - structural signal enrichment is separate, deduped, home-local, and tier-zero for other wakes
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:35.0871831Z WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 13 --recovery-generation 260649.1790882193.lR1wq4
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:36.0680685Z ok - every readable unread status line is annotated in full while invalid status files preserve their raw wakes
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:36.3629671Z WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 262774.1790882196.clqg9q
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:40.0110436Z WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 262774.1790882196.clqg9q
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:40.4361546Z ok - slow annotation releases the append lock and a deleted status file fails open
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:42.2538900Z ok - a branch-actor scoped ack never swallows an unacked main-owned row, and main's later drain sees exactly what remains
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:44.0291117Z ok - main drain and acknowledgement exclude an active branch grant
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:44.9557214Z ok - a branch-actor acknowledgement commits secondmate stall receipts for exactly its granted rows
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:46.9864315Z ok - a branch-held row raises no queued-wake warning for main, and the same row is presented and acknowledged once the grant clears
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:47.6763862Z ok - a queue that cannot be counted keeps the queued-wake alarm up
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:49.7685238Z ok - structurally unusable rows are retired by main alone, leaving every remaining row presentable and acknowledgeable
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:50.5810600Z ok - branch grant cannot take a row already claimed by main
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:52.3838741Z ok - main's acknowledgement leaves a row that arrived after its drain for whichever actor takes it next
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:54.1342780Z ok - actor ownership filtering precedes same-key deduplication
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:55.1651762Z ok - main reclaims rows granted to an exited branch owner
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:55.2905259Z ok - a branch-actor drain with no eligible-row snapshot refuses loudly instead of draining nothing
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:55.6729290Z WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation existing
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:56.0856249Z ok - wake append publishes atomic recovery evidence before durable rows
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:56.2947540Z ok - recovery mint and delivery log avoid sibling $()
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:16:58.3307117Z ok - wake drain: generation-less legacy wakes are adopted and acknowledged
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:17:00.5438467Z ok - wake drain: a stale acknowledgement cannot retire or consume a newer recovery episode
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:17:02.5559494Z ok - wake drain: an acknowledgement that consumes nothing says so and names the exact command for the current wake
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:17:04.4420218Z ok - wake drain: a branch acknowledgement that consumes nothing names the exact command for its granted wake
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:17:05.3225519Z ok - wake drain: recovery acknowledgement failures are explicit and retryable
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:17:12.9328427Z ok - interruptions preserve durable rows until post-handling acknowledgement
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:17:13.5720342Z ok - fm_wake_queue_prune_task: prunes wakes for target task without touching other tasks
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:17:14.0891879Z ok - drain rotates scratch files an interrupted drain left under the queue lock
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:17:21.9207411Z ok - watch liveness: a dead secondmate is relaunched once, ledgered, and quiet afterwards
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:17:24.4695666Z ok - watch liveness: a missing secondmate endpoint is relaunched without a pre-kill
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:17:29.3572910Z ok - watch liveness: one tick relaunches every dead mate, queues a row each, and wakes once
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:17:38.5649555Z ok - watch liveness: alive and ambiguous endpoints are probed, logged, and never touched
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:17:46.2763327Z ok - watch liveness: the cadence marker gates probing and survives across legs
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:18:00.4733213Z ok - watch liveness: the attempt bound parks a flapping mate once and a live probe rearms a full budget
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:18:01.9289770Z ok - watch liveness: a failed auto-relaunch wakes once with its cause and is ledgered
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:18:03.2984055Z ok - watch liveness: an unwritable or unreadable relaunch ledger refuses to kill or spawn
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:18:06.0987571Z ok - watch liveness: a per-mate error keeps scanning, recovers later mates, and still wakes
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:18:08.6609822Z ok - watch liveness: an outcome that could not be queued surfaces as an error, not a wake
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:18:12.8439771Z ok - watch liveness: a mate mid-episode under the shared liveness lock is skipped entirely
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:18:16.9852148Z ok - watch liveness: an unreachable remote secondmate is probed, preserved, and never failed over
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:18:17.1716049Z FM_TEST_END 2026-10-01T19:18:17Z tests/fm-wake-queue.test.sh exit=0 duration_ms=182340 gate_skip=false
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:18:17.1951448Z FM_TEST_BEGIN 2026-10-01T19:18:17Z tests/fm-remote-backlog-handoff.test.sh family=secondmate expected_gate_skip=none
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:18:17.5470438Z ok - confined put rejects incomplete and superseded payload generations
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:18:17.6730858Z ok - confined put rejects directory replacement without external writes
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:18:21.0645373Z ok - ambiguous receipt leaves one durable outbox and no duplicate dispatchable source
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:18:25.5782104Z ok - re-delivery after unknown completion converges without duplication
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:18:31.8725396Z ok - dropped transfer recovery overwrites scratch and delivers exactly once
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:18:42.9718960Z ok - concurrent handoffs serialize staging through confirmed cleanup
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:18:50.4534048Z ok - receiver removes one proven dead stale lock and retries once
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:18:57.8417382Z ok - bootstrap detects pending outbox handoffs without a journal
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:19:03.6173988Z ok - remote handoff releases durable work and separately retries its receiver wake
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:19:16.5630093Z ok - an escalated undelivered receiver wake stays retryable instead of jamming the outbox
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:19:27.3171944Z ok - a permanently unconfirmable wake never jams later durable handoffs
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:19:39.8654718Z ok - fresh remote work gets a new wake after confirmed cleanup recovery
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:19:44.8361660Z ok - confirmed marker cleanup cannot fail a completed remote handoff
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:19:54.6462649Z ok - delivered pending state cannot suppress a new handoff wake
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:03.5176442Z ok - unrecordable best-effort wake state drops without blocking later handoffs
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:07.6185605Z ok - undeletable invalid wake state cannot block remote handoffs
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:08.0656839Z ok - route classification serializes with retirement before staging
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:08.3706986Z ok - unconfigured bootstrap has no remote handoff behavior
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:08.3707758Z ALL TESTS PASSED
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:08.9603998Z FM_TEST_END 2026-10-01T19:20:08Z tests/fm-remote-backlog-handoff.test.sh exit=0 duration_ms=111757 gate_skip=false
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:08.9834916Z FM_TEST_BEGIN 2026-10-01T19:20:08Z tests/fm-watcher-lock.test.sh family=watcher-wake-lock expected_gate_skip=none
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:09.0355083Z ok - disposable watcher refuses inherited state outside its marked lab
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:11.5918252Z ok - wait deadline diagnoses and reaps a stopped test child without hanging
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:11.8522937Z ok - simultaneous watcher starts leave exactly one live process
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:11.9635658Z ok - fm_pid_identity real ps fallback is locale-invariant
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:11.9636308Z ok - fm_pid_identity is locale-invariant across LC_ALL/LC_TIME
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:12.0170654Z ok - fm_pid_identity ps fallback is terminal-width-invariant
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:12.0577215Z ok - /proc process identity ignores simulated btime changes
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:12.0741982Z ok - /proc process identity detects pid reuse
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:12.0756840Z ok - MSYS /proc process identity regression skipped on non-Windows host
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:12.4429508Z ok - killed watcher stale lock is reclaimed
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:12.5576498Z tests/fm-watcher-lock.test.sh: line 1655: 376091 Killed                  FM_STATE_OVERRIDE="$state" bash -c '
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:12.5577790Z     . "$1"
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:12.5578248Z     fm_lock_remove_path() {
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:12.5578766Z       if [ "$1" = "$STATE/.watch.lock" ]; then
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:12.5579413Z         kill -KILL "${BASHPID:-$$}"
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:12.5579944Z       fi
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:12.5580326Z       return 1
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:12.5580726Z     }
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:12.5581106Z     fm_lock_try_acquire "$2"
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:12.5581599Z   ' _ "$LIB" "$lockdir" > /dev/null 2>&1
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:12.7329230Z ok - stale watcher reclaim publishes durable recovery evidence before clear
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:12.9418423Z ok - live watcher lock with stale heartbeat is actionable
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:13.6956534Z ok - live watcher lock with a beacon past the hard bound is replaced, under it is still refused
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:14.5393335Z ok - guard banner leads when down with pending wakes (repair-after-drain) and stays silent when live and fresh
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:15.8044762Z ok - concurrent fm_lock_try_acquire yields exactly one winner
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:15.9183141Z ok - dead-pid stale lock is reclaimed by a single acquirer
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:17.6774581Z ok - concurrent stale-lock steal yields exactly one winner
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:17.8626759Z ok - dead steal owner is reclaimed once without a nested steal marker
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:18.0814290Z ok - dead nested steal chain from an interrupted reclaim is recovered
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:18.2310008Z ok - a competing reaper cannot remove the successor's steal mutex
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:18.3961669Z ok - a steal mutex abandoned by this process does not block its own reclaim
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:18.5705970Z ok - a steal reap interrupted in this process is resumed from its own tombstone
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:20.6395427Z ok - live steal mutex is not reclaimed
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:20.6881898Z ok - live-held lock is not stolen
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:20.7193153Z ok - empty mid-acquire lock keeps a minimum grace
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:20.8406164Z ok - late original claimant cannot claim a recreated lock
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:20.9046058Z ok - paused mid-acquire claimant backs off to active stealer
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:21.0443323Z ok - watch restart preserves foreign and missing namespace locks despite a live local PID collision
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:21.5787589Z ok - shared stale clear refuses matching, missing, unreadable and malformed owner proof
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:21.9288780Z ok - shared stale clear publishes under the steal mutex before removing a proven dead owner
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:22.7334732Z ok - watch restart preserves recovery without signaling a reused pid
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:30.2229665Z ok - watch restart attaches to a verified healthy peer and later surfaces a successor gap
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:31.1140315Z ok - watcher self-evicts when the lock pid no longer names it
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:43.1661513Z ok - arm turns clean self-eviction without a successor into a typed failure
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:45.1477387Z ok - arm attaches to a live fresh watcher and fails loudly when that cycle has no successor
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:46.0252826Z ok - attached arm signals record a classified lifecycle entry
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:47.4652380Z ok - arm starts cleanly and resurfaces recovery after a dead-pid lock
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:48.2207513Z ok - arm cleans child watcher and temp output on HUP
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:49.2227507Z ok - arm defers TERM until startup watcher can run its lock cleanup
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:52.0761337Z ok - arm TERM stops a startup watcher that never becomes cleanup-ready
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:53.5761777Z WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 393500.1790882452.QEC8MF
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:54.2135488Z ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:54.2136096Z ●  WATCHER DOWN - SUPERVISION IS OFF
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:54.2142222Z ●  1 registered custom check(s), but no live watcher process holds this home lock (last beat: 1s ago).
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:54.2143227Z ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:54.2144599Z ●  This is a supervision warning only; the guarded operation WILL still run.
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:54.2145880Z ●  After draining queued wakes, repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:54.2147090Z ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:54.2147671Z WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:20:54.2182106Z ok - arm propagates an immediate watcher wake before confirmation
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:05.2136648Z ok - arm attaches to a peer watcher after child stands down and surfaces a missing successor
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:05.4616252Z watcher: lock held by live pid 396043 but heartbeat is stale for 844197665s (>300s); inspect or stop that watcher before re-arming.
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:05.6899383Z ok - arm reports FAILED and exits non-zero when no fresh watcher can be confirmed
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:18.1155844Z ok - cycle-exit ledger links a verified successor and remains size-capped
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:18.9405971Z ok - SIGSTOP distinguishes live PID from stale beacon and termination records the exit class
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:19.2133252Z FM_TEST_END 2026-10-01T19:21:19Z tests/fm-watcher-lock.test.sh exit=0 duration_ms=70222 gate_skip=false
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:19.2371888Z FM_TEST_BEGIN 2026-10-01T19:21:19Z tests/fm-claude-stop-autoarm.test.sh family=standalone expected_gate_skip=none
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:19.3646537Z ok - auto-arm: inert in a linked child worktree even when in-flight
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:19.4301888Z ok - auto-arm: inert with no session lock
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:21.1338725Z ok - auto-arm: a demonstrably dead recorded session owner is reclaimed through fm-lock.sh before arming
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:21.7872216Z ok - auto-arm: inert without arm, rewake, or lock replacement when another live harness owns the home
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:21.9461976Z ok - auto-arm: inert while AFK owns supervision
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:23.2144471Z ok - auto-arm: stale-owner recovery leaves the AFK and supervision-need gates unchanged
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:23.8784116Z ok - auto-arm: resolves the outermost pid of a nested contiguous claude ancestry (bg-spare chain)
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:24.0360563Z ok - auto-arm: inert with nothing in flight and no X-mode need
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:24.6465765Z ok - auto-arm: actionable close translates to exactly one exit-2 rewake with reason
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:25.6340644Z ok - auto-arm: actionable close survives a healthy successor without duplicate delivery
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:26.3027460Z ok - auto-arm: an attached cycle's end starts a handling successor named after the closed arm before the rewake
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:26.6983348Z ok - auto-arm: an unconfirmed handling successor is reported in the rewake instead of blocking it
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:26.9761367Z ok - auto-arm: bounded failure verification emits one automatic-mechanism alarm
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:27.4944286Z ok - auto-arm: consecutive failures keep Stop-owned retry without repeating notice
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:28.2840275Z ok - auto-arm: marker-write refusal defers delivery until one successor commits the notice
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:28.5702431Z ok - auto-arm: unverified clean close exhausts retries and fails closed
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:28.8350377Z ok - auto-arm: post-alarm actionable outcomes cannot continue or reset failure state
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:29.5637123Z ok - auto-arm: benign cycle end with a live watcher and fresh beacon stays silent across the next cycle
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:30.3453189Z ok - auto-arm: budget contention preserves the episode and forces a reset retry
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:30.6762630Z ok - auto-arm: owner-mutex contention preserves successor episode state
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:31.2844993Z ok - auto-arm: X-mode poll need arms the cycle even with no tasks in flight
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:31.9755541Z ok - auto-arm: a registered custom check arms the cycle even with no tasks in flight
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:34.5954974Z ok - auto-arm: concurrent firings admit one owner and one rewake translation
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:34.8671714Z ok - auto-arm: TERM mid-arm commits a durable failure and exits 2 for rewake
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:35.5710253Z ok - auto-arm: an abandoned owner claim is reclaimed so a lapsed cycle re-arms
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:36.3227416Z ok - auto-arm: an abandoned-claim reclaim reaps a dead steal mutex without nesting
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:36.5295780Z ok - auto-arm: a legacy owner still arming is never reclaimed while its watcher keeps beating
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:36.7526815Z ok - auto-arm: a fresh legacy arming claim is never reclaimed while its startup window is still open
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:36.9441865Z ok - auto-arm: a live claim the ledger does not name is never reclaimed
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:37.6899656Z ok - auto-arm: a claim whose pid was reused is reclaimed even while its ledger entry still reads arming
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:38.4126862Z ok - auto-arm: a reused-pid claim is reclaimed even with no ledger entry to prove it
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:38.6349562Z ok - auto-arm: an identity-matched owner still arming is never reclaimed
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:38.8211116Z ok - auto-arm: the guard's terminal-check claim is never reclaimed
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:39.6251437Z ok - auto-arm: a stuck live legacy owner is retired via TERM and its lock reclaimed
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:41.4653027Z ok - auto-arm: a SIGSTOPped legacy owner is reclaimed with TERM pending and dies on continue
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:41.6651353Z ok - auto-arm: a live open generation claim defers concurrent firings with no lock held
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:42.3285257Z ok - auto-arm: a hung generation owner with no watcher beat is superseded so re-arming self-heals
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:42.9505135Z ok - auto-arm: an identityless arming ledger never defers the gate (reused-pid loophole closed)
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:43.1732843Z ok - auto-arm: a superseded owner never re-invokes the arm and leaves its successor's claim untouched
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:50.1754068Z ok - auto-arm: a superseded owner goes silent - one supersession episode, one translation, no held mutex
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:50.4379264Z ok - auto-arm: need vanishing mid-cycle closes without a rewake
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:50.6917747Z ok - auto-arm: mid-cycle AFK hands triage to the daemon with no rewake
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:51.2950963Z ok - auto-arm: active in a marked secondmate home
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:51.5721013Z ok - auto-arm: a long FM_POLL with FM_GUARD_GRACE unset reaches fm-watch-arm.sh with the derived grace
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:52.1799236Z ok - auto-arm: config/supervision-host-off keeps the hook on the arm exactly as before
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:52.5794015Z ok - auto-arm: a Claude home without config/supervision-host runs the host by default
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:52.9891122Z ok - auto-arm: an opted-in home runs the host bound to its generation, and a host line rewakes like a wake
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:53.3997903Z ok - auto-arm: a wake the host hands back under the away record says it is automatic supervision, not a return
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:53.9311019Z ok - auto-arm: a wake the host hands back beside a quiet record carries no away note
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:54.5396275Z ok - auto-arm: without the host the rewake banner is unchanged, eight wake lines at most
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:54.9357699Z ok - auto-arm: a host handback delivers every host line, while its wake lines keep their cap
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:55.1935571Z ok - auto-arm: a host that stood down closes silently without a retry
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:55.4678074Z ok - auto-arm: a host that died without a close is retried, then reported as a failure
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:55.9163207Z ok - auto-arm: --help, -h, and an unknown argument arm nothing; the Stop path still arms
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:55.9239351Z ok - fm-lock: shared session-lock lib preserves the status path
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:21:57.1861050Z ok - auto-arm: stands down only on a pi-code-delivered transcript_path (/.pi/)
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:22:21.1985574Z FM_TEST_END 2026-10-01T19:22:21Z tests/fm-claude-stop-autoarm.test.sh exit=0 duration_ms=61953 gate_skip=false
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:22:21.2216741Z FM_TEST_BEGIN 2026-10-01T19:22:21Z tests/fm-calm-pi-extension.test.sh family=pure-contract-unit expected_gate_skip=none
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:22:22.5865123Z ok - Pi calm resolves its persistent home independently of Pi's launch directory
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:22:22.5874233Z ok - Pi calm compatibility evidence never rejects a Pi version for being newer than 0.82.0, and still fails closed on a missing or malformed version
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:22:23.4899957Z ok - a missing collapsed-thinking presentation API degrades only that Calm adapter with a clear skip reason, while the rest of Calm still registers
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:22:23.5985622Z ok - missing Pi presentation class exports reach the independent adapter degradation path
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:22:24.8346600Z ok - Calm hides queued Firstmate rows only on a session that can keep them, keeps hidden ones out of the editor on Escape, delivers them once in order, and leaves unsupported sessions and Calm off stock
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:22:25.7396229Z ok - Calm registers none of its 7 built-in tool wrappers at load while config/calm is off, and all 7 synchronously at load while config/calm is on
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:22:26.6336020Z ok - Calm's first same-session /calm activation claims every uncontested built-in, leaves a foreign bash tool fully intact and callable, warns prominently and logs the contested name, and only rows constructed before that activation - the documented bound - fail to retroactively collapse
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:22:27.6925095Z ok - Pi calm centralizes transcript visibility, preserves execution/export data, keeps Pi's stock working row visible while no run is active, and persists its choice across session starts
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:22:28.6821778Z ok - Pi calm on collapses mid-turn assistant working notes to zero height while Calm off keeps them, leaves streaming, truncated-final, and genuine final replies untouched, never mutates the messages, ignores every /calm argument, and restores a legacy persisted max as ordinary Calm on
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:22:37.4799957Z ok - Pi operational follow-up E2E processes exact user-role notifications once while Calm hides current and adjacent rows, Calm off and absent render them, and restart preserves semantics
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:22:42.1566261Z ok - Pi 0.99.2 with Calm on hides and retains queued Firstmate input through Escape, delivers it once, and leaves Calm off stock
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:22:44.5181596Z ok - Pi Calm native /skill:ahoy geometry keeps every collapsed thinking and tool block at zero height while preserving expansion, history, restart, and Calm-off rendering
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:22:53.9976263Z ok - Pi Calm working ship keeps its centered two-row asymmetric Unicode boat inside a deterministic long-wave trough, paints all water standard blue and the whole boat standard yellow with balanced resets, keeps ANSI-stripped width exact, reverses cleanly at both edges and every width, clamps visible and hidden resizes, falls back deterministically when narrow, freezes and resumes across settle/start without hidden-time jumps or duplicate timers, resets only on a fresh session, and leaves Calm-off visibility untouched
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:22:55.6735514Z ok - the rendered-export-DOM guard renders in one pass, retries a bounded number of Chrome start-up failures, and reports the Chrome binary, Chrome version, Pi version, exit status, and Chrome diagnostic when every attempt fails
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:23:21.1959722Z ok - Pi calm native E2E replaces the stock working row with a moving, resize-clamped working ship that freezes and resumes across two working periods in one Pi session, clears on abort, keeps captain turns visible, hides exact operational user rows without changing persistence, restores stock rendering Calm-off, survives restart, and preserves export plus Ctrl+O behavior
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:23:21.2852136Z FM_TEST_END 2026-10-01T19:23:21Z tests/fm-calm-pi-extension.test.sh exit=0 duration_ms=60055 gate_skip=false
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:23:21.3087700Z FM_TEST_BEGIN 2026-10-01T19:23:21Z tests/fm-send-resolve-key.test.sh family=backend-dispatch expected_gate_skip=none
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:23:24.0679790Z ok - fm-send --resolve-key: the answer send itself closes the open decision
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:23:25.3237017Z ok - fm-send --resolve-key: the close never re-wakes its own home, later lines still do
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:23:27.6341181Z ok - fm-send --resolve-key: separate answers do not each re-wake; later lines still do
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:23:30.4226325Z ok - fm-send --resolve-key: a colon-first stated key is open under that key and answerable
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:23:32.2961168Z ok - fm-send --resolve-key: an answer that starts a workstream leaves no orphaned decision
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:23:34.5330733Z ok - fm-send preserves decisions through routine work and refuses superseded terminal decisions
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:23:36.0320622Z ok - fm-send --resolve-key: a key that is not open refuses loudly before anything is sent
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:23:37.8657222Z ok - fm-send --resolve-key: the close happens at enqueue, surviving a failed doorbell
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:23:39.4117436Z ok - fm-send --resolve-key: a failed enqueue never closes the decision
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:23:41.3514825Z ok - fm-send --resolve-key: one answer closes each named key and only those
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:23:44.1722807Z ok - fm-send --resolve-key: one answer's closes after a drain fold never wake this home
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:23:46.0305581Z ok - fm-send --resolve-key: a marked local-secondmate answer closes with the plain answer text
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:23:47.8494870Z ok - fm-send --resolve-key: a remote-secondmate answer closes the same local ledger, transport-only difference
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:23:50.5323393Z ok - fm-send --resolve-key: a remote reply's leading [corr=...] tag no longer blocks closing its stated key
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:23:52.1236652Z ok - fm-send --resolve-key: a failed remote transport never closes the decision
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:23:54.5193829Z ok - fm-send --resolve-key: --key, empty message, explicit targets, and malformed keys refuse loudly
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:23:57.2450408Z ok - fm-send --resolve-key: a reserved pending-reply key actually closes through the operator path
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:23:59.9707112Z ok - fm-send --resolve-key: an unrelated writer cannot close or hijack a reserved key, and the operator close still can
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:24:01.4732222Z ok - fm-send --resolve-key: a reserved key this send cannot close refuses loudly before anything is sent
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:24:02.9628032Z ok - fm-send --resolve-key: an overlong decision key refuses before sending
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:24:04.0481339Z ok - fm-send --resolve-key: a stamped close line stays inside the status-line cap
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:24:05.6558183Z ok - fm-send --resolve-key: failed-close recovery commands safely quote operator text and paths
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:24:07.4802602Z ok - fm-send --resolve-key: a remote secondmate reserved-key close is the same local ledger append
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:24:12.3557825Z ok - fm-send --resolve-key: a decision answer refuses the attended branch before sending, a blocked: key stays steering, and the away-posture record relocates the answer
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:24:12.4103208Z FM_TEST_END 2026-10-01T19:24:12Z tests/fm-send-resolve-key.test.sh exit=0 duration_ms=51093 gate_skip=false
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:24:12.4339681Z FM_TEST_BEGIN 2026-10-01T19:24:12Z tests/fm-remote-secondmate-parent-binding.test.sh family=standalone expected_gate_skip=none
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:24:14.0517919Z ok - remote provisioning publishes durable parent state before its completion marker
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:24:43.6218041Z ok - a remote secondmate's finished worker cleans up when the remote code root's own .env looked relay-active
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:24:44.8202866Z ok - a remote secondmate's finished worker cleans up when only an ambient exported token looked relay-active
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:24:46.0220746Z ok - a remote secondmate's finished worker cleans up with no relay signal anywhere
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:24:46.7306075Z ok - a remote secondmate's own committed relay token still refuses cleanup
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:09.7051906Z ok - remote secondmate publication refuses targets outside its home
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:09.7052525Z ALL TESTS PASSED
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:10.2445450Z rm: cannot remove '/tmp/fm-remote-parent-binding.EbG8M3/remote-home/state/parent-route/ios.git-hooks/post-commit': Permission denied
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:10.2447678Z rm: cannot remove '/tmp/fm-remote-parent-binding.EbG8M3/remote-home/state/parent-route/ios.git-hooks/pre-auto-gc': Permission denied
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:10.2449738Z rm: cannot remove '/tmp/fm-remote-parent-binding.EbG8M3/remote-home/state/parent-route/ios.git-hooks/pre-commit': Permission denied
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:10.2451731Z rm: cannot remove '/tmp/fm-remote-parent-binding.EbG8M3/remote-home/state/parent-route/ios.git-hooks/pre-rebase': Permission denied
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:10.2454257Z rm: cannot remove '/tmp/fm-remote-parent-binding.EbG8M3/remote-home/state/parent-route/ios.git-hooks/commit-msg': Permission denied
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:10.2457243Z rm: cannot remove '/tmp/fm-remote-parent-binding.EbG8M3/remote-home/state/parent-route/ios.git-hooks/prepare-commit-msg': Permission denied
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:10.2459125Z rm: cannot remove '/tmp/fm-remote-parent-binding.EbG8M3/remote-home/state/parent-route/ios.git-hooks/pre-applypatch': Permission denied
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:10.2460483Z rm: cannot remove '/tmp/fm-remote-parent-binding.EbG8M3/remote-home/state/parent-route/ios.git-hooks/post-applypatch': Permission denied
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:10.2461812Z rm: cannot remove '/tmp/fm-remote-parent-binding.EbG8M3/remote-home/state/parent-route/ios.git-hooks/pre-merge-commit': Permission denied
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:10.2463101Z rm: cannot remove '/tmp/fm-remote-parent-binding.EbG8M3/remote-home/state/parent-route/ios.git-hooks/pre-push': Permission denied
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:10.2464963Z rm: cannot remove '/tmp/fm-remote-parent-binding.EbG8M3/remote-home/state/parent-route/ios.git-hooks/post-checkout': Permission denied
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:10.2466247Z rm: cannot remove '/tmp/fm-remote-parent-binding.EbG8M3/remote-home/state/parent-route/ios.git-hooks/applypatch-msg': Permission denied
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:10.2467514Z rm: cannot remove '/tmp/fm-remote-parent-binding.EbG8M3/remote-home/state/parent-route/ios.git-hooks/post-rewrite': Permission denied
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:10.2468550Z rm: cannot remove '/tmp/fm-remote-parent-binding.EbG8M3/remote-home/state/parent-route/ios.git-hooks/post-merge': Permission denied
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:10.2469560Z rm: cannot remove '/tmp/fm-remote-parent-binding.EbG8M3/remote-home/state/parent-route/ios.git-hooks/sendemail-validate': Permission denied
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:10.3022355Z FM_TEST_END 2026-10-01T19:25:10Z tests/fm-remote-secondmate-parent-binding.test.sh exit=0 duration_ms=57859 gate_skip=false
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:10.3260341Z FM_TEST_BEGIN 2026-10-01T19:25:10Z tests/fm-worker-account.test.sh family=backend-dispatch expected_gate_skip=none
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:16.2637217Z ok - an absent pin leaves Claude and Pi launches exactly as they were
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:19.3035692Z ok - a Claude pin selects its root and sheds the credentials that would outrank it
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:19.5861593Z ok - a Claude pin refuses a signed-out root even when the invoking process has a usable login and API key
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:22.8521375Z ok - an ordinary Claude pin selects the default login and drops an ambient root
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:24.4766130Z ok - malformed, relative, CR-terminated, empty, extra-line, missing-root, and non-file pins refuse before launch
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:27.4054867Z ok - a Pi pin selects its root and passes the declared provider
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:28.6480800Z ok - a Pi pin refuses unqualified, missing, undeclared, signed-out, and raw launches
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:35.0879244Z ok - extension providers and a Pi without auth check fall back to an exact model-listing match
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:40.8641635Z ok - a Claude pin leaves codex and Pi launches unchanged
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:43.8315127Z ok - a raw Claude launch command receives the home's pin
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:44.3148303Z ok - a pinned home refuses a raw Claude command that overrides the account
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:47.2730025Z ok - an unpinned home keeps a raw Claude account override
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:49.1446826Z ok - a local secondmate reads the launching home's pin and its own home's file is never inherited over
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:49.1448411Z # all fm-worker-account tests passed
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:49.2538854Z FM_TEST_END 2026-10-01T19:25:49Z tests/fm-worker-account.test.sh exit=0 duration_ms=38920 gate_skip=false
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:49.2776354Z FM_TEST_BEGIN 2026-10-01T19:25:49Z tests/fm-bootstrap-network-parallel.test.sh family=session-bootstrap expected_gate_skip=none
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:52.8764319Z ok - bootstrap network (parallel): per-mate output stays intact, fail-closed, and correctly sequenced
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:25:59.9897122Z ok - bootstrap network (fallback): per-mate output stays intact, fail-closed, and correctly sequenced
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:19.5395741Z ok - a remote inheritance failure reports its own error line, not an earlier unchanged item
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:19.5396411Z # all fm-bootstrap-network-parallel tests passed
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:19.6453938Z FM_TEST_END 2026-10-01T19:26:19Z tests/fm-bootstrap-network-parallel.test.sh exit=0 duration_ms=30359 gate_skip=false
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:19.6689624Z FM_TEST_BEGIN 2026-10-01T19:26:19Z tests/fm-spawn-compact-adviser-disable.test.sh family=backend-dispatch expected_gate_skip=none
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:22.5666623Z ok - ship launch with no allowlist starts its agent with the compact-adviser switch on
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:25.4299802Z ok - ship launch under an enabled allowlist keeps the compact-adviser switch through the cleared environment
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:31.1509620Z ok - the launch command sets the switch on its own, whichever allowlist posture is in force
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:34.7352668Z ok - a secondmate launch carries the compact-adviser switch in both allowlist postures
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:39.4011577Z ok - ship and secondmate launches export their absolute steering inbox as FM_TASK_INBOX
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:43.0602522Z ok - relaunch rebuilds the compact-adviser switch for the replacement agent in both allowlist postures
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:45.9131265Z ok - a compound raw launch-command still starts its agent with the compact-adviser switch on
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:46.0008523Z FM_TEST_END 2026-10-01T19:26:45Z tests/fm-spawn-compact-adviser-disable.test.sh exit=0 duration_ms=26324 gate_skip=false
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:46.0244278Z FM_TEST_BEGIN 2026-10-01T19:26:46Z tests/fm-remote-doctor.test.sh family=secondmate expected_gate_skip=none
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:46.2572878Z ok - a missing herdr CLI is a human gap that --fix never claims to close
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:46.3727581Z ok - an absent launch agent is a fixable gap and the read-only run changes nothing
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:46.8361831Z ok - --fix installs the dedicated fm-remote launch agent without touching default
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:47.1493973Z ok - --fix is idempotent once the host is ready
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:47.8364260Z ok - a loaded and running launch agent must match the complete owned contract
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:48.6153380Z ok - a failed reload leaves stale effective launch-agent state unready
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:49.1605423Z ok - a launch agent outside the Aqua session scope is rewritten in place
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:50.1094329Z ok - launchd failures are reported and delayed server readiness is awaited
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:52.2277598Z ok - a session served outside the Aqua login session is fixable and --fix retakes it through launchd
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:52.4194302Z ok - human gaps are reported with their operator step and never claimed as fixed
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:52.8405194Z ok - a bash Directory Services login shell is rendered with -l -c
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:53.2691404Z ok - custom Directory Services shell paths remain valid plist arguments
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:56.5298368Z ok - shell resolution bounds Directory Services and uses executable SHELL and POSIX fallbacks
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:57.2708169Z ok - repeated repair reuses one resolved login shell and remains a no-op
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:57.4770978Z ok - a non-darwin host skips launch agents and starts its herdr server directly
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:26:57.9062934Z ok - --fix creates only owned version-manager wrappers and never clobbers an operator file
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:02.1014333Z ok - doctor refreshes stale worker identity before probing tools
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:02.3998645Z ok - the entrypoint symlink is recreated when absent and never overwritten when operator-owned
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:02.4506174Z FM_TEST_END 2026-10-01T19:27:02Z tests/fm-remote-doctor.test.sh exit=0 duration_ms=16418 gate_skip=false
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:02.4743043Z FM_TEST_BEGIN 2026-10-01T19:27:02Z tests/fm-watch-checkpoint.test.sh family=watcher-wake-lock expected_gate_skip=none
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:03.5992884Z ok - quiet checkpoint exits 124 with a clean checkpoint line and no live lock
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:07.2830924Z WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 543358.1790882826.5mX4UC
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:08.0492520Z ok - checkpoint passes through a real watcher wake and leaves the queue for drain
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:09.1236533Z ok - checkpoint preserves watcher environment for registered custom checks
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:09.3220023Z ok - checkpoint rejects an existing watcher singleton as unowned
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:09.5798480Z ok - checkpoint: an opted-in home runs the host for the checkpoint's bound, raised only while away
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:09.6293054Z ok - checkpoint: a handed-back wake passes through, and a host stand-down is a failure
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:09.6691922Z ok - checkpoint: a Codex home without config/supervision-host, or with an off file, never runs the host
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:14.2967778Z ok - checkpoint: the real host ends its park at the checkpoint bound as a quiet checkpoint
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:14.3358379Z FM_TEST_END 2026-10-01T19:27:14Z tests/fm-watch-checkpoint.test.sh exit=0 duration_ms=11854 gate_skip=false
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:14.3595615Z FM_TEST_BEGIN 2026-10-01T19:27:14Z tests/fm-spawn-worktree-settle.test.sh family=backend-dispatch expected_gate_skip=none
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:18.2647486Z ok - a single transient stale pane_current_path read is not accepted as the worktree
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:21.1255823Z ok - an already-settled pane confirms on the next read, not a whole extra cycle
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:22.4418103Z ok - a transient primary-checkout pane read is not accepted as the worktree
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:24.0367433Z ok - a pane stuck on the primary checkout fails loudly at the deadline
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:24.0368128Z # all fm-spawn-worktree-settle tests passed
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:24.0925283Z FM_TEST_END 2026-10-01T19:27:24Z tests/fm-spawn-worktree-settle.test.sh exit=0 duration_ms=9724 gate_skip=false
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:24.1157444Z FM_TEST_BEGIN 2026-10-01T19:27:24Z tests/fm-turnend-foreign-owner-arm-fix.test.sh family=watcher-wake-lock expected_gate_skip=none
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:24.5565452Z SETUP live synthetic owner= 552008 lock= 552008
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:24.9772048Z second-session acquisition rc=0 stdout='lock_rc=1\n' stderr='error: another live firstmate session holds the lock (pid 552008); operate read-only until resolved\n'
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:25.2322580Z nonowner autoarm rc=0 stdout='autoarm_rc=0\n' stderr=''
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:25.4976003Z nonowner stop 1 rc=0 stdout='{"systemMessage":"FIRSTMATE SUPERVISION IS OWNED BY ANOTHER LIVE SESSION: this read-only session cannot and should not arm or repair the watcher (lock owner pid 552008). Allowing this turn to end safely; the owning session must restore supervision."}\n' stderr=''
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:25.7609734Z nonowner stop 2 rc=0 stdout='{"systemMessage":"FIRSTMATE SUPERVISION IS OWNED BY ANOTHER LIVE SESSION: this read-only session cannot and should not arm or repair the watcher (lock owner pid 552008). Allowing this turn to end safely; the owning session must restore supervision."}\n' stderr=''
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:26.0241858Z nonowner stop 3 rc=0 stdout='{"systemMessage":"FIRSTMATE SUPERVISION IS OWNED BY ANOTHER LIVE SESSION: this read-only session cannot and should not arm or repair the watcher (lock owner pid 552008). Allowing this turn to end safely; the owning session must restore supervision."}\n' stderr=''
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:26.2889470Z nonowner stop 4 rc=0 stdout='{"systemMessage":"FIRSTMATE SUPERVISION IS OWNED BY ANOTHER LIVE SESSION: this read-only session cannot and should not arm or repair the watcher (lock owner pid 552008). Allowing this turn to end safely; the owning session must restore supervision."}\n' stderr=''
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:26.5524435Z nonowner stop 5 rc=0 stdout='{"systemMessage":"FIRSTMATE SUPERVISION IS OWNED BY ANOTHER LIVE SESSION: this read-only session cannot and should not arm or repair the watcher (lock owner pid 552008). Allowing this turn to end safely; the owning session must restore supervision."}\n' stderr=''
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:26.5527137Z FIXED repeated non-owner Stops: all five ended safely
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:26.8175603Z fresh-beat-only counterfactual rc=0 stdout='{"systemMessage":"FIRSTMATE SUPERVISION IS OWNED BY ANOTHER LIVE SESSION: this read-only session cannot and should not arm or repair the watcher (lock owner pid 552008). Allowing this turn to end safely; the owning session must restore supervision."}\n' stderr=''
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:28.7224820Z COUNTERFACTUAL dead original owner: watcher= 554322
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:29.0357086Z replacement-owned healthy watcher rc=0 stdout='{"systemMessage":"FIRSTMATE SUPERVISION IS OWNED BY ANOTHER LIVE SESSION: this read-only session cannot and should not arm or repair the watcher (lock owner pid 553408). Allowing this turn to end safely; the owning session must restore supervision."}\n' stderr=''
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:30.2374968Z same-session acquisition rc=0 stdout='lock acquired: harness pid 554928\nlock_rc=0\n' stderr=''
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:30.7121873Z other-session acquisition rc=0 stdout='lock_rc=1\n' stderr='error: another live firstmate session holds the lock (pid 554928, session synthetic-same); operate read-only until resolved\n'
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:31.0850394Z same-session stop rc=2 stdout='' stderr='●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n●  TURN WOULD END BLIND - SUPERVISION IS OFF\n●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 606s ago).\n●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.\n●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.\n●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:31.3756686Z other-session stop rc=0 stdout='{"systemMessage":"FIRSTMATE SUPERVISION IS OWNED BY ANOTHER LIVE SESSION: this read-only session cannot and should not arm or repair the watcher (lock owner pid 554928). Allowing this turn to end safely; the owning session must restore supervision."}\n' stderr=''
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:31.3758969Z FIXED same-session id owns the lock; a different id is still foreign
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:32.1110044Z single owner, no autoarm firing rc=0 stdout='lock acquired: harness pid 556425\nsingle_owner_verified=1\nsingle_owner_guard_rc=2\n' stderr='●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n●  TURN WOULD END BLIND - SUPERVISION IS OFF\n●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 607s ago).\n●  The Stop-owned auto-arm did not claim this home either, so recovery is NOT already under way.\n●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.\n●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:32.1114873Z COMPLETE
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:32.1486669Z FM_TEST_END 2026-10-01T19:27:32Z tests/fm-turnend-foreign-owner-arm-fix.test.sh exit=0 duration_ms=8025 gate_skip=false
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:32.1730791Z FM_TEST_BEGIN 2026-10-01T19:27:32Z tests/fm-send-agy-confirm.test.sh family=unclassified expected_gate_skip=none
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:33.0128491Z ok - agy typed send: no not-submitted refusal on confirmed idle-to-busy
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:33.0179601Z ok - agy typed send: sleep log shows the confirm poll running to the late busy render
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:33.7937781Z ok - agy typed send: explicit FM_SEND_RETRIES=3 keeps the exit-1 verdict=unknown refusal
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:34.8133184Z ok - agy typed send: never-rendering busy footer still refuses with verdict=unknown
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:35.7524010Z ok - agy typed send: long-brief render (15th poll) still confirms idle-to-busy
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:36.5273017Z ok - claude typed send: late busy footer still refuses (agy budget is agy-scoped)
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:36.5627057Z FM_TEST_END 2026-10-01T19:27:36Z tests/fm-send-agy-confirm.test.sh exit=0 duration_ms=4382 gate_skip=false
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:36.5860478Z FM_TEST_BEGIN 2026-10-01T19:27:36Z tests/fm-worker-account-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:36.6200827Z skip-runner: claude is not installed, so its pin check was not exercised
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:39.6905630Z ok - pi 0.99.2: the pin check reads auth check and the model listing, and refuses what only an ambient credential signs in
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:39.6906861Z skip-runner: pi-signed is not installed, so its pin check was not exercised
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:39.6907770Z # worker account live guard checked: pi
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:39.7245207Z FM_TEST_END 2026-10-01T19:27:39Z tests/fm-worker-account-live-e2e.test.sh exit=0 duration_ms=3131 gate_skip=false
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:39.7474982Z FM_TEST_BEGIN 2026-10-01T19:27:39Z tests/fm-operational-input.test.sh family=pure-contract-unit expected_gate_skip=none
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:39.8468745Z ok - operational input: every current generic envelope retains its exact structured kind
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:39.8531950Z ok - operational input: the established from-firstmate carrier remains structurally typed and byte-compatible
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:39.8590739Z ok - operational input: untyped landed FIRSTMATE_OP transcripts are explicit legacy-operational input
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:39.8598007Z ok - operational input: historical prose compatibility is isolated from current parsing
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:39.9129747Z ok - operational input: quoted, ASCII-only, arbitrary-U+2063, altered-legacy, and label-only near misses stay genuine
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:39.9537747Z ok - operational input: the OpenCode adapter constructs through the canonical owner
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:39.9648215Z ok - operational input: current construction rejects legacy kinds and empty bodies
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:40.1156079Z ok - record-backed carrier: Claude-only selection, an ASCII doorbell naming an exact envelope record, home-bound open, and no recognition without the record
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:42.3065738Z ok - record pruning: expired records past one argument list are all pruned on a write
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:42.3541418Z FM_TEST_END 2026-10-01T19:27:42Z tests/fm-operational-input.test.sh exit=0 duration_ms=2598 gate_skip=false
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:42.3781095Z FM_TEST_BEGIN 2026-10-01T19:27:42Z tests/fm-lint-workflows.test.sh family=pure-contract-unit expected_gate_skip=none
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:42.4108832Z ok - fm-lint-workflows.sh pins an explicit actionlint version (1.7.12)
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:42.4258380Z ok - current .github/workflows YAML files parse
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:42.4448672Z ok - column-0 heredoc workflow fails validation with a clear error
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:42.4632553Z ok - valid fixture workflow passes
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:42.4742156Z ok - empty workflows directory fails closed
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:42.4886591Z ok - explicit malformed workflow path fails validation
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:42.5060843Z ok - non-mapping workflow YAML root fails
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:42.5280470Z ok - missing actionlint fails closed
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:42.5481498Z ok - fm-lint-workflows.sh refuses to lint under a non-pinned actionlint version
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:42.6124582Z ok - actionlint installer retries a transient download failure
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:42.8988239Z ok - actionlint installer selects the official archive, URL, and checksum per OS/arch
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:42.9348727Z ok - actionlint installer rejects a wrong checksum
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:42.9952272Z ok - actionlint installer falls back to shasum -a 256 when sha256sum is absent
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:43.0449220Z ok - actionlint installer prefers sha256sum when both hashers are present
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:43.0807330Z ok - actionlint installer rejects an unsupported OS or architecture
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:43.1623225Z ok - fm-lint.sh default path catches a self-broken ci.yml
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:43.2435965Z FM_TEST_END 2026-10-01T19:27:43Z tests/fm-lint-workflows.test.sh exit=0 duration_ms=857 gate_skip=false
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:43.2669356Z FM_TEST_BEGIN 2026-10-01T19:27:43Z tests/fm-backend-tmux-smoke.test.sh family=backend-dispatch expected_gate_skip=none
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:43.3257653Z @1
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:43.3355191Z ok - real tmux: fm_backend_tmux_create_task creates a window and refuses a duplicate
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:43.4909398Z ok - real tmux: fm_backend_tmux_send_text_line sends literal text and submits with Enter
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:43.5182967Z ok - real tmux: fm_backend_tmux_send_literal + fm_backend_tmux_send_key Enter submit as two separate steps
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:43.5413257Z ok - real tmux: fm_backend_tmux_capture's -S -N bound trims old history for a small window and reaches it for a large one
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:43.5470829Z ok - real tmux: fm_backend_tmux_resolve_bare_selector (list-live) finds the created window by name
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:43.5529309Z ok - real tmux: fm_backend_tmux_resolve_bare_selector fails for a window that does not exist
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:43.5846320Z ok - real tmux: kill removes the window and the readable session inventory authoritatively classifies it missing
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:43.6155064Z FM_TEST_END 2026-10-01T19:27:43Z tests/fm-backend-tmux-smoke.test.sh exit=0 duration_ms=341 gate_skip=false
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:43.6389897Z FM_TEST_BEGIN 2026-10-01T19:27:43Z tests/fm-forge-detect.test.sh family=pure-contract-unit expected_gate_skip=none
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:43.6817161Z ok - an origin on SSH port 29418 proposes forge=gerrit and names the evidence
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:43.6977650Z ok - a refs/for/ push refspec proposes forge=gerrit and names the evidence
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:43.7532641Z ok - a remote carrying neither Gerrit fact proposes forge=none
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:43.7699237Z ok - detection reads the clone's config and changes nothing
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:43.7752940Z ok - a directory that is not a git work tree is refused with exit 2
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:43.7753427Z # all fm-forge-detect tests passed
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:43.8152566Z FM_TEST_END 2026-10-01T19:27:43Z tests/fm-forge-detect.test.sh exit=0 duration_ms=168 gate_skip=false
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:43.8389209Z FM_TEST_BEGIN 2026-10-01T19:27:43Z tests/fm-project-origin.test.sh family=standalone expected_gate_skip=none
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:43.9149017Z ok - ordinary clone URLs are accepted and clone with the command the remote host runs
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:43.9273380Z ok - executable transports, option-shaped values, and unusable spellings are refused
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:43.9274536Z ALL TESTS PASSED
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:43.9669828Z FM_TEST_END 2026-10-01T19:27:43Z tests/fm-project-origin.test.sh exit=0 duration_ms=120 gate_skip=false
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:43.9905590Z FM_TEST_BEGIN 2026-10-01T19:27:43Z tests/fm-composer-codex-idle-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.0177124Z skip: live: codex absent
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.0525610Z FM_TEST_END 2026-10-01T19:27:44Z tests/fm-composer-codex-idle-live-e2e.test.sh exit=0 duration_ms=48 gate_skip=true
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.0526790Z fm-test-run: gate skip: tests/fm-composer-codex-idle-live-e2e.test.sh: live: codex absent
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.0767722Z FM_TEST_BEGIN 2026-10-01T19:27:44Z tests/fm-pi-primary-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.1039173Z skip: live: opt-in; set FM_PI_LIVE_E2E=1 to run
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.1381487Z fm-test-run: gate skip: tests/fm-pi-primary-live-e2e.test.sh: live: opt-in; set FM_PI_LIVE_E2E=1 to run
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.1382968Z FM_TEST_END 2026-10-01T19:27:44Z tests/fm-pi-primary-live-e2e.test.sh exit=0 duration_ms=48 gate_skip=true
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.1616552Z FM_TEST_BEGIN 2026-10-01T19:27:44Z tests/fm-bearings-board-lavish-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.1904875Z skip: live: lavish-axi absent
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.2250940Z fm-test-run: gate skip: tests/fm-bearings-board-lavish-live-e2e.test.sh: live: lavish-axi absent
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.2252387Z FM_TEST_END 2026-10-01T19:27:44Z tests/fm-bearings-board-lavish-live-e2e.test.sh exit=0 duration_ms=50 gate_skip=true
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.2489017Z FM_TEST_BEGIN 2026-10-01T19:27:44Z tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.2762940Z skip: live: opt-in; set FM_SESSIONSTART_INSTRUCTION_REFRESH_LIVE_E2E=1 to run
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.3108304Z fm-test-run: gate skip: tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh: live: opt-in; set FM_SESSIONSTART_INSTRUCTION_REFRESH_LIVE_E2E=1 to run
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.3110419Z FM_TEST_END 2026-10-01T19:27:44Z tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh exit=0 duration_ms=49 gate_skip=true
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.3348964Z FM_TEST_BEGIN 2026-10-01T19:27:44Z tests/fm-backend-cmux-smoke.test.sh family=cmux expected_gate_skip=optional-binary
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.3496652Z skip: cmux CLI not found on PATH or at the bundle path
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.3814584Z fm-test-run: gate skip: tests/fm-backend-cmux-smoke.test.sh: cmux CLI not found on PATH or at the bundle path
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.3816054Z FM_TEST_END 2026-10-01T19:27:44Z tests/fm-backend-cmux-smoke.test.sh exit=0 duration_ms=33 gate_skip=true
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.4029340Z FM_TEST_SUMMARY total=27 failed=0 skipped_gate=5 duration_ms=1055629
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.4047022Z FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=5 duration_ms=126402 failed=0
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.4048604Z FM_TEST_SUMMARY_FAMILY family=cmux count=1 duration_ms=33 failed=0
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.4050347Z FM_TEST_SUMMARY_FAMILY family=live-harness-optin count=5 duration_ms=3326 failed=0
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.4051952Z FM_TEST_SUMMARY_FAMILY family=pr-forge count=1 duration_ms=304871 failed=0
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.4053463Z FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=4 duration_ms=63678 failed=0
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.4055074Z FM_TEST_SUMMARY_FAMILY family=secondmate count=2 duration_ms=128175 failed=0
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.4056464Z FM_TEST_SUMMARY_FAMILY family=session-bootstrap count=1 duration_ms=30359 failed=0
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.4057999Z FM_TEST_SUMMARY_FAMILY family=standalone count=3 duration_ms=119932 failed=0
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.4059454Z FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=4382 failed=0
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.4060931Z FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=4 duration_ms=272441 failed=0
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.4075409Z FM_TEST_SLOWEST rank=1 script=tests/fm-pr-check-security.test.sh duration_ms=304871
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.4076705Z FM_TEST_SLOWEST rank=2 script=tests/fm-wake-queue.test.sh duration_ms=182340
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.4077953Z FM_TEST_SLOWEST rank=3 script=tests/fm-remote-backlog-handoff.test.sh duration_ms=111757
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.4079196Z FM_TEST_SLOWEST rank=4 script=tests/fm-watcher-lock.test.sh duration_ms=70222
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.4080380Z FM_TEST_SLOWEST rank=5 script=tests/fm-claude-stop-autoarm.test.sh duration_ms=61953
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.4081566Z FM_TEST_SLOWEST rank=6 script=tests/fm-calm-pi-extension.test.sh duration_ms=60055
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.4082944Z FM_TEST_SLOWEST rank=7 script=tests/fm-remote-secondmate-parent-binding.test.sh duration_ms=57859
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.4084482Z FM_TEST_SLOWEST rank=8 script=tests/fm-send-resolve-key.test.sh duration_ms=51093
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.4085680Z FM_TEST_SLOWEST rank=9 script=tests/fm-worker-account.test.sh duration_ms=38920
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.4086933Z FM_TEST_SLOWEST rank=10 script=tests/fm-bootstrap-network-parallel.test.sh duration_ms=30359
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.4088372Z FM_TEST_SLOWEST rank=11 script=tests/fm-spawn-compact-adviser-disable.test.sh duration_ms=26324
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.4089757Z FM_TEST_SLOWEST rank=12 script=tests/fm-remote-doctor.test.sh duration_ms=16418
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.4091163Z FM_TEST_SLOWEST rank=13 script=tests/fm-watch-checkpoint.test.sh duration_ms=11854
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.4092212Z FM_TEST_SLOWEST rank=14 script=tests/fm-spawn-worktree-settle.test.sh duration_ms=9724
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.4093340Z FM_TEST_SLOWEST rank=15 script=tests/fm-turnend-foreign-owner-arm-fix.test.sh duration_ms=8025
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:27:44.4365732Z fm-test-run: wrote timing artifact: /home/runner/work/_temp/fm-test/fm-test-timing-portable-serial-6.json
+Behavior portable serial 6	Upload portable serial shard 6 timing artifact	﻿2026-10-01T19:27:44.4472197Z ##[group]Run actions/upload-artifact@v4
+Behavior portable serial 6	Upload portable serial shard 6 timing artifact	2026-10-01T19:27:44.4472528Z with:
+Behavior portable serial 6	Upload portable serial shard 6 timing artifact	2026-10-01T19:27:44.4472761Z   name: fm-test-timing-portable-serial-6
+Behavior portable serial 6	Upload portable serial shard 6 timing artifact	2026-10-01T19:27:44.4473207Z   path: /home/runner/work/_temp/fm-test/fm-test-timing-portable-serial-6.json
+Behavior portable serial 6	Upload portable serial shard 6 timing artifact	2026-10-01T19:27:44.4474172Z   if-no-files-found: warn
+Behavior portable serial 6	Upload portable serial shard 6 timing artifact	2026-10-01T19:27:44.4474452Z   compression-level: 6
+Behavior portable serial 6	Upload portable serial shard 6 timing artifact	2026-10-01T19:27:44.4474678Z   overwrite: false
+Behavior portable serial 6	Upload portable serial shard 6 timing artifact	2026-10-01T19:27:44.4474900Z   include-hidden-files: false
+Behavior portable serial 6	Upload portable serial shard 6 timing artifact	2026-10-01T19:27:44.4475156Z ##[endgroup]
+Behavior portable serial 6	Upload portable serial shard 6 timing artifact	2026-10-01T19:27:44.6192743Z (node:561726) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Behavior portable serial 6	Upload portable serial shard 6 timing artifact	2026-10-01T19:27:44.6194658Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Behavior portable serial 6	Upload portable serial shard 6 timing artifact	2026-10-01T19:27:44.6284269Z With the provided path, there will be 1 file uploaded
+Behavior portable serial 6	Upload portable serial shard 6 timing artifact	2026-10-01T19:27:44.6300397Z Artifact name is valid!
+Behavior portable serial 6	Upload portable serial shard 6 timing artifact	2026-10-01T19:27:44.6301105Z Root directory input is valid!
+Behavior portable serial 6	Upload portable serial shard 6 timing artifact	2026-10-01T19:27:45.0360747Z Beginning upload of artifact content to blob storage
+Behavior portable serial 6	Upload portable serial shard 6 timing artifact	2026-10-01T19:27:45.0547570Z (node:561726) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+Behavior portable serial 6	Upload portable serial shard 6 timing artifact	2026-10-01T19:27:45.3512990Z Uploaded bytes 1415
+Behavior portable serial 6	Upload portable serial shard 6 timing artifact	2026-10-01T19:27:45.4337883Z Finished uploading artifact content to blob storage!
+Behavior portable serial 6	Upload portable serial shard 6 timing artifact	2026-10-01T19:27:45.4339319Z SHA256 digest of uploaded artifact zip is aa588ad3b7bce723d8b3dc0c3e46d47062a53159bdec999ba4943575901a6712
+Behavior portable serial 6	Upload portable serial shard 6 timing artifact	2026-10-01T19:27:45.4340980Z Finalizing artifact upload
+Behavior portable serial 6	Upload portable serial shard 6 timing artifact	2026-10-01T19:27:45.6999369Z Artifact fm-test-timing-portable-serial-6.zip successfully finalized. Artifact ID 11189991062
+Behavior portable serial 6	Upload portable serial shard 6 timing artifact	2026-10-01T19:27:45.7001665Z Artifact fm-test-timing-portable-serial-6 has been successfully uploaded! Final size is 1415 bytes. Artifact ID is 11189991062
+Behavior portable serial 6	Upload portable serial shard 6 timing artifact	2026-10-01T19:27:45.7008226Z Artifact download URL: https://github.com/kw7243/firstmate/actions/runs/36912228174/artifacts/11189991062
+Behavior portable serial 6	Post Run actions/checkout@v6	﻿2026-10-01T19:27:45.7235340Z Post job cleanup.
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.8076038Z [command]/usr/bin/git version
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.8119512Z git version 2.55.0
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.8192129Z Temporarily overriding HOME='/home/runner/work/_temp/6068ca48-8e73-4206-ba77-9e70dfe11f3f' before making global git config changes
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.8193658Z Adding repository directory to the temporary git global config as a safe directory
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.8197990Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/firstmate/firstmate
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.8231440Z Removing SSH command configuration
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.8239017Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.8278796Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.8530835Z Removing HTTP extra header
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.8536473Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.8573292Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.8830746Z Removing includeIf entries pointing to credentials config files
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.8842599Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.8876006Z includeif.gitdir:/home/runner/work/firstmate/firstmate/.git.path
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.8876946Z includeif.gitdir:/home/runner/work/firstmate/firstmate/.git/worktrees/*.path
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.8877737Z includeif.gitdir:/github/workspace/.git.path
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.8878512Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.8892701Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/firstmate/firstmate/.git.path
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.8921025Z /home/runner/work/_temp/git-credentials-d58d5a7d-8b8b-4625-9470-8ee40a4eeec4.config
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.8945564Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/firstmate/firstmate/.git.path /home/runner/work/_temp/git-credentials-d58d5a7d-8b8b-4625-9470-8ee40a4eeec4.config
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.8977338Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/firstmate/firstmate/.git/worktrees/*.path
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.9004913Z /home/runner/work/_temp/git-credentials-d58d5a7d-8b8b-4625-9470-8ee40a4eeec4.config
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.9017057Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/firstmate/firstmate/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-d58d5a7d-8b8b-4625-9470-8ee40a4eeec4.config
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.9057369Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.9083461Z /github/runner_temp/git-credentials-d58d5a7d-8b8b-4625-9470-8ee40a4eeec4.config
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.9093091Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-d58d5a7d-8b8b-4625-9470-8ee40a4eeec4.config
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.9138302Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.9172903Z /github/runner_temp/git-credentials-d58d5a7d-8b8b-4625-9470-8ee40a4eeec4.config
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.9186893Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-d58d5a7d-8b8b-4625-9470-8ee40a4eeec4.config
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.9236081Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Behavior portable serial 6	Post Run actions/checkout@v6	2026-10-01T19:27:45.9481299Z Removing credentials config '/home/runner/work/_temp/git-credentials-d58d5a7d-8b8b-4625-9470-8ee40a4eeec4.config'
+Behavior portable serial 6	Complete job	﻿2026-10-01T19:27:45.9642638Z Cleaning up orphan processes
+Behavior portable serial 6	Complete job	2026-10-01T19:27:45.9886010Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

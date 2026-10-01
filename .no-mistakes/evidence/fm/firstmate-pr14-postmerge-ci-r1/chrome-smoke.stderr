@@ -1,0 +1,4 @@
+
+(process:4089826): GLib-GIO-CRITICAL **: 20:52:57.255: g_settings_schema_source_lookup: assertion 'source != NULL' failed
+[4089826:4089826:1001/205257.487685:ERROR:dbus/object_proxy.cc:572] Failed to call method: org.freedesktop.DBus.Properties.GetAll: object_path= /org/freedesktop/UPower/devices/DisplayDevice: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.UPower was not provided by any .service files
+[4089826:4089826:1001/205257.533287:ERROR:dbus/object_proxy.cc:572] Failed to call method: org.freedesktop.NetworkManager.GetDevices: object_path= /org/freedesktop/NetworkManager: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.NetworkManager was not provided by any .service files

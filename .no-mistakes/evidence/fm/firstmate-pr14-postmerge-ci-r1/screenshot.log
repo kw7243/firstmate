@@ -1,0 +1,5 @@
+
+(process:4104946): GLib-GIO-CRITICAL **: 20:54:05.600: g_settings_schema_source_lookup: assertion 'source != NULL' failed
+[4104946:4104946:1001/205405.882012:ERROR:dbus/object_proxy.cc:572] Failed to call method: org.freedesktop.DBus.Properties.GetAll: object_path= /org/freedesktop/UPower/devices/DisplayDevice: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.UPower was not provided by any .service files
+[4104946:4104946:1001/205405.940827:ERROR:dbus/object_proxy.cc:572] Failed to call method: org.freedesktop.NetworkManager.GetDevices: object_path= /org/freedesktop/NetworkManager: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.NetworkManager was not provided by any .service files
+239294 bytes written to file /home/ubuntu/.no-mistakes/evidence/01M3WKBBGW6603Q1A28DA55CZQ/calm-export.png

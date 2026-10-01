@@ -1,0 +1,15 @@
+{
+  "ambient_before": {
+    "tuiMode": "fullscreen",
+    "hideThinkingBlock": false
+  },
+  "ambient_after": {
+    "tuiMode": "fullscreen",
+    "hideThinkingBlock": false
+  },
+  "fixture_after": {
+    "hideThinkingBlock": true,
+    "tuiMode": "regular"
+  },
+  "ambient_unchanged": true
+}

@@ -1,0 +1,58 @@
+Remote inspection:
+  gh-axi run view 36916666328 --conclusion failure
+  gh-axi pr checks 14
+  gh-axi run list --workflow ci.yml --branch main --limit 2
+  gh-axi run view 36912228174 --job 110537427478 --log
+  gh-axi run view 36916666328 --job 110552206867 --log
+
+Targeted live checks:
+  bash .calm-validation/before.sh
+  bash .calm-validation/fullscreen-probe.sh
+  bash .calm-validation/after.sh
+These drivers select only test_interactive_terminal_e2e from
+  tests/fm-calm-pi-extension.test.sh
+Before uses git show 6a3949342f31434e7786cba6bf6ad7b95337ff04:tests/fm-calm-pi-extension.test.sh.
+After uses the checked-out target. The original assertion bodies are unchanged.
+The fullscreen probe intercepts the expected missing-output assertion to press
+PageUp in the real Pi TUI and require CALM_E2E_OUTPUT to become visible.
+All sessions use the existing test's dedicated tmux socket and 180x44 grid.
+The real Pi CLI and Firstmate rendering extensions run against generated session
+records and deterministic provider responses; no provider credential is needed.
+
+Runner environment (paths relative to the worktree):
+  HOME=.calm-validation/ambient-home
+  TMPDIR=.calm-validation/tmp
+  TMUX_TMPDIR=.t
+  PI_CODING_AGENT_DIR=.calm-validation/ambient-config
+  FM_PI_PACKAGE_DIR=.calm-validation/deps/node_modules/@earendil-works/pi-coding-agent
+  FM_CHROME_BIN=.calm-validation/chrome.sh
+  LD_LIBRARY_PATH=.calm-validation/sysroot/usr/lib/x86_64-linux-gnu
+  PATH prepended with .calm-validation/deps/node_modules/.bin
+  EVIDENCE_CASE set separately to before, fullscreen-probe, and verified evidence dirs
+  FM_ROOT_OVERRIDE, FM_STATE_OVERRIDE, FM_DATA_OVERRIDE, FM_CONFIG_OVERRIDE,
+  FM_PROJECTS_OVERRIDE, FM_HOME, and TMUX unset for each invocation
+
+Versions: Pi 1.0.0; Node 24.18.0; tmux 3.4; Chrome for Testing 154.0.8037.92.
+Workspace-local npm packages: @earendil-works/pi-coding-agent@1.0.0,
+@puppeteer/browsers, puppeteer-core.
+Chrome installed with browsers install chrome@stable --path .calm-validation/browser.
+Missing shared libraries were downloaded with apt-get download and extracted
+with dpkg-deb -x into .calm-validation/sysroot; nothing was installed system-wide.
+Initial export attempts exposed missing shared libraries and Chrome's Unix socket
+path-length limit. After supplying libraries locally and using /tmp only for
+Chrome's incidental temporary sockets, the complete unchanged E2E passed.
+
+Visual evidence:
+  Chrome --headless=new --screenshot=.../calm-export.png opened verified/calm-export.html.
+  node .calm-validation/capture-export.cjs captured the same product export at
+  its first user message as calm-export-conversation.png.
+Both screenshots were visually inspected.
+
+Isolation check:
+  Python json.loads compared the disposable ambient settings before and after
+  against {"tuiMode":"fullscreen","hideThinkingBlock":false}, then checked
+  the fixture's generated settings were {"hideThinkingBlock":true,"tuiMode":"regular"}.
+
+Only the focused E2E ran; no full suite, lint, static analysis, pipeline control,
+push, or CI execution ran. Transient runners, packages, browsers, and fixtures
+were removed from the worktree after evidence capture.

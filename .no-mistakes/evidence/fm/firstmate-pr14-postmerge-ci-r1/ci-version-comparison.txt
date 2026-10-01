@@ -1,0 +1,4 @@
+Behavior portable serial 6	Install the Pi package for the Pi extension tests	2026-10-01T19:10:08.7173418Z └── @earendil-works/pi-coding-agent@0.99.2
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:23:21.1959722Z ok - Pi calm native E2E replaces the stock working row with a moving, resize-clamped working ship that freezes and resumes across two working periods in one Pi session, clears on abort, keeps captain turns visible, hides exact operational user rows without changing persistence, restores stock rendering Calm-off, survives restart, and preserves export plus Ctrl+O behavior
+Behavior portable serial 6	Install the Pi package for the Pi extension tests	2026-10-01T19:46:04.4170833Z └── @earendil-works/pi-coding-agent@1.0.0
+Behavior portable serial 6	Run portable serial shard 6	2026-10-01T19:58:53.2259112Z not ok - calm mode was not off by default (missing: 'CALM_E2E_OUTPUT')

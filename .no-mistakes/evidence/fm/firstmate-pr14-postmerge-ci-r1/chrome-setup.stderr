@@ -1,0 +1,32 @@
+[4082724:4082724:1001/205222.931826:FATAL:chrome/browser/process_singleton_posix.cc:313] Socket path too long: /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3WKBBGW6603Q1A28DA55CZQ/.calm-validation/tmp/org.chromium.Chromium.daZA8Z/SingletonSocket.
+[1001/205222.947856:ERROR:third_party/crashpad/crashpad/util/file/file_io_posix.cc:145] open /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq: No such file or directory (2)
+[1001/205222.947941:ERROR:third_party/crashpad/crashpad/util/file/file_io_posix.cc:145] open /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq: No such file or directory (2)
+Received signal 6
+#0 0x56a492008783 (/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3WKBBGW6603Q1A28DA55CZQ/.calm-validation/browser/chrome/linux-154.0.8037.92/chrome-linux64/chrome+0x6949782)
+#1 0x56a496ea7594 (/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3WKBBGW6603Q1A28DA55CZQ/.calm-validation/browser/chrome/linux-154.0.8037.92/chrome-linux64/chrome+0xb7e8593)
+#2 0x7653bae45330 (/usr/lib/x86_64-linux-gnu/libc.so.6+0x4532f)
+#3 0x7653bae4527e (/usr/lib/x86_64-linux-gnu/libc.so.6+0x4527d)
+#4 0x7653bae288ff (/usr/lib/x86_64-linux-gnu/libc.so.6+0x288fe)
+#5 0x56a496e9e435 (/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3WKBBGW6603Q1A28DA55CZQ/.calm-validation/browser/chrome/linux-154.0.8037.92/chrome-linux64/chrome+0xb7df434)
+#6 0x56a496e5f79d (/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3WKBBGW6603Q1A28DA55CZQ/.calm-validation/browser/chrome/linux-154.0.8037.92/chrome-linux64/chrome+0xb7a079c)
+#7 0x56a496e5f72e (/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3WKBBGW6603Q1A28DA55CZQ/.calm-validation/browser/chrome/linux-154.0.8037.92/chrome-linux64/chrome+0xb7a072d)
+#8 0x56a491d68c83 (/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3WKBBGW6603Q1A28DA55CZQ/.calm-validation/browser/chrome/linux-154.0.8037.92/chrome-linux64/chrome+0x66a9c82)
+#9 0x56a4914b2c19 (/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3WKBBGW6603Q1A28DA55CZQ/.calm-validation/browser/chrome/linux-154.0.8037.92/chrome-linux64/chrome+0x5df3c18)
+#10 0x56a491987326 (/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3WKBBGW6603Q1A28DA55CZQ/.calm-validation/browser/chrome/linux-154.0.8037.92/chrome-linux64/chrome+0x62c8325)
+#11 0x56a49198604f (/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3WKBBGW6603Q1A28DA55CZQ/.calm-validation/browser/chrome/linux-154.0.8037.92/chrome-linux64/chrome+0x62c704e)
+#12 0x56a491986004 (/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3WKBBGW6603Q1A28DA55CZQ/.calm-validation/browser/chrome/linux-154.0.8037.92/chrome-linux64/chrome+0x62c7003)
+#13 0x56a491fdf919 (/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3WKBBGW6603Q1A28DA55CZQ/.calm-validation/browser/chrome/linux-154.0.8037.92/chrome-linux64/chrome+0x6920918)
+#14 0x56a491fdead3 (/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3WKBBGW6603Q1A28DA55CZQ/.calm-validation/browser/chrome/linux-154.0.8037.92/chrome-linux64/chrome+0x691fad2)
+#15 0x56a491581750 (/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3WKBBGW6603Q1A28DA55CZQ/.calm-validation/browser/chrome/linux-154.0.8037.92/chrome-linux64/chrome+0x5ec274f)
+#16 0x56a49157fbd5 (/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3WKBBGW6603Q1A28DA55CZQ/.calm-validation/browser/chrome/linux-154.0.8037.92/chrome-linux64/chrome+0x5ec0bd4)
+#17 0x56a49157f340 (/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3WKBBGW6603Q1A28DA55CZQ/.calm-validation/browser/chrome/linux-154.0.8037.92/chrome-linux64/chrome+0x5ec033f)
+#18 0x7653bae2a1ca (/usr/lib/x86_64-linux-gnu/libc.so.6+0x2a1c9)
+#19 0x7653bae2a28b (/usr/lib/x86_64-linux-gnu/libc.so.6+0x2a28a)
+#20 0x56a49230bc4a (/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3WKBBGW6603Q1A28DA55CZQ/.calm-validation/browser/chrome/linux-154.0.8037.92/chrome-linux64/chrome+0x6c4cc49)
+  r8: 00002670000685fd  r9: 0000000000000001 r10: 0000000000000008 r11: 0000000000000246
+ r12: 0000000000000006 r13: 0000267000068500 r14: 0000000000000016 r15: 00007ffdef52a8a0
+  di: 00000000003e4c24  si: 00000000003e4c24  bp: 00007ffdef52a220  bx: 00000000003e4c24
+  dx: 0000000000000006  ax: 0000000000000000  cx: 00007653bae9ec0c  sp: 00007ffdef52a1e0
+  ip: 00007653bae9ec0c efl: 0000000000000246 cgf: 002b000000000033 erf: 0000000000000000
+ trp: 0000000000000000 msk: 0000000000000000 cr2: 0000000000000000
+[end of stack trace]

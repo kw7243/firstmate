@@ -1,0 +1,44 @@
+
+ CALM_EXPORT_FIND.txt
+
+
+ Thinking...
+
+
+ fm_watch_arm_pi
+ watcher: started Pi extension arm child 1
+
+
+
+ FIRSTMATE WATCHER WAKE: signal: /tmp/probe.status
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+
+ FIRSTMATE WATCHER WAKE: can you explain this phrase?
+
+
+
+ Captain quote: ⁣FIRSTMATE_OP: v1 watcher: QUOTED_CURRENT_NEAR_MISS
+
+
+
+ FIRSTMATE_OP: v1 watcher: ASCII_ONLY_NEAR_MISS
+
+
+
+ Ordinary captain text before ⁣FIRSTMATE_OP: v1 watcher: EMBEDDED_CURRENT_NEAR_MISS
+
+
+
+ ⁣ordinary captain text after unrelated separator
+
+
+ The deterministic tool example is complete.
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3WKBBGW6603Q1A28DA55CZQ/.calm-validation/tmp/fm-calm-pi-extension.sTGpVE/e2e-project (main)
+↑7 ↓4 0.1%/4.1k (auto)                                                                                                                                                       delayed

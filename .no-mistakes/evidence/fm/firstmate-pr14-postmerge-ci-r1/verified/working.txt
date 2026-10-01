@@ -1,0 +1,30 @@
+ ⁣FIRSTMATE_OP: v1 launch-brief: CURRENT_LAUNCH_BRIEF_E2E
+
+
+ Error: CALM_OPERATIONAL_E2E_ERROR
+
+ Tool output: expanded
+
+
+ CALM_BOAT_E2E_PROMPT
+
+
+ Operation aborted
+
+
+ CALM_BOAT_E2E_PROMPT
+
+
+ Operation aborted
+
+ Tool output: expanded
+
+
+ CALM_WORKING_E2E_PROMPT
+
+
+── ⠋ Working ───────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3WKBBGW6603Q1A28DA55CZQ/.calm-validation/tmp/...
+↑7 ↓4 45.0%/4.1k (auto)                                                                      delayed

@@ -1,0 +1,4 @@
+1.0.0
+scenario=test_interactive_terminal_e2e terminal=180x44
+Confirmed baseline fullscreen capture omits CALM_E2E_OUTPUT.
+Pi PageUp reveals CALM_E2E_OUTPUT: the row was offscreen, not hidden by Calm.
