@@ -292,6 +292,103 @@ test_fire_and_forget_retry_stays_off_without_the_flag() {
   pass "fm-send inbox: without config/wait-no-turns a fire-and-forget ring is not retried"
 }
 
+test_delayed_fire_and_forget_retry_publication() (
+  local mode dir state sender= holder= signal expected action real_sleep
+  real_sleep=$(command -v sleep)
+  trap 'kill ${sender:-} ${holder:-} 2>/dev/null || true; wait 2>/dev/null || true' EXIT
+  for mode in contention pending handled newer-handled; do
+    dir=$(setup_case "faf-delayed-$mode")
+    state="$dir/home/state"
+    mkdir -p "$dir/home/config"
+    : > "$dir/home/config/wait-no-turns"
+    rm -f "$state/t1.meta"
+    fm_write_secondmate_meta "$state/domain.meta" "$dir/home" "sess:fm-t1" alpha claude
+    mv "$dir/fakebin/tmux" "$dir/fakebin/tmux.base"
+    cat > "$dir/fakebin/tmux" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = capture-pane ] && [ -n "${FM_PAUSE_RECORD:-}" ] \
+  && [ -f "$FM_PAUSE_RECORD" ] && [ ! -e "$FM_PAUSE_RECORD.paused" ]; then
+  : > "$FM_PAUSE_RECORD.paused"
+  printf 'paused\n' >&7
+  IFS= read -r -t 15 signal <&8 || exit 1
+fi
+exec "$0.base" "$@"
+SH
+    cat > "$dir/fakebin/sleep" <<'SH'
+#!/usr/bin/env bash
+if [ "${FM_NOTIFY_RETRY_LOCK:-0}" = 1 ] && [ "${1:-}" = 0.1 ]; then
+  printf 'waiting\n' >&9
+  "$FM_REAL_SLEEP" "$@"
+fi
+exit 0
+SH
+    chmod +x "$dir/fakebin/tmux" "$dir/fakebin/sleep"
+    mkfifo "$dir/paused" "$dir/resume" "$dir/progress" "$dir/locked" "$dir/unlock"
+    exec 7<> "$dir/paused" 8<> "$dir/resume" 9<> "$dir/progress" \
+      10<> "$dir/locked" 11<> "$dir/unlock"
+    (
+      run_send "$dir" "$dir/first.err" FM_TASK_INBOX_LOCK_WAIT_SECS=0 \
+        FM_FAKE_TMUX_COMPOSER=pending FM_PAUSE_RECORD="$state/domain.inbox/001.msg" \
+        FM_NOTIFY_RETRY_LOCK=1 FM_REAL_SLEEP="$real_sleep" -- \
+        fm-domain --fire-and-forget 0123456789abcdef "first delayed instruction"
+      rc=$?
+      printf 'completed\n' >&9
+      exit "$rc"
+    ) &
+    sender=$!
+    IFS= read -r -t 15 signal <&7 || fail "$mode send did not pause after enqueue"
+    expected=002.msg
+    if [ "$mode" = contention ]; then
+      FM_STATE_OVERRIDE="$state" bash -c '
+        . "$1"
+        lock="$2/domain.inbox/.seq.lock"
+        fm_task_inbox_lock_acquire "$lock" || exit 1
+        printf "locked\n" >&10
+        IFS= read -r -t 15 signal <&11
+        fm_lock_release "$lock"
+      ' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$state" &
+      holder=$!
+      IFS= read -r -t 15 signal <&10 || fail "could not hold the inbox scan lock"
+      expected=001.msg
+    else
+      run_send "$dir" "$dir/newer.err" FM_FAKE_TMUX_COMPOSER=pending -- \
+        fm-domain --fire-and-forget 1123456789abcdef "newer instruction" \
+        || fail "$mode newer send failed"
+      [ "$(cat "$state/domain.inbox/.retry-ring" 2>/dev/null)" = 002.msg ] \
+        || fail "$mode newer send did not publish its retry"
+      case "$mode" in
+        handled) mv "$state/domain.inbox/001.msg" "$state/domain.inbox/handled/" ;;
+        newer-handled)
+          mv "$state/domain.inbox/002.msg" "$state/domain.inbox/handled/"
+          expected=001.msg
+          ;;
+      esac
+    fi
+    printf 'resume\n' >&8
+    if [ "$mode" = contention ]; then
+      IFS= read -r -t 15 signal <&9 || fail "send neither waited for the lock nor completed"
+      printf 'unlock\n' >&11
+      wait "$holder" || fail "inbox scan lock holder failed"
+      holder=
+    fi
+    wait "$sender" || fail "$mode delayed send failed"
+    sender=
+    [ "$(cat "$state/domain.inbox/.retry-ring" 2>/dev/null)" = "$expected" ] \
+      || fail "$mode delayed send lost the pending retry for $expected"
+    assert_contains "$(cat "$dir/first.err")" "the watcher will ring it once more" \
+      "$mode delayed send could not record retry bookkeeping"
+    action=$(FM_STATE_OVERRIDE="$state" FM_CONFIG_OVERRIDE="$dir/home/config" \
+      FM_TASK_INBOX_GRACE_SECS=0 bash -c '
+        . "$1"
+        fm_task_inbox_due_action "$2" domain
+      ' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$state")
+    [ "$action" = "retry $state/domain.inbox/$expected" ] \
+      || fail "$mode delayed send is not owed its pending retry: $action"
+    exec 7>&- 8>&- 9>&- 10>&- 11>&-
+  done
+  pass "fm-send inbox: delayed retry publication waits through contention and preserves newer pending sends"
+)
+
 test_harness_invocations_stay_typed() {
   local dir err typed
   # A slash command must reach the harness's own parser, on any harness.
@@ -512,6 +609,7 @@ test_pending_composer_skips_ring_advisorily
 test_failed_ring_is_still_sent
 test_fire_and_forget_unlanded_ring_owes_one_retry
 test_fire_and_forget_retry_stays_off_without_the_flag
+test_delayed_fire_and_forget_retry_publication || exit 1
 test_harness_invocations_stay_typed
 test_explicit_target_stays_typed
 test_key_path_never_touches_inbox

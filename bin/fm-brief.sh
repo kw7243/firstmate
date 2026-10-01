@@ -385,6 +385,7 @@ The one exception is `respond`: it sent its answer before it began waiting, so r
 A wait your shell can watch this way needs no `paused:` line, except your own pipeline run, a long foreground command, or your own validation round, which you declare once just before its blocking hold: append `paused:` once just before its first blocking command, then stay in the command, and never append it again as you reissue that command.
 EOF
 WAIT_SECTION=${WAIT_SECTION%$'\n'}
+WAIT_SECTION=${WAIT_SECTION//paused:/"$PAUSED_VERB:"}
 WAIT_BLOCK=
 if [ -e "$CONFIG/wait-no-turns" ]; then
   WAIT_BLOCK="$WAIT_SECTION"$'\n\n'

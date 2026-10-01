@@ -608,6 +608,29 @@ test_fire_and_forget_retry_is_quiet_without_the_flag() {
   pass "inbox: without config/wait-no-turns a fire-and-forget retry mark stays quiet"
 }
 
+test_retry_publication_orders_pending_sequences() {
+  local state older newer
+  state="$TMP_ROOT/retry-sequence/state"
+  mkdir -p "$state"
+  older=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "older steer" fire-and-forget)
+  mv "$older" "$state/t1.inbox/999.msg"
+  older="$state/t1.inbox/999.msg"
+  newer=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "newer steer" fire-and-forget)
+  [ "${newer##*/}" = 1000.msg ] || fail "retry sequence fixture did not cross the padding boundary"
+  inbox_lib "$state" fm_task_inbox_mark_retry "$state" t1 "$newer"
+  inbox_lib "$state" fm_task_inbox_mark_retry "$state" t1 "$older"
+  [ "$(cat "$state/t1.inbox/.retry-ring")" = 1000.msg ] \
+    || fail "a delayed older retry replaced the newer numeric sequence"
+  mv "$older" "$state/t1.inbox/handled/"
+  inbox_lib "$state" fm_task_inbox_mark_retry "$state" t1 "$state/t1.inbox/handled/999.msg"
+  [ "$(cat "$state/t1.inbox/.retry-ring")" = 1000.msg ] \
+    || fail "an already-handled record replaced the newer pending retry"
+  inbox_lib "$state" fm_task_inbox_clear_retry "$state" t1 "$newer"
+  inbox_lib "$state" fm_task_inbox_mark_retry "$state" t1 "$older"
+  [ ! -e "$state/t1.inbox/.retry-ring" ] || fail "a delayed handled record recreated a spent retry"
+  pass "inbox: retry publication orders numeric sequences and ignores handled records"
+}
+
 test_retry_cleanup_preserves_concurrent_publication() {
   local mode dir state fire newer action
   for mode in clear handled missing invalid; do
@@ -1093,6 +1116,7 @@ test_ladder_writes_ignore_vanished_inbox
 test_fire_and_forget_records_never_enter_the_ladder
 test_fire_and_forget_retry_is_owed_once
 test_fire_and_forget_retry_is_quiet_without_the_flag
+test_retry_publication_orders_pending_sequences
 test_retry_cleanup_preserves_concurrent_publication
 test_retry_reader_waits_for_publication
 test_ring_ladder_policy

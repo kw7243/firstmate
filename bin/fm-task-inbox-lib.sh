@@ -388,11 +388,21 @@ fm_task_inbox_oldest_unhandled() {  # <state-dir> <task-id>
 # Owe a fire-and-forget record its one retry ring (see the header). A newer
 # mark replaces an older one: a ring names the whole inbox, not one record.
 fm_task_inbox_mark_retry() {  # <state-dir> <task-id> <record-path>
-  local dir lock status=0
+  local dir lock base seq current current_seq=0 status=0
   dir=$(fm_task_inbox_dir "$1" "$2")
+  base=${3##*/}
+  seq=$(fm_task_inbox_seq_of "$base") || return 1
   lock="$dir/.seq.lock"
-  fm_task_inbox_lock_acquire "$lock" || return 1
-  { printf '%s\n' "${3##*/}" > "$dir/.retry-ring"; } 2>/dev/null || status=1
+  FM_TASK_INBOX_LOCK_WAIT_SECS=$FM_TASK_INBOX_LOCK_WAIT_DEFAULT fm_task_inbox_lock_acquire "$lock" || return 1
+  if [ -f "$dir/$base" ]; then
+    current=$(cat "$dir/.retry-ring" 2>/dev/null || true)
+    if [ -f "$dir/$current" ]; then
+      current_seq=$(fm_task_inbox_seq_of "$current") || current_seq=0
+    fi
+    if [ "$seq" -gt "$current_seq" ]; then
+      { printf '%s\n' "$base" > "$dir/.retry-ring"; } 2>/dev/null || status=1
+    fi
+  fi
   fm_lock_release "$lock"
   return "$status"
 }

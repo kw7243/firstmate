@@ -831,9 +831,10 @@ test_herdr_lab_contract_applies_to_scouts_but_not_secondmates() {
 }
 
 test_pause_verb_override_renders_all_brief_scaffolds() {
-  local home kind id brief append now epoch templates template line signals
+  local home kind id brief append now epoch templates template line signals waiting declarations declaration
   home="$TMP_ROOT/pause-verb-home"
-  mkdir -p "$home/data"
+  mkdir -p "$home/data" "$home/config"
+  : > "$home/config/wait-no-turns"
 
   for kind in ship:no-mistakes ship:direct-PR ship:local-only scout secondmate; do
     id="brief-pause-verb-${kind//:/-}"
@@ -852,6 +853,22 @@ test_pause_verb_override_renders_all_brief_scaffolds() {
         ;;
     esac
     brief="$home/data/$id/brief.md"
+    if [ "$kind" != secondmate ]; then
+      waiting=$(awk '/^# Waiting$/ { waiting=1; next } /^# / { waiting=0 } waiting' "$brief")
+      declarations=$(printf '%s\n' "$waiting" | grep -o '`[^`]*:`' | tail -n 2 | tr -d '`')
+      [ "$(printf '%s\n' "$declarations" | wc -l | tr -d ' ')" = 2 ] \
+        || fail "$kind Waiting section did not emit both wait declarations"
+      while IFS= read -r declaration; do
+        [ "$declaration" = awaiting: ] || fail "$kind Waiting section emitted the wrong verb: $declaration"
+        FM_CLASSIFY_PAUSED_VERB=awaiting bash -c '
+          . "$1"
+          status_is_paused "$2 waiting for validation"
+        ' _ "$ROOT/bin/fm-classify-lib.sh" "$declaration" \
+          || fail "$kind Waiting declaration is not recognized by the classifier"
+      done <<DECLARATIONS
+$declarations
+DECLARATIONS
+    fi
     # Fill the scaffold's generated status-append command the way a worker does
     # and run it. The stamp must be a value the worker supplies, so the command
     # may not carry an unevaluated substitution that a file-write tool would
