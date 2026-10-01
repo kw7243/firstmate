@@ -44,7 +44,7 @@
 # An existing destination must be a regular, non-symlinked file; a missing one
 # is created with its directory.
 #
-# Return codes, shared by every entry point that resolves the channel:
+# Return codes for fm_parent_channel_destination and fm_parent_channel_report:
 #   0  resolved, or appended / already present
 #   1  this is a main home (no .fm-secondmate-home marker): nothing to report
 #   2  the identity marker exists but is unusable (symlink, NUL, bad id)

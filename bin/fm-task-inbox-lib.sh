@@ -25,8 +25,8 @@
 # Layout under <state-dir>:
 #   <task>.inbox/NNN.msg       one durable steer, numeric sequence, atomic rename
 #   <task>.inbox/handled/      the worker's `mv` here IS the acknowledgement
-#   <task>.inbox/.seq.lock     serializes sequence allocation across writers
-#                              (the session and the away daemon)
+#   <task>.inbox/.seq.lock     serializes sequence allocation and retry-marker
+#                              publication, reads, and cleanup
 #   <task>.inbox/.ring-state   watcher re-ring ladder: "<msg>\t<count>\t<epoch>"
 #   <task>.inbox/.escalated    oldest-message name already surfaced as stale,
 #                              so later polls suppress another escalation
@@ -37,7 +37,7 @@
 #   schema=fm-task-inbox.v1
 #   at=<utc timestamp>
 #   delivery=fire-and-forget   present only when the re-ring ladder must ignore it
-#                              (it still gets one retry ring; see below)
+#                              (optional retry policy below)
 #   --
 #   <exact message text; newlines are legal; a marked secondmate request keeps
 #    its from-firstmate marker and corr token verbatim in this body>
@@ -67,13 +67,20 @@
 # fm-send's ring at enqueue did not land
 # (fm_task_inbox_ring returned 1 or 2) it marks the record, and one grace later
 # the due action is `retry`: once the worker has no open decision of its own,
-# the watcher rings once more and spends the mark
-# whatever the result, so the record never rings a third time and never
-# escalates. A waiting worker does not poll its inbox (bin/fm-brief.sh), so
-# without this retry the record could sit unread until a checkpoint. A pending ordinary record's
+# the watcher makes one retry attempt and spends the matching mark whatever
+# the result. A dead or missing pane spends it without typing; the unread
+# record does not escalate. If clearing the mark fails while the record remains
+# unhandled after an attempt, the watcher surfaces the bookkeeping failure.
+# A waiting worker does not poll its inbox (bin/fm-brief.sh), so without this
+# retry the record could sit unread until a checkpoint. A pending ordinary record's
 # ladder rings the same inbox, so the retry waits behind it, and an
 # acknowledged record drops its mark. The remote steer leg has no watcher
 # ladder and owes no retry.
+# Publication uses the default bounded lock wait even when enqueue requested
+# a nonblocking lock: the record is already durable and still needs its retry.
+# Only pending records may publish; a delayed older sender cannot replace a
+# newer pending mark. Publication and both conditional and stale cleanup share
+# .seq.lock, so cleanup cannot erase a concurrently published newer mark.
 #
 # Inbox names containing bytes outside printable ASCII are unsupported. The
 # doorbell refuses them rather than sending terminal control bytes to a pane.
@@ -408,8 +415,8 @@ fm_task_inbox_mark_retry() {  # <state-dir> <task-id> <record-path>
 }
 
 # Spend the retry mark after its ring, only while it still names that record:
-# a newer mark written meanwhile is owed its own retry and survives. Fails only
-# when the processed record's mark stays behind.
+# a newer mark written meanwhile is owed its own retry and survives. Fails if
+# the lock cannot be acquired or the matching mark cannot be removed.
 fm_task_inbox_clear_retry() {  # <state-dir> <task-id> <record-path>
   local dir lock status=0
   dir=$(fm_task_inbox_dir "$1" "$2")
@@ -430,7 +437,7 @@ fm_task_inbox_clear_retry() {  # <state-dir> <task-id> <record-path>
 #   escalate <record-path> <count>   attempt budget spent; surface as stale
 #   retry <record-path>       a fire-and-forget record's one retry ring is due
 # An empty inbox also resets the ladder bookkeeping so the next message starts
-# a fresh ladder.
+# a fresh ladder. Retry-scan lock failure returns nonzero with no action.
 fm_task_inbox_due_action() {  # <state-dir> <task-id>
   local dir oldest base now grace max ladder rec_base count last lock action=quiet
   dir=$(fm_task_inbox_dir "$1" "$2")

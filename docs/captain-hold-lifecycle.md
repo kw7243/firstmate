@@ -161,9 +161,9 @@ Replay then retires the record.
 Two retained-delivery gaps remain bounded by tasks-axi 0.2.6.
 They are recorded for separate upstream work rather than representing defects introduced by this branch.
 
-- A retained local-only delivery cannot reach the row.
+- A retained local-only delivery reaches the row's body, but not its structured delivery evidence.
   `--note` exists on `tasks-axi done` but not on `tasks-axi update`, while the durable pending-close record carrying that note is retired when retention completes.
-- A relocated retained report cannot reach the row, because tasks-axi accepts only `data/<id>/report.md`.
+- A relocated retained report reaches the row's body, but not its structured report field, because tasks-axi accepts only `data/<id>/report.md` there.
   `done` reports `Task report link must be a data/<id>/report.md path`, and `update` reports `--report must be a data/<id>/report.md path`.
 
 When an interrupted retention leaves such a relocated report in the validated pending-close record, `answer` skips only that known-unsupported row artifact and closes normally.

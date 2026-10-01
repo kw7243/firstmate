@@ -51,7 +51,7 @@ If the worktree or ownership cannot be reconciled safely, leave all state intact
 ## A live crewmate claiming the pipeline is dead
 
 This is the inverse of the dead-endpoint case above: the worker is alive and the pipeline it declares dead usually is too.
-A drive call blocks until the next gate or outcome, far longer than a harness lets one command run, and the daemon accepts a response immediately and runs the round in the background.
+The brief's drive instructions are owned by `fm_nm_driving_block` in [`bin/fm-dod-lib.sh`](../../../bin/fm-dod-lib.sh); the daemon accepts a response immediately and runs the round in the background.
 So a crewmate's timed-out, killed, or errored drive call leaves it waiting on a read it never got, and the "the daemon is gone" conclusion it draws from that is a guess, not evidence.
 
 Read the two authoritative sources yourself before believing the claim:

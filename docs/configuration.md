@@ -576,7 +576,10 @@ See [`fleet-ledger.md`](fleet-ledger.md) for the opt-in setup, record contract, 
 ## Waiting worker spends no turns (config/wait-no-turns)
 
 The optional local, gitignored `config/wait-no-turns` presence flag opts this home into keeping a waiting worker from spending turns until it is answered.
-With it present, ship and scout briefs gain the `# Waiting` section and the foreground no-mistakes drive text, every brief's inbox section keeps the natural-checkpoint check and adds that a waiting worker does not poll or list its inbox because a waiting instruction rings, a pending-reply recovery waits while that mate has its own open decision or blocker, and a fire-and-forget steer whose doorbell did not land gets one later ring.
+With it present, ship and scout briefs gain the `# Waiting` section, and no-mistakes ship instructions use the foreground drive text.
+Every brief's inbox section keeps the natural-checkpoint check and adds that a waiting worker does not poll or list its inbox because a waiting instruction rings.
+Pending-reply recovery waits while the mate has its own open decision or blocker.
+A local fire-and-forget steer whose initial ring was skipped or failed can receive one later retry attempt under the [`fm-task-inbox-lib.sh` contract](../bin/fm-task-inbox-lib.sh); [remote fire-and-forget steers](remote-secondmates.md#swallowed-doorbells) receive no retry ring.
 With the file absent, generated briefs omit the waiting section and the no-poll inbox line, the drive text backgrounds the call, recovery sends during an open decision, and a fire-and-forget steer is not owed a retry ring.
 The flag is a home-local preference and is not inherited by secondmate homes.
 

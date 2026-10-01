@@ -51,9 +51,8 @@
 # watcher re-rings an unacknowledged message while its endpoint remains
 # available, escalates after the bounded ladder, and instead routes a positively
 # dead or missing endpoint directly to recovery without typing. An explicit
-# fire-and-forget record is excluded from that ladder; when config/wait-no-turns
-# is present and its ring here was skipped or failed, the watcher rings it
-# exactly once more.
+# fire-and-forget record is excluded from that ladder; its optional local retry
+# is governed by bin/fm-task-inbox-lib.sh's retry-ring contract.
 # bin/fm-task-inbox-lib.sh owns the record format, the doorbell line, and the
 # re-ring ladder. The composer pre-check before the ring is ADVISORY only: when
 # the composer visibly holds pending text the ring is skipped with a notice and
