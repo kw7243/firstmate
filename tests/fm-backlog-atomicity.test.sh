@@ -2470,6 +2470,8 @@ case "\$*" in
       : > "$case_dir/state-swapped"
       mv "$home/state" "$home/state-original" || exit 1
       "$real_ln" -s "$foreign_state" "$home/state" || exit 1
+      # Preserve the prepared owner so lock acquisition reaches its caller.
+      mv "$home/state-original/\${2##*/}" "\$2" || exit 1
     fi
     ;;
 esac
@@ -2478,6 +2480,7 @@ SH
   chmod +x "$case_dir/fakebin/ln"
 
   out=$(run_bootstrap "$case_dir") || rc=$?
+  assert_present "$case_dir/state-swapped" "bootstrap did not reach the state-swap injection"
   [ "$rc" -ne 0 ] || fail "bootstrap trusted a worker record after its state boundary changed"
   assert_contains "$out" "post-lock worker record check refused" \
     "bootstrap did not report the post-lock state-boundary failure"
@@ -2696,6 +2699,8 @@ case "\$*" in
       : > "$case_dir/state-swapped"
       mv "$home/state" "$home/state-original" || exit 1
       "$real_ln" -s "$foreign_state" "$home/state" || exit 1
+      # Preserve the prepared owner so lock acquisition reaches its caller.
+      mv "$home/state-original/\${2##*/}" "\$2" || exit 1
     fi
     ;;
 esac
@@ -2704,6 +2709,7 @@ SH
   chmod +x "$case_dir/fakebin/ln"
 
   out=$(run_teardown "$case_dir" "$id") || rc=$?
+  assert_present "$case_dir/state-swapped" "teardown did not reach the state-swap injection"
   [ "$rc" -ne 0 ] || fail "teardown trusted a record after its parent was swapped"
   assert_contains "$out" "task record authorized directory resolves outside this home" \
     "post-lock record check did not report the swapped parent"

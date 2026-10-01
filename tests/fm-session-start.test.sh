@@ -72,7 +72,7 @@ new_world() {
 make_fake_toolchain() {
   local fakebin=$1
   fm_fake_exit0 "$fakebin" tmux node chrome-devtools-axi
-  fm_fake_version_tool "$fakebin" lavish-axi FM_FAKE_LAVISH_AXI_VERSION 0.1.77
+  fm_fake_version_tool "$fakebin" lavish-axi FM_FAKE_LAVISH_AXI_VERSION 0.1.80
   cat > "$fakebin/gh-axi" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --version ]; then
@@ -205,9 +205,8 @@ SH
   chmod +x "$fakebin/tasks-axi"
 }
 
-# make_fake_ps_claude <fakebin>: harness_pid()/holder_alive() (fm-lock.sh) walk
-# `ps` output looking for a harness command name; this fake reports EVERY
-# queried pid as a live `claude` harness unless a stable harness pid is set.
+# make_fake_ps_claude <fakebin>: keep the suite's live process as the harness
+# anchor across startup commands, unless the fixture sets another owner.
 make_fake_ps_claude() {
   local fakebin=$1
   make_fake_ps_harness "$fakebin" claude
@@ -222,6 +221,7 @@ set -u
 # for, so a case that builds a pi (or codex) fixture gets pi (or codex) ancestry
 # without having to repeat it per run; FM_FAKE_HARNESS still overrides it.
 harness=\${FM_FAKE_HARNESS:-$harness}
+harness_pid=\${FM_FAKE_HARNESS_PID:-$SESSION_START_TEST_HARNESS_PID}
 SH
   cat >> "$fakebin/ps" <<'SH'
 pid=
@@ -232,7 +232,7 @@ for argument in "$@"; do
 done
 case "$*" in
   *"comm="*)
-    if [ -z "${FM_FAKE_HARNESS_PID:-}" ] || [ "$pid" = "$FM_FAKE_HARNESS_PID" ] \
+    if [ "$pid" = "$harness_pid" ] \
       || [ "$pid" = "${FM_FAKE_LIVE_HOLDER_PID:-}" ]; then
       printf '/usr/local/bin/%s\n' "$harness"
     else
@@ -241,7 +241,7 @@ case "$*" in
     exit 0
     ;;
   *"args="*)
-    if [ -z "${FM_FAKE_HARNESS_PID:-}" ] || [ "$pid" = "$FM_FAKE_HARNESS_PID" ] \
+    if [ "$pid" = "$harness_pid" ] \
       || [ "$pid" = "${FM_FAKE_LIVE_HOLDER_PID:-}" ]; then
       printf '%s\n' "$harness"
     else
@@ -250,8 +250,8 @@ case "$*" in
     exit 0
     ;;
   *"ppid="*)
-    [ -n "${FM_FAKE_HARNESS_PID:-}" ] || exit 1
-    /bin/ps -o ppid= -p "$pid"
+    [ "$pid" != "$harness_pid" ] || exit 1
+    printf '%s\n' "$harness_pid"
     ;;
 esac
 exit 1
@@ -840,7 +840,8 @@ EOF
   printf '%s\n' "$holder_pid" > "$home/state/.lock"
 
   status=0
-  out=$(run_session_start "$home" "$root" "$fakebin:$BASE_PATH") || status=$?
+  out=$(FM_FAKE_LIVE_HOLDER_PID="$holder_pid" \
+    run_session_start "$home" "$root" "$fakebin:$BASE_PATH") || status=$?
   kill "$holder_pid" 2>/dev/null || true
   wait "$holder_pid" 2>/dev/null || true
 
@@ -926,7 +927,8 @@ EOF
   sleep 300 &
   holder_pid=$!
   printf '%s\n' "$holder_pid" > "$home/state/.lock"
-  out=$(FM_TRACE_CONTEXT=off run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
+  out=$(FM_TRACE_CONTEXT=off FM_FAKE_LIVE_HOLDER_PID="$holder_pid" \
+    run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
   kill "$holder_pid" 2>/dev/null || true
   wait "$holder_pid" 2>/dev/null || true
   assert_contains "$out" "READ-ONLY SESSION" "trace-context refusal fixture did not enter read-only mode"
@@ -1474,7 +1476,11 @@ EOF
   printf 'window=sess:p-slow\nkind=ship\nbackend=herdr\n' > "$home/state/task-a-slow.meta"
   printf 'window=sess:p-live\nkind=ship\nbackend=herdr\n' > "$home/state/task-z-live.meta"
 
-  out=$(FM_SESSION_START_ENDPOINT_TIMEOUT=2 run_session_start "$home" "$root" "$fakebin:$BASE_PATH") || status=$?
+  # The same fake hangs the side-band home summary before the endpoint section.
+  # Bound that unrelated refresh at 5s instead of paying its production 60s;
+  # the endpoint's own 2s bound and descendant-cleanup assertions stay real.
+  out=$(FM_HOME_SUMMARY_TIMEOUT=5 FM_SESSION_START_ENDPOINT_TIMEOUT=2 \
+    run_session_start "$home" "$root" "$fakebin:$BASE_PATH") || status=$?
 
   expect_code 0 "$status" "a hung endpoint read must not fail the digest"
   assert_contains "$out" \
@@ -1506,7 +1512,10 @@ EOF
   printf 'window=sess:p-slow\nkind=ship\nbackend=herdr\n' > "$home/state/task-a-slow.meta"
   printf 'window=sess:p-live\nkind=ship\nbackend=herdr\n' > "$home/state/task-z-live.meta"
 
-  out=$(FM_SESSION_START_ENDPOINT_TIMEOUT=00 run_session_start "$home" "$root" "$fakebin:$BASE_PATH") || status=$?
+  # Only the unrelated summary gets a shorter fixture budget. The invalid
+  # endpoint value must still fall back to the real 10s production bound.
+  out=$(FM_HOME_SUMMARY_TIMEOUT=5 FM_SESSION_START_ENDPOINT_TIMEOUT=00 \
+    run_session_start "$home" "$root" "$fakebin:$BASE_PATH") || status=$?
 
   expect_code 0 "$status" "a padded-zero per-read bound must not fail the digest"
   assert_contains "$out" \
@@ -1696,6 +1705,9 @@ $rec
 EOF
   make_fake_toolchain "$fakebin"
   make_fake_ps_claude "$fakebin"
+  # A Claude home runs the supervision host by default and then presents its
+  # outcomes; this case pins a home that does not run it.
+  : > "$home/config/supervision-host-off"
 
   FM_HOME="$home" "$ROOT/bin/fm-branch-outcome.sh" append \
     --task task-b --verdict captain --summary 'unread Pi branch outcome' >/dev/null \
@@ -2632,6 +2644,7 @@ EOF
   holder_pid=$!
   printf '%s\n' "$holder_pid" > "$home/state/.lock"
   readonly_out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$root" PATH="$fakebin:$BASE_PATH" \
+    FM_FAKE_LIVE_HOLDER_PID="$holder_pid" \
     env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
     "$SESSION_START" --reemit)
   kill "$holder_pid" 2>/dev/null || true

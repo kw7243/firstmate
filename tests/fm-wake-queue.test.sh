@@ -1183,6 +1183,8 @@ test_drain_asserts_watcher_liveness() {
   printf '%s\n' "$dir" > "$state/.watch.lock/fm-home"
   printf '%s\n' "$WATCH" > "$state/.watch.lock/watcher-path"
   printf '%s\n' "$identity" > "$state/.watch.lock/pid-identity"
+  FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_lock_write_namespace "$2"' _ \
+    "$ROOT/bin/fm-wake-lib.sh" "$state/.watch.lock" || fail "could not record the live watcher fixture namespace"
   touch "$state/.last-watcher-beat"
   FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_GUARD_GRACE=300 "$DRAIN" >/dev/null 2> "$err" \
     || fail "drain failed with a live watcher and fresh beacon"

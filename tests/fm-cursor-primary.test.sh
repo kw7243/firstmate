@@ -15,7 +15,7 @@
 #   SESSION     - bin/fm-sessionstart-cursor.sh, which injects the digest at
 #                 sessionStart.
 #
-# The park runs as a child of a fake harness (a bash symlink named cursor-agent)
+# The park runs as a child of a fake harness (an executable named cursor-agent)
 # whose pid holds the fixture home's session lock, so the real Cursor ancestry
 # path in bin/fm-session-lock-lib.sh is exercised rather than stubbed.
 # tests/fm-cursor-primary-live-e2e.test.sh is the opt-in guard against a real
@@ -75,7 +75,8 @@ install_scripts() {
            fm-primary-scope-lib.sh fm-supervision-lib.sh fm-wake-lib.sh fm-path-lib.sh fm-process-identity-lib.sh \
            fm-session-lock-lib.sh fm-cursor-lib.sh fm-operational-input.sh \
            fm-supervision-instructions.sh fm-harness.sh fm-lock.sh \
-           fm-gate-refuse-lib.sh; do
+           fm-gate-refuse-lib.sh fm-afk-contract.sh fm-classify-lib.sh fm-timeout-lib.sh \
+           fm-supervision-engine-lib.sh; do
     cp "$ROOT/bin/$f" "$dir/bin/$f"
   done
   cp "$ROOT/bin/fm-arm-command-policy.mjs" "$dir/bin/fm-arm-command-policy.mjs"
@@ -134,12 +135,12 @@ SH
   chmod +x "$dir/bin/fm-watch-arm.sh"
 }
 
-# The park's child body: claim the home lock as this fake harness process, then
+# The park's child body: claim the home lock as the fake harness parent, then
 # run the adapter as its child, so the real Cursor ancestry path decides lock
 # ownership on every platform. Keep the fake harness process alive: Linux
 # changes the process identity when an exec reaches the adapter's shebang.
 PARK_CHILD='
-  printf "%s\n" "$$" > "$FM_HOME/state/.lock"
+  printf "%s\n" "$PPID" > "$FM_HOME/state/.lock"
   "$FM_HOME/bin/fm-turnend-guard-cursor.sh"
 '
 
@@ -162,7 +163,7 @@ run_session() {  # <dir> <event> <source> [session-id]
   local dir=$1 event=$2 source=$3 session_id=${4:-sess-cursor} payload
   payload=$(printf '{"hook_event_name":"%s","session_id":"%s","cursor_version":"x"}' "$event" "$session_id")
   printf '%s' "$payload" | FM_HOME="$dir" FM_SESSION_SOURCE="$source" "$FAKE_CURSOR" -c '
-    printf "%s\n" "$$" > "$FM_HOME/state/.lock"
+    printf "%s\n" "$PPID" > "$FM_HOME/state/.lock"
     "$FM_HOME/bin/fm-sessionstart-cursor.sh" --source "$FM_SESSION_SOURCE"
   ' 2>/dev/null
 }
@@ -209,7 +210,7 @@ test_autoarm_stands_down_on_cursor_payload() {
   : > "$dir/state/task1.meta"
   write_arm_fixture "$dir" actionable
   printf '%s' "$CURSOR_PAYLOAD" | FM_HOME="$dir" "$FAKE_CURSOR" -c '
-      printf "%s\n" "$$" > "$FM_HOME/state/.lock"
+      printf "%s\n" "$PPID" > "$FM_HOME/state/.lock"
       exec "$FM_HOME/bin/fm-claude-stop-autoarm.sh"
     ' >/dev/null 2>&1
   status=$?
@@ -511,6 +512,16 @@ test_park_runs_the_supervision_host_only_when_opted_in() {
   [ -e "$dir/state/arm-ran" ] || fail "a home without config/supervision-host must park on the arm"
   [ ! -e "$dir/state/host-ran" ] || fail "a home without config/supervision-host ran the supervision host"
 
+  dir=$(make_primary_dir "$TMP_ROOT/park-host-opted-out")
+  : > "$dir/state/task1.meta"
+  mkdir -p "$dir/config"
+  : > "$dir/config/supervision-host-off"
+  write_arm_fixture "$dir" actionable
+  write_host_fixture "$dir" handback
+  out=$(run_park "$dir")
+  [ -e "$dir/state/arm-ran" ] || fail "a home opted out by config/supervision-host-off must park on the arm"
+  [ ! -e "$dir/state/host-ran" ] || fail "a home opted out by config/supervision-host-off ran the supervision host"
+
   dir=$(make_primary_dir "$TMP_ROOT/park-host-on")
   : > "$dir/state/task1.meta"
   : > "$dir/state/.afk-contract"
@@ -529,6 +540,21 @@ test_park_runs_the_supervision_host_only_when_opted_in() {
   [ "$(printf '%s\n' "$body" | grep -c '^stale: fixture-win')" -eq 8 ] \
     || fail "the follow-up must keep the eight-line cap on wake lines: $body"
   case "$body" in *'not from the captain: it is not a return'*) ;; *) fail "an away handback must say it is not the captain's return: $body" ;; esac
+
+  # Quiet mode's record is a present captain (bin/fm-afk-contract.sh AWAY OR
+  # QUIET), so the same handback beside it carries no away note.
+  dir=$(make_primary_dir "$TMP_ROOT/park-host-quiet")
+  : > "$dir/state/task1.meta"
+  FM_HOME="$dir" FM_AFK_MODE=quiet "$ROOT/bin/fm-afk-contract.sh" enter --words 'keep routine wakes off my main' >/dev/null 2>&1 \
+    || fail "fixture: could not record quiet mode"
+  mkdir -p "$dir/config"
+  : > "$dir/config/supervision-host"
+  write_arm_fixture "$dir" actionable
+  write_host_fixture "$dir" handback
+  out=$(run_park "$dir")
+  body=$(followup_of "$out")
+  case "$body" in *'supervision-host:'*) ;; *) fail "the quiet-record handback did not reach main: $out" ;; esac
+  case "$body" in *'not a return'*) fail "a handback beside a quiet record called itself away-posture supervision: $body" ;; esac
   pass "cursor park: an opted-in home parks on the supervision host and relays every host line"
 }
 

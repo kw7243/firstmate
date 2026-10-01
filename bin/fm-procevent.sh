@@ -29,7 +29,10 @@
 #            Record a worker-owned built-in source. Its one source record
 #            persists across rounds, and re-registration by the same task
 #            acknowledges nonterminal captured rounds without touching the
-#            source claim. Terminal rounds are concluded with `handled`.
+#            source claim. Terminal rounds are concluded with `handled`. A
+#            staged `--agent-reply-file` is handed to the adapter's
+#            `deliver-reply` under the source lock once the task is eligible,
+#            so a refused arm never posts it and a failed post publishes no registration.
 # register-extension
 #            Resolve an explicitly enabled home-local process-event-adapter/1
 #            binding, verify its package and handshake, and record the source
@@ -47,9 +50,9 @@
 #            that generation's live claim or its launch stamp says it started.
 #            The wait is the reconcile confirm window and ends early on evidence.
 #            No evidence within the window is a nonzero result. Exit 3 means a
-#            live listener from another registration generation still held the
-#            source when the window ended, so this generation cannot start until
-#            it is retired.
+#            live listener from another registration in this home and state root
+#            still held the source when the window ended, so this generation
+#            cannot start until it is retired.
 # start      Claim the source, run its child to completion, durably capture the
 #            output, and publish normalized wakes for pending results. It then
 #            releases the claim, unless the adapter's `relisten` command says
@@ -551,8 +554,8 @@ cmd_register() {
 cmd_register_task() {
   local adapter=${1-} id=${2-} task=${3-} sep=${4-} result pending pending_adapter
   local reply_source='' reply_dest='' stale arg i adopting=0 pending_owner prior_record=''
-  local pending_rounds=0
-  local -a argv=()
+  local pending_rounds=0 delivered
+  local -a argv=() kept=()
   shift 4 2>/dev/null || usage
   [ "$adapter" = lavish ] || die "register-task is reserved for the Lavish adapter"
   fm_procevent_adapter_valid "$adapter" || die "adapter name must be lowercase alphanumeric or dash: $adapter"
@@ -570,6 +573,16 @@ cmd_register_task() {
     || die "cannot own a board for task $task; its captured feedback would reach no endpoint"
   (umask 077; mkdir -p "$REG") || die "cannot prepare the process-event registry"
   fm_procevent_source_lock_acquire "$id" || die "cannot lock the source"
+  if [ -e "$(fm_procevent_claim_path "$id")" ] || [ -L "$(fm_procevent_claim_path "$id")" ]; then
+    if ! fm_procevent_claim_load_locked "$id" 2>/dev/null; then
+      fm_procevent_source_lock_release "$id"
+      die "cannot safely read source ownership: $id"
+    fi
+    if ! fm_procevent_claim_owned_by_state "$STATE" "$FM_HOME"; then
+      fm_procevent_source_lock_release "$id"
+      die "cannot arm source $id owned by home $FM_PROCEVENT_CLAIM_HOME at state ${FM_PROCEVENT_CLAIM_STATE_ROOT:-$FM_PROCEVENT_CLAIM_HOME/state}"
+    fi
+  fi
   if [ -e "$(source_file "$id")" ] || [ -L "$(source_file "$id")" ]; then
     if [ "$(source_kind "$id" 2>/dev/null || true)" != task-owned ]; then
       fm_procevent_source_lock_release "$id"
@@ -643,6 +656,30 @@ cmd_register_task() {
       die "cannot read the registration this re-arm replaces: $id"
     fi
   fi
+  if [ -n "$reply_dest" ]; then
+    delivered=0
+    "$(adapter_script "$adapter")" deliver-reply "${argv[@]:1}" || delivered=$?
+    if [ "$delivered" -eq 0 ]; then
+      rm -f -- "$reply_dest"
+      reply_dest=''
+      kept=()
+      i=0
+      while [ "$i" -lt "${#argv[@]}" ]; do
+        if [ "${argv[$i]}" = --agent-reply-file ]; then
+          i=$((i + 2))
+        else
+          kept+=("${argv[$i]}")
+          i=$((i + 1))
+        fi
+      done
+      argv=("${kept[@]}")
+    elif [ "$delivered" -ne 3 ]; then
+      [ -z "$prior_record" ] || rm -f -- "$prior_record"
+      rm -f -- "$reply_dest"
+      fm_procevent_source_lock_release "$id"
+      die "cannot arm source $id: its staged reply was not delivered"
+    fi
+  fi
   if ! fm_procevent_task_registration_publish_locked "$STATE" "$adapter" "$id" "$task" "${argv[@]}"; then
     [ -z "$prior_record" ] || rm -f -- "$prior_record"
     [ -z "$reply_dest" ] || rm -f -- "$reply_dest"
@@ -650,7 +687,7 @@ cmd_register_task() {
     die "cannot publish task-owned registration"
   fi
   # Re-arm is the worker's acknowledgement of every open nonterminal round.
-  # It deliberately does not inspect, acquire, release, or replace the claim.
+  # It deliberately does not acquire, release, or replace the claim.
   while IFS= read -r pending; do
     [ -n "$pending" ] || continue
     result=$pending
@@ -1894,14 +1931,14 @@ confirm_launched_runners() {  # <source-id><TAB><registration-identity><TAB><lau
   [ "${#pending[@]}" -eq 0 ] || printf '%s\n' "${pending[@]}"
 }
 
-# 0 when this registration generation holds a live claim, 3 when another
-# generation does, 1 otherwise.
+# Within this home and state root: 0 when this generation holds a live claim,
+# 3 when another generation does; 1 otherwise.
 generation_is_listening() {  # <source-id> <registration-identity>
   local id=$1 identity=$2 state result=1
   fm_procevent_source_lock_try_acquire "$id" || return 1
   fm_procevent_claim_state_locked "$id"
   state=$?
-  if [ "$state" -eq 0 ]; then
+  if [ "$state" -eq 0 ] && fm_procevent_claim_owned_by_state "$STATE" "$FM_HOME"; then
     result=3
     [ "$FM_PROCEVENT_CLAIM_REG_IDENTITY" != "$identity" ] || result=0
   fi
