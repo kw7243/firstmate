@@ -293,7 +293,7 @@ test_fire_and_forget_retry_stays_off_without_the_flag() {
 }
 
 test_delayed_fire_and_forget_retry_publication() (
-  local mode dir state sender='' holder='' signal expected action real_sleep
+  local mode dir state sender='' holder='' _signal expected action real_sleep
   real_sleep=$(command -v sleep)
   trap 'kill ${sender:-} ${holder:-} 2>/dev/null || true; wait 2>/dev/null || true' EXIT
   for mode in contention pending handled newer-handled; do
@@ -310,7 +310,7 @@ if [ "${1:-}" = capture-pane ] && [ -n "${FM_PAUSE_RECORD:-}" ] \
   && [ -f "$FM_PAUSE_RECORD" ] && [ ! -e "$FM_PAUSE_RECORD.paused" ]; then
   : > "$FM_PAUSE_RECORD.paused"
   printf 'paused\n' >&7
-  IFS= read -r -t 15 signal <&8 || exit 1
+  IFS= read -r -t 15 _signal <&8 || exit 1
 fi
 exec "$0.base" "$@"
 SH
@@ -336,7 +336,7 @@ SH
       exit "$rc"
     ) &
     sender=$!
-    IFS= read -r -t 15 signal <&7 || fail "$mode send did not pause after enqueue"
+    IFS= read -r -t 15 _signal <&7 || fail "$mode send did not pause after enqueue"
     expected=002.msg
     if [ "$mode" = contention ]; then
       FM_STATE_OVERRIDE="$state" bash -c '
@@ -344,11 +344,11 @@ SH
         lock="$2/domain.inbox/.seq.lock"
         fm_task_inbox_lock_acquire "$lock" || exit 1
         printf "locked\n" >&10
-        IFS= read -r -t 15 signal <&11
+        IFS= read -r -t 15 _signal <&11
         fm_lock_release "$lock"
       ' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$state" &
       holder=$!
-      IFS= read -r -t 15 signal <&10 || fail "could not hold the inbox scan lock"
+      IFS= read -r -t 15 _signal <&10 || fail "could not hold the inbox scan lock"
       expected=001.msg
     else
       run_send "$dir" "$dir/newer.err" FM_FAKE_TMUX_COMPOSER=pending -- \
@@ -366,7 +366,7 @@ SH
     fi
     printf 'resume\n' >&8
     if [ "$mode" = contention ]; then
-      IFS= read -r -t 15 signal <&9 || fail "send neither waited for the lock nor completed"
+      IFS= read -r -t 15 _signal <&9 || fail "send neither waited for the lock nor completed"
       printf 'unlock\n' >&11
       wait "$holder" || fail "inbox scan lock holder failed"
       holder=
