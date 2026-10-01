@@ -102,15 +102,20 @@ stop_reply_listener() {
 
 # Block until this generation's capture has been applied. A live listener keeps
 # its claim across polls, so start is only launched when nothing owns the source.
-await_reply_result() { # <result-path>
-  local result=$1 handled=${1%.result}.handled _
+await_reply_result() { # <result-path> [tries]
+  local result=$1 handled=${1%.result}.handled _ tries=${2:-800}
   if [ "$(reply_owner)" != live ]; then
     remote_env "$ROOT/bin/fm-procevent.sh" start "$SID" >/dev/null 2>&1 &
   fi
-  for _ in $(seq 1 800); do
+  for _ in $(seq 1 "$tries"); do
     [ -s "$result" ] && [ -f "$handled" ] && return 0
     sleep 0.05
   done
+  if [ ! -s "$result" ]; then
+    printf 'timed out waiting for capture: %s\n' "$result" >&2
+  else
+    printf 'timed out waiting for application: %s\n' "$result" >&2
+  fi
   return 1
 }
 
@@ -673,8 +678,10 @@ assert_not_contains "$(status_open_decisions "$PARENT/state/ios.status")" $'repl
 stop_reply_listener || fail "the reply listener did not stop before the cursor-loss recapture"
 rm -f "$PARENT/state/remote-replies/ios.cursor"
 GEN=$((GEN + 1))
-await_reply_result "$PARENT/state/procevent-inbox/$SID.$GEN.result" \
-  || fail "the replay-identity whole-log recapture was not captured"
+# Whole-log replays refetch every offered document, so their application needs
+# more headroom than a single new delta; ordinary waits keep their normal bound.
+await_reply_result "$PARENT/state/procevent-inbox/$SID.$GEN.result" 2400 \
+  || fail "the replay-identity whole-log recapture did not complete capture and application"
 assert_present "$PARENT/state/procevent-inbox/$SID.$GEN.handled" \
   "the replay-identity whole-log recapture was not applied"
 [ "$(grep -cF "$REPLAY_LINE" "$PARENT/state/ios.status")" -eq 1 ] \
@@ -934,8 +941,8 @@ mv "$PARENT/state/.wake-queue" "$TMP_ROOT/wake-queue-before-replay" 2>/dev/null 
 stop_reply_listener || fail "the reply listener did not stop before the whole-log recapture"
 rm -f "$PARENT/state/remote-replies/ios.cursor"
 GEN=$((GEN + 1))
-await_reply_result "$PARENT/state/procevent-inbox/$SID.$GEN.result" \
-  || fail "the cursor-loss recapture was not captured"
+await_reply_result "$PARENT/state/procevent-inbox/$SID.$GEN.result" 2400 \
+  || fail "the cursor-loss recapture did not complete capture and application"
 assert_present "$PARENT/state/procevent-inbox/$SID.$GEN.handled" \
   "the whole-log recapture was not acknowledged by the adapter"
 # Documents that were undelivered when their lines first mirrored have since

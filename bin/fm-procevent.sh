@@ -50,9 +50,9 @@
 #            that generation's live claim or its launch stamp says it started.
 #            The wait is the reconcile confirm window and ends early on evidence.
 #            No evidence within the window is a nonzero result. Exit 3 means a
-#            live listener from another registration generation still held the
-#            source when the window ended, so this generation cannot start until
-#            it is retired.
+#            live listener from another registration in this home and state root
+#            still held the source when the window ended, so this generation
+#            cannot start until it is retired.
 # start      Claim the source, run its child to completion, durably capture the
 #            output, and publish normalized wakes for pending results. It then
 #            releases the claim, unless the adapter's `relisten` command says
@@ -687,7 +687,7 @@ cmd_register_task() {
     die "cannot publish task-owned registration"
   fi
   # Re-arm is the worker's acknowledgement of every open nonterminal round.
-  # It deliberately does not inspect, acquire, release, or replace the claim.
+  # It deliberately does not acquire, release, or replace the claim.
   while IFS= read -r pending; do
     [ -n "$pending" ] || continue
     result=$pending
@@ -1931,8 +1931,8 @@ confirm_launched_runners() {  # <source-id><TAB><registration-identity><TAB><lau
   [ "${#pending[@]}" -eq 0 ] || printf '%s\n' "${pending[@]}"
 }
 
-# 0 when this registration generation holds a live claim, 3 when another
-# generation does, 1 otherwise.
+# Within this home and state root: 0 when this generation holds a live claim,
+# 3 when another generation does; 1 otherwise.
 generation_is_listening() {  # <source-id> <registration-identity>
   local id=$1 identity=$2 state result=1
   fm_procevent_source_lock_try_acquire "$id" || return 1

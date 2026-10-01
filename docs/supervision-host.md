@@ -77,9 +77,7 @@ Hook, plugin, extension, and checkpoint owners pass their harness as the primary
 Grok's model-owned call relies on primary detection.
 The host pins dispatched work to the primary's crew harness rather than the engine's.
 
-Grok's arm command is fixed when the session-start block renders.
-So adding or removing the file on a Grok home takes effect at the next session start.
-The other owners read the file at every arm.
+[configuration.md](configuration.md#supervision-host-configsupervision-host) owns when supervision-host configuration changes take effect.
 
 ### The report surface
 

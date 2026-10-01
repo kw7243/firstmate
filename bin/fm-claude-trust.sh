@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Pre-register Claude Code's workspace trust for the directory a claude spawn is
 # about to launch into - the isolated task worktree of a ship or scout crewmate,
-# or the seeded home of a secondmate - so the agent reaches its brief or charter
+# a seeded secondmate home, or a disposable lab primary - so the agent starts
 # instead of wedging on the trust dialog. In worktree mode it also carries
 # forward the external-CLAUDE.md-import approval, but only when the primary
 # checkout already holds standing consent for it - see the consent-gating
@@ -81,7 +81,7 @@
 # is treated like an absent flag - trust registered, no import consent.
 #
 # THE SCOPE TEST IS THE SAFETY PROPERTY, and it is STRUCTURAL rather than a
-# path policy. Each mode has its own, because the two directories have entirely
+# path policy. Each mode has its own, because these launch directories have
 # different shapes on disk.
 #
 # WORKTREE MODE. <worktree> must be a LINKED git worktree - its own git dir,

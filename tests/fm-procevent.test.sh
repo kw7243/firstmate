@@ -3832,7 +3832,7 @@ pass "a detected ambiguous reused-PID group is not signalled"
 # --- an accidentally orphaned runner is bounded by its owner ----------------
 #
 # Reproduces the shape that wedged a host: a listener detached into its own
-# process group, reparented to init when its session ended, and left running for
+# process group, reparented away from its session, and left running for
 # a day with its blocking child - and everything that child spawned - still
 # executing. The cost was not the runner itself but the process churn under it,
 # which is why this asserts the whole descendant tree stops, not just the leader.
@@ -3934,6 +3934,20 @@ HKEEP="$TMP_ROOT/orphan-live-owner"; new_home "$HKEEP"
 fm_test_track_procevent_home "$HKEEP"
 orphan_pe "$HORPHAN" register lavish orphan-src -- "$ORPHAN_STUB" "$TMP_ROOT/orphan-dead" >/dev/null
 orphan_pe "$HKEEP" register lavish keep-src -- "$QUIET_STUB" "$TMP_ROOT/orphan-live" >/dev/null
+# Both owners stay present while the two listeners start. Only the assertions
+# below end the orphan's ownership; a loaded startup must not spend its lease.
+(
+  # shellcheck source=bin/fm-procevent-lib.sh
+  . "$ROOT/bin/fm-procevent-lib.sh"
+  deadline=$((SECONDS + FM_TEST_STUB_MAX_BLOCK_SECONDS))
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    fm_procevent_owner_lease_touch "$HORPHAN/state" || true
+    fm_procevent_owner_lease_touch "$HKEEP/state" || true
+    sleep 0.25
+  done
+) &
+ORPHAN_SETUP_KEEPER=$!
+trap 'kill "$ORPHAN_SETUP_KEEPER" 2>/dev/null || true; wait "$ORPHAN_SETUP_KEEPER" 2>/dev/null || true; fm_test_cleanup' EXIT
 orphan_pe "$HORPHAN" reconcile >/dev/null
 orphan_pe "$HKEEP" reconcile >/dev/null
 
@@ -3943,19 +3957,40 @@ wait_for "$HKEEP/state/procevent/keep-src.runner" \
   || fail "the live-owner listener never recorded its runner"
 wait_for "$TMP_ROOT/orphan-dead.descendant" \
   || fail "the dead-owner listener's child never spawned its own descendant"
+wait_for "$TMP_ROOT/orphan-live.descendant" \
+  || fail "the live-owner listener's child never spawned its own descendant"
 ORPHAN_PID=$(cat "$HORPHAN/state/procevent/orphan-src.runner")
 KEEP_PID=$(cat "$HKEEP/state/procevent/keep-src.runner")
 ORPHAN_DESCENDANT=$(cat "$TMP_ROOT/orphan-dead.descendant")
 
-# The reproduction condition itself: the listener is already an orphan in the
-# kernel's sense before anything is asserted about reaping it.
+# Measure this session's orphan adopter independently: a service subreaper can
+# adopt the detached child instead of PID 1. The probe's parent is waited for,
+# and its child exits after observing adoption or a bounded five-second wait.
+orphan_adopter=$(perl -e '
+  defined(my $parent = fork) or exit 1;
+  if ($parent) { waitpid($parent, 0) == $parent or exit 1; exit($? >> 8); }
+  my $original_parent = $$;
+  defined(my $child = fork) or exit 1;
+  exit 0 if $child;
+  my $deadline = time + 5;
+  while (getppid() == $original_parent && time < $deadline) {
+    select undef, undef, undef, 0.05;
+  }
+  getppid() != $original_parent or exit 1;
+  print getppid(), "\n";
+') || fail "could not observe this session's orphan adopter"
+case "$orphan_adopter" in ''|*[!0-9]*) fail "the orphan adopter probe did not finish" ;; esac
+# The listener must already have left its invoking session before reaping it.
 orphan_ppid=$(ps -o ppid= -p "$ORPHAN_PID" 2>/dev/null | tr -d '[:space:]')
-[ "$orphan_ppid" = 1 ] \
+[ "$orphan_ppid" = "$orphan_adopter" ] \
   || fail "the listener under test was not reparented away from its session (ppid $orphan_ppid)"
 kill -0 -"$ORPHAN_PID" 2>/dev/null \
   || fail "the listener's process group was not running"
 kill -0 "$ORPHAN_DESCENDANT" 2>/dev/null \
   || fail "the listener's descendant was not running"
+kill "$ORPHAN_SETUP_KEEPER" 2>/dev/null || true
+wait "$ORPHAN_SETUP_KEEPER" 2>/dev/null || true
+trap fm_test_cleanup EXIT
 pass "a detached listener starts reparented, with a live descendant tree under it"
 
 # Only the second home's session stays present, on the same short bound, so the

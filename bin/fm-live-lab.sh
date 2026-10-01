@@ -81,8 +81,8 @@
 #                 fm-host-mirror.sh verified claude and fm-host-mirror.sh check
 #                 pass, and the mirror holds a captain and a main entry.
 #   extensions    Pi: the watcher, turn-end guard, and branch extensions are
-#                 loaded by the process holding the lab session lock, at the
-#                 current on-disk builds.
+#                 loaded by the process holding the lab session lock; watcher
+#                 and turn-end guard builds match the current files on disk.
 #   host          Claude: with --expect-host yes (the default on Claude unless
 #                 --supervision-host off) the supervision host runs; with no,
 #                 none runs. Skipped when the lab has no mate or worker, since
