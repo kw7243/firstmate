@@ -341,6 +341,7 @@ record_session_start_completion() {  # <agents-hash>
   fi
 }
 
+# shellcheck disable=SC2329 # Invoked indirectly by fm_run_timed's Bash watchdog.
 print_startup_truncation() {
   local SESSION_START_LAST_STAGE SESSION_START_PENDING BAR
   SESSION_START_LAST_STAGE=$(cat "$SESSION_START_STAGE_FILE" 2>/dev/null) || SESSION_START_LAST_STAGE=
