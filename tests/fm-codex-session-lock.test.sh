@@ -251,6 +251,7 @@ chmod +x "$TMP_ROOT/foreground-root/bin/fm-bootstrap.sh" "$TMP_ROOT/foreground-r
 cat > "$TMP_ROOT/foreground.sh" <<'TOOL'
 set -eu
 export FM_TEST_DIGEST_OUTPUT="$FM_HOME/digest.out"
+export FM_TEST_SWEEP_OUTPUT='MISSING: foreground fixture tool'
 bash "$FM_ROOT_OVERRIDE/bin/fm-session-start.sh" > "$FM_TEST_DIGEST_OUTPUT" 2>&1
 . "$ROOT/bin/fm-session-lock-lib.sh"
 fm_session_lock_owned_by_self "$FM_HOME/state"
@@ -259,6 +260,9 @@ fm_session_lock_owned_by_self "$FM_HOME/state"
 grep -qx state=done "$FM_HOME/state/.startup-network.status"
 grep -qx report_published=1 "$FM_HOME/state/.startup-network.status"
 [ "$(wc -l < "$FM_HOME/sweeps")" -eq 1 ]
+[ "$(grep -c 'MISSING: foreground fixture tool' "$FM_HOME/digest.out")" -eq 1 ]
+[ -f "$FM_HOME/state/.startup-network.delivered" ]
+[ ! -s "$FM_HOME/state/.wake-queue" ]
 # Re-emission runs the read-only probe, retains the generation and completes.
 unset FM_TEST_DIGEST_OUTPUT
 bash "$FM_ROOT_OVERRIDE/bin/fm-session-start.sh" --reemit > "$FM_HOME/reemit.out" 2>&1
@@ -266,6 +270,9 @@ fm_session_lock_owned_by_self "$FM_HOME/state"
 [ ! -e "$FM_HOME/state/.lock.acquire" ]
 grep -qx state=done "$FM_HOME/state/.startup-network.status"
 grep -qx phases=probe "$FM_HOME/state/.startup-network.status"
+[ "$(grep -c 'MISSING: foreground fixture tool' "$FM_HOME/reemit.out")" -eq 1 ]
+[ -f "$FM_HOME/state/.startup-network.delivered" ]
+[ ! -s "$FM_HOME/state/.wake-queue" ]
 TOOL
 (
   export FM_HOME="$TMP_ROOT/foreground-home" FM_ROOT_OVERRIDE="$TMP_ROOT/foreground-root"
@@ -302,29 +309,38 @@ printf '999999999\n' > "$FM_HOME/state/.wake-queue.lock/pid"
 printf 'foreign-boot/pid:[999999]\n' > "$FM_HOME/state/.wake-queue.lock/pid-namespace"
 export FM_TEST_SWEEP_OUTPUT='actionable foreground finding' FM_SESSION_START_TIMEOUT=30 FM_STATUS_PRESENTATION_LOCK_TIMEOUT=1
 rc=0
-if [ "$1" = start ]; then
-  FM_SESSION_START_TIMEOUT=2 timeout 15 bash "$FM_ROOT_OVERRIDE/bin/fm-startup-network.sh" start --locked 1 --harvest-pid $$ > "$FM_HOME/result" 2>&1 || rc=$?
-  [ "$rc" -ne 0 ] && [ "$rc" -ne 124 ]
+if [ "$1" != session-start ]; then
+  harvest_pid=$$
+  [ "$1" != start-unclaimed ] || harvest_pid=0
+  FM_SESSION_START_TIMEOUT=2 timeout 15 bash "$FM_ROOT_OVERRIDE/bin/fm-startup-network.sh" start --locked 1 --harvest-pid "$harvest_pid" > "$FM_HOME/result" 2>&1 || rc=$?
 else
   timeout 75 bash "$FM_ROOT_OVERRIDE/bin/fm-session-start.sh" > "$FM_HOME/result" 2>&1 || rc=$?
+  [ -f "$FM_HOME/state/.session-start-complete" ]
+fi
+if [ "$1" = start-unclaimed ]; then
+  [ "$rc" -ne 0 ] && [ "$rc" -ne 124 ]
+  grep -q 'wake delivery failed' "$FM_HOME/state/.startup-network.report"
+  [ ! -f "$FM_HOME/state/.startup-network.delivered" ]
+else
   [ "$rc" -eq 0 ]
-  grep -q 'startup remains incomplete' "$FM_HOME/result"
-  [ ! -e "$FM_HOME/state/.session-start-complete" ]
+  [ "$(grep -c 'actionable foreground finding' "$FM_HOME/result")" -eq 1 ]
+  [ -f "$FM_HOME/state/.startup-network.delivered" ]
+  [ ! -s "$FM_HOME/state/.wake-queue" ]
+  ! grep -q 'wake delivery failed' "$FM_HOME/state/.startup-network.report"
 fi
 grep -q 'actionable foreground finding' "$FM_HOME/state/.startup-network.report"
-grep -q 'wake delivery failed' "$FM_HOME/state/.startup-network.report"
 [ ! -e "$FM_HOME/state/.lock.acquire" ]
 [ ! -e "$FM_HOME/state/.startup-network.lock" ]
 grep -qx 'foreign-boot/pid:\[999999\]' "$FM_HOME/state/.wake-queue.lock/pid-namespace"
 TOOL
-for entry in start session-start; do
+for entry in start session-start start-unclaimed; do
   (
     export FM_HOME="$TMP_ROOT/foreground-delivery-$entry" FM_ROOT_OVERRIDE="$TMP_ROOT/foreground-root"
     run_tool "$first" "$TMP_ROOT/foreground-delivery.sh" "$entry" > "$TMP_ROOT/foreground-delivery-$entry.out" 2>&1 \
       || fail "foreground $entry wake publication failed: $(cat "$TMP_ROOT/foreground-delivery-$entry.out" "$FM_HOME/result")"
   )
 done
-pass 'both transient startup entries bound wake publication and release owned claims while preserving evidence'
+pass 'transient startup acknowledges inline without queue contention and bounds unclaimed fallback delivery'
 
 cat > "$TMP_ROOT/foreground-truncated.sh" <<'TOOL'
 set -eu

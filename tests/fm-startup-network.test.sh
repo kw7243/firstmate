@@ -1179,6 +1179,50 @@ EOF
   pass 'fm-startup-network: failed bounded append restores recovery state and releases owned locks'
 }
 
+test_foreground_inline_delivery_and_fallback() {
+  local mode rec home root log claimant rc
+  for mode in printed closed-output failed-ack dead-claim no-claim; do
+    rec=$(new_world "inline-$mode")
+    IFS='|' read -r home root log <<EOF
+$rec
+EOF
+    claimant=$$
+    [ "$mode" != dead-claim ] || claimant=999999999
+    [ "$mode" != no-claim ] || claimant=0
+    if [ "$mode" = failed-ack ]; then
+      mkdir "$home/state/.startup-network.delivered"
+      chmod 500 "$home/state/.startup-network.delivered"
+    fi
+    rc=0
+    if [ "$mode" = closed-output ]; then
+      FM_SESSION_START_TIMEOUT=2 FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_OUT='MISSING: inline fixture' \
+        run_stage "$home" "$root" run --locked 0 --harvest-pid "$claimant" >&- 2> "$home/stderr" || rc=$?
+    else
+      FM_SESSION_START_TIMEOUT=2 FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_OUT='MISSING: inline fixture' \
+        run_stage "$home" "$root" run --locked 0 --harvest-pid "$claimant" > "$home/stdout" 2> "$home/stderr" || rc=$?
+    fi
+    [ "$rc" -eq 0 ] || fail "inline $mode did not publish or deliver its fallback"
+    assert_grep 'MISSING: inline fixture' "$home/state/.startup-network.report" "inline $mode discarded the report"
+    assert_absent "$home/state/.startup-network.lock" "inline $mode retained its publication lock"
+    if [ "$mode" = printed ]; then
+      [ "$(grep -c 'MISSING: inline fixture' "$home/stdout")" -eq 1 ] || fail 'inline result was not printed exactly once'
+      [ -f "$home/state/.startup-network.delivered" ] || fail 'inline result was not acknowledged'
+      [ ! -s "$home/state/.wake-queue" ] || fail 'acknowledged inline result also woke the session'
+    else
+      [ ! -f "$home/state/.startup-network.delivered" ] || fail "inline $mode incorrectly acknowledged delivery"
+      [ "$(grep -c $'check\tstartup-network' "$home/state/.wake-queue")" -eq 1 ] || fail "inline $mode did not queue exactly one fallback"
+    fi
+    if [ "$mode" = failed-ack ]; then chmod 700 "$home/state/.startup-network.delivered"; fi
+  done
+
+  rc=0
+  run_stage "$home" "$root" harvest --pid '' >&- 2> "$home/harvest-stderr" || rc=$?
+  [ "$rc" -ne 0 ] || fail 'ordinary harvest swallowed failed printing'
+  [ ! -f "$home/state/.startup-network.delivered" ] || fail 'ordinary harvest acknowledged failed printing'
+  assert_absent "$home/state/.startup-network.lock" 'ordinary failed harvest retained its publication lock'
+  pass 'fm-startup-network: foreground delivery acknowledges printing before wake fallback, including failed sinks and receipts'
+}
+
 test_wait_fails_without_a_published_stage
 test_start_returns_without_holding_the_callers_stdout
 test_harvest_acknowledgement_suppresses_the_wake_and_no_claim_produces_it
@@ -1207,4 +1251,5 @@ test_the_timing_artifact_cannot_carry_a_command_line_or_forge_records
 test_a_held_publish_lock_cannot_keep_the_worker_alive_past_its_budget
 test_wake_delivery_is_bounded_and_preserves_the_report
 test_failed_wake_append_restores_recovery_state
+test_foreground_inline_delivery_and_fallback
 echo "# fm-startup-network.test.sh: all assertions passed"

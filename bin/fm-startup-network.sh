@@ -61,10 +61,12 @@
 #          names the session-start process
 #          that will try to print the result inline, so the worker can tell
 #          whether a wake is still needed.
-#        fm-startup-network.sh run --locked <0|1>
+#        fm-startup-network.sh run --locked <0|1> [--harvest-pid <pid>]
 #          Run the checks in the foreground and publish the result. This is what
 #          `start` detaches with its private generation reservation; run it
 #          directly to redo the stage by hand from the lock-owning harness.
+#          --harvest-pid prints and acknowledges inline for that live claimant
+#          before the fallback-wake decision, as transient start does.
 #          Exits non-zero when the stage was refused or could not publish,
 #          including a lock a live process still held at its deadline.
 #        fm-startup-network.sh harvest --pid <pid>
@@ -289,7 +291,7 @@ cmd_start() {  # <locked> <harvest-pid>
   # Keep this invocation foreground; the ordinary runner retains all existing
   # stage/publication bounds and unknown-owner refusals.
   if fm_session_lock_transient_codex; then
-    cmd_run "$locked" "" ""
+    cmd_run "$locked" "" "" "$harvest_pid"
     return
   fi
 
@@ -511,6 +513,9 @@ publish() {  # <generation> <state> <phases> <locked> <started> <rc> <output-fil
     return 0
   fi
   state=$(record_result "$generation" "$state" "$phases" "$locked" "$started" "$rc" "$out" "$timings")
+  if [ -n "$harvest_pid" ] && kill -0 "$harvest_pid" 2>/dev/null; then
+    harvest_locked "$harvest_pid" || true
+  fi
   fm_lock_release "$PUBLISH_LOCK"
   await_delivery "$generation" "$state"
 }
@@ -537,9 +542,11 @@ publish_lock_held() {  # <generation> <phases> <locked> <started> <lockdir> <out
   queue_result_wake failed
 }
 
-cmd_run() {  # <locked> <session-generation> <worker-generation>
+cmd_run() {  # <locked> <session-generation> <worker-generation> [<harvest-pid>]
   local locked=$1 lock_pid=$2 generation=$3 phases started budget out rc sweep_locked=0 downgraded=0 internal=0 lease_held=0 timings stage_started stage_deadline
+  local harvest_pid=${4:-}
   local DELIVERY_DEADLINE=
+  case "$harvest_pid" in ''|0*|*[!0-9]*) harvest_pid= ;; esac
   mkdir -p "$STATE" 2>/dev/null || return 1
   started=$(now)
   budget=$(stage_budget)
@@ -689,13 +696,13 @@ print_finished() {  # <state>
     ''|*[!0-9]*) ;;
     *) took=$((finished - started)) ;;
   esac
-  printf 'check run ended after %ss: %s.\n' "$took" "$(phase_label "$phases")"
-  [ "$state" = 'done' ] || printf 'The stage itself did not finish cleanly (%s) - the NETWORK_CHECKS line below names what to rerun.\n' "$state"
+  printf 'check run ended after %ss: %s.\n' "$took" "$(phase_label "$phases")" || return 1
+  [ "$state" = 'done' ] || printf 'The stage itself did not finish cleanly (%s) - the NETWORK_CHECKS line below names what to rerun.\n' "$state" || return 1
   if [ "$report_published" = 0 ]; then
     printf 'NETWORK_CHECKS: could not publish the deferred check report, so %s results are unavailable; rerun %s/bin/fm-startup-network.sh run --locked %s\n' \
       "$(phase_label "$phases")" "$FM_ROOT" "$(status_get locked)"
   elif [ -s "$REPORT_FILE" ]; then
-    cat "$REPORT_FILE"
+    cat "$REPORT_FILE" || return 1
     printf 'These ran AFTER the sections above were composed, so re-read any record a line here names.\n'
   else
     printf '(silent - no problems found)\n'
@@ -745,13 +752,8 @@ print_state() {
   esac
 }
 
-cmd_harvest() {  # <pid>
+harvest_locked() (
   local pid=$1 generation state claim_record claim_generation claim_pid
-  if ! take_lock "$PUBLISH_LOCK" "$(delivery_budget)"; then
-    printf 'NETWORK_CHECKS: the deferred check record is locked by %s, so %s could not be confirmed; read %s/bin/fm-startup-network.sh report once that lock is released\n' \
-      "$(held_by)" "$(phase_label "$(status_get phases)")" "$FM_ROOT"
-    return 1
-  fi
   generation=$(status_get generation)
   # Another session's live claim is left alone; the worker reaps a dead one.
   if [ -f "$CLAIM_FILE" ]; then
@@ -765,14 +767,25 @@ EOF
     fi
   fi
   state=$(status_get state)
-  print_state
+  print_state || return 1
   case "$state" in
-    done|timeout|failed) [ "$(status_get report_published)" = 0 ] || write_atomic "$DELIVERED_FILE" <<EOF || true
+    done|timeout|failed) [ "$(status_get report_published)" = 0 ] || write_atomic "$DELIVERED_FILE" <<EOF || return 1
 delivered
 EOF
       ;;
   esac
+)
+
+cmd_harvest() {  # <pid>
+  local pid=$1 rc=0
+  if ! take_lock "$PUBLISH_LOCK" "$(delivery_budget)"; then
+    printf 'NETWORK_CHECKS: the deferred check record is locked by %s, so %s could not be confirmed; read %s/bin/fm-startup-network.sh report once that lock is released\n' \
+      "$(held_by)" "$(phase_label "$(status_get phases)")" "$FM_ROOT"
+    return 1
+  fi
+  harvest_locked "$pid" || rc=$?
   fm_lock_release "$PUBLISH_LOCK"
+  return "$rc"
 }
 
 cmd_wait() {  # <seconds>
@@ -819,8 +832,8 @@ case "$MODE" in
       exit "$rc"
     }
     ;;
-  run) cmd_run "$LOCKED" "$LOCK_PID" "$GENERATION" || exit $? ;;
-  harvest) cmd_harvest "${HARVEST_PID:-}" ;;
+  run) cmd_run "$LOCKED" "$LOCK_PID" "$GENERATION" "$HARVEST_PID" || exit $? ;;
+  harvest) cmd_harvest "${HARVEST_PID:-}" || exit $? ;;
   report) print_state; print_timings ;;
   wait) cmd_wait "${1:-120}" || exit $? ;;
   -h|--help) usage ;;

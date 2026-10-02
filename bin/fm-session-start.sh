@@ -406,8 +406,7 @@ if [ -z "${FM_SESSION_START_STAGE_FILE:-}" ]; then
       printf '\nFOREGROUND NETWORK CHECKS (transient Codex tool)\n'
       NETWORK_STAGE_LOCKED=1
       [ "$REEMIT" -eq 0 ] || NETWORK_STAGE_LOCKED=0
-      if "$SCRIPT_DIR/fm-startup-network.sh" run --locked "$NETWORK_STAGE_LOCKED"; then
-        "$SCRIPT_DIR/fm-startup-network.sh" harvest --pid "" || true
+      if "$SCRIPT_DIR/fm-startup-network.sh" run --locked "$NETWORK_STAGE_LOCKED" --harvest-pid $$; then
         if [ "$REEMIT" -eq 0 ]; then
           record_session_start_completion "$(sed -n '2p' "$FM_SESSION_START_FOREGROUND_FILE")"
         fi
