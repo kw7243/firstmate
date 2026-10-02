@@ -411,8 +411,11 @@ if [ -z "${FM_SESSION_START_STAGE_FILE:-}" ]; then
           record_session_start_completion "$(sed -n '2p' "$FM_SESSION_START_FOREGROUND_FILE")"
         fi
       else
-        "$SCRIPT_DIR/fm-startup-network.sh" report
-        printf 'SESSION_START_COMPLETION: startup remains incomplete because foreground checks could not finish or publish.\n'
+        fm_run_timed "$SESSION_START_BUDGET" bash -c '
+          "$1" report
+          printf "%s\n" "$2"
+        ' _ "$SCRIPT_DIR/fm-startup-network.sh" \
+          'SESSION_START_COMPLETION: startup remains incomplete because foreground checks could not finish or publish.' || true
       fi
     else
       printf 'SESSION_START_COMPLETION: startup remains incomplete because ownership could not be re-verified before foreground checks.\n'

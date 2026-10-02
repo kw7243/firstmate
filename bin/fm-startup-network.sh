@@ -767,7 +767,7 @@ EOF
     fi
   fi
   state=$(status_get state)
-  print_state || return 1
+  FM_TIMEOUT_MECHANISM_OVERRIDE=bash fm_run_timed "$(seconds_until "$DELIVERY_DEADLINE")" print_state || return 1
   case "$state" in
     done|timeout|failed) [ "$(status_get report_published)" = 0 ] || write_atomic "$DELIVERED_FILE" <<EOF || return 1
 delivered
@@ -778,9 +778,11 @@ EOF
 
 cmd_harvest() {  # <pid>
   local pid=$1 rc=0
-  if ! take_lock "$PUBLISH_LOCK" "$(delivery_budget)"; then
-    printf 'NETWORK_CHECKS: the deferred check record is locked by %s, so %s could not be confirmed; read %s/bin/fm-startup-network.sh report once that lock is released\n' \
-      "$(held_by)" "$(phase_label "$(status_get phases)")" "$FM_ROOT"
+  local DELIVERY_DEADLINE=$(( $(now) + $(delivery_budget) ))
+  if ! take_lock "$PUBLISH_LOCK" "$(seconds_until "$DELIVERY_DEADLINE")"; then
+    fm_run_timed "$(seconds_until "$DELIVERY_DEADLINE")" \
+      printf 'NETWORK_CHECKS: the deferred check record is locked by %s, so %s could not be confirmed; read %s/bin/fm-startup-network.sh report once that lock is released\n' \
+      "$(held_by)" "$(phase_label "$(status_get phases)")" "$FM_ROOT" || true
     return 1
   fi
   harvest_locked "$pid" || rc=$?

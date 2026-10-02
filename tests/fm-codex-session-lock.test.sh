@@ -245,6 +245,7 @@ fi
 printf 'sweep-started\n' >> "$FM_HOME/sweeps"
 sleep "${FM_TEST_SWEEP_SLEEP:-0}"
 printf '%s\n' "${FM_TEST_SWEEP_OUTPUT:-BOOTSTRAP_INFO: fixture completed}"
+[ -z "${FM_TEST_SWEEP_OUTPUT_FILE:-}" ] || cat "$FM_TEST_SWEEP_OUTPUT_FILE"
 STUB
 cp "$TMP_ROOT/foreground-root/bin/fm-inactive-reconcile.sh" "$TMP_ROOT/foreground-root/bin/fm-herdr-session-cleanup.sh"
 chmod +x "$TMP_ROOT/foreground-root/bin/fm-bootstrap.sh" "$TMP_ROOT/foreground-root/bin/fm-inactive-reconcile.sh" "$TMP_ROOT/foreground-root/bin/fm-herdr-session-cleanup.sh"
@@ -341,6 +342,64 @@ for entry in start session-start start-unclaimed; do
   )
 done
 pass 'transient startup acknowledges inline without queue contention and bounds unclaimed fallback delivery'
+
+cat > "$TMP_ROOT/foreground-stalled.sh" <<'TOOL'
+set -eu
+bash "$FM_ROOT_OVERRIDE/bin/fm-lock.sh"
+export FM_SESSION_START_TIMEOUT=2 FM_TEST_SWEEP_OUTPUT_FILE="$FM_HOME/sweep-output"
+if [ "$1" = session-start ]; then
+  export FM_SESSION_START_TIMEOUT=30 FM_STATUS_PRESENTATION_LOCK_TIMEOUT=1
+  mkdir "$FM_HOME/state/.wake-queue.lock"
+  printf '999999999\n' > "$FM_HOME/state/.wake-queue.lock/pid"
+  printf 'foreign-boot/pid:[999999]\n' > "$FM_HOME/state/.wake-queue.lock/pid-namespace"
+fi
+python3 - "$1" $$ <<'PY'
+import os, pathlib, select, signal, subprocess, sys, time
+root = os.environ["FM_ROOT_OVERRIDE"]
+output = os.environ["FM_TEST_SWEEP_OUTPUT_FILE"]
+mode, claimant = sys.argv[1:]
+pathlib.Path(output).write_text("MISSING: stalled foreground fixture\n" * 65536)
+args = ["fm-startup-network.sh", "start", "--locked", "1", "--harvest-pid", claimant] if mode == "start" else ["fm-session-start.sh"]
+process = subprocess.Popen(["bash", f"{root}/bin/{args[0]}", *args[1:]], stdin=subprocess.DEVNULL,
+                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True)
+try:
+    if mode == "session-start":
+        observed = b""
+        deadline = time.monotonic() + 45
+        while b"FOREGROUND NETWORK CHECKS (transient Codex tool)" not in observed:
+            remaining = deadline - time.monotonic()
+            assert remaining > 0 and select.select([process.stdout], [], [], remaining)[0], "local digest did not finish"
+            chunk = os.read(process.stdout.fileno(), 4096)
+            assert chunk, observed.decode(errors="replace")
+            observed += chunk
+    result = process.wait(timeout=75 if mode == "session-start" else 10)
+    assert result == 0, (mode, result, os.read(process.stdout.fileno(), 8192).decode(errors="replace"))
+finally:
+    if process.poll() is None:
+        os.killpg(process.pid, signal.SIGKILL)
+        process.wait()
+    process.stdout.close()
+PY
+[ ! -e "$FM_HOME/state/.lock.acquire" ]
+[ ! -e "$FM_HOME/state/.startup-network.lock" ]
+[ ! -f "$FM_HOME/state/.startup-network.delivered" ]
+[ "$(grep -c 'MISSING: stalled foreground fixture' "$FM_HOME/state/.startup-network.report")" -eq 65536 ]
+if [ "$1" = session-start ]; then
+  [ ! -f "$FM_HOME/state/.session-start-complete" ]
+  grep -q 'wake delivery failed' "$FM_HOME/state/.startup-network.report"
+  grep -qx 'foreign-boot/pid:\[999999\]' "$FM_HOME/state/.wake-queue.lock/pid-namespace"
+else
+  [ "$(grep -c 'startup-network' "$FM_HOME/state/.wake-queue")" -eq 1 ]
+fi
+TOOL
+for entry in start session-start; do
+  (
+    export FM_HOME="$TMP_ROOT/foreground-stalled-$entry" FM_ROOT_OVERRIDE="$TMP_ROOT/foreground-root"
+    run_tool "$first" "$TMP_ROOT/foreground-stalled.sh" "$entry" > "$TMP_ROOT/foreground-stalled-$entry.out" 2>&1 \
+      || fail "foreground $entry stalled output did not settle: $(cat "$TMP_ROOT/foreground-stalled-$entry.out")"
+  )
+done
+pass 'transient startup bounds stalled output, including the automatic report after fallback delivery fails'
 
 cat > "$TMP_ROOT/foreground-truncated.sh" <<'TOOL'
 set -eu
