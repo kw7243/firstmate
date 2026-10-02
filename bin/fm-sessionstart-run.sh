@@ -137,6 +137,10 @@ if [ -z "$SOURCE" ] && [ ! -t 0 ]; then
   ')
 fi
 
+if fm_session_lock_codex_ancestor_pid >/dev/null && ! fm_session_lock_trusted_codex_session_id >/dev/null; then
+  exec "$SCRIPT_DIR/fm-sessionstart-nudge.sh"
+fi
+
 case "$SOURCE" in
   resume|reload|fork)
     exec "$SCRIPT_DIR/fm-sessionstart-nudge.sh"

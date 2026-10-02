@@ -292,6 +292,13 @@ stage() {  # <stage-name>: breadcrumb for the parent's truncation banner
 # shellcheck source=bin/fm-session-lock-lib.sh
 . "$SCRIPT_DIR/fm-session-lock-lib.sh"
 
+SESSION_START_BUDGET=${FM_SESSION_START_TIMEOUT:-120}
+# A non-positive or non-numeric budget is not a budget (`timeout 0` disables
+# the deadline outright), so an unusable value falls back to the default
+# rather than silently removing the bound.
+case "$SESSION_START_BUDGET" in ''|*[!0-9]*) SESSION_START_BUDGET=120 ;; esac
+[ "$SESSION_START_BUDGET" -gt 0 ] 2>/dev/null || SESSION_START_BUDGET=120
+
 # The baseline describes instructions this true session started with, not the
 # most recently emitted instructions. It is intentionally immutable for this
 # lock owner: every later stale-context rebuild needs the current file again.
@@ -321,13 +328,44 @@ record_session_start_completion() {  # <agents-hash>
     COMPLETION_RECORDED=1
   else
     [ -z "$COMPLETION_TMP" ] || rm -f "$COMPLETION_TMP" 2>/dev/null || true
-    printf '\nSESSION_START_COMPLETION: not recorded - the next clear or compact will run a full startup.\n'
+    fm_run_timed "$SESSION_START_BUDGET" printf '\nSESSION_START_COMPLETION: not recorded - the next clear or compact will run a full startup.\n' || true
   fi
   if [ "$SESSION_SOURCE" = startup ] && [ "$COMPLETION_RECORDED" -eq 1 ] && [ -n "$AGENTS_START_HASH" ]; then
     if ! write_agents_baseline "$COMPLETION_PID" "$AGENTS_START_HASH"; then
-      printf '\nSESSION_START_AGENTS_BASELINE: not recorded - a later supported rebuild will re-emit AGENTS.md.\n'
+      fm_run_timed "$SESSION_START_BUDGET" printf '\nSESSION_START_AGENTS_BASELINE: not recorded - a later supported rebuild will re-emit AGENTS.md.\n' || true
     fi
   fi
+}
+
+print_startup_truncation() {
+  local SESSION_START_LAST_STAGE SESSION_START_PENDING BAR
+  SESSION_START_LAST_STAGE=$(cat "$SESSION_START_STAGE_FILE" 2>/dev/null) || SESSION_START_LAST_STAGE=
+  [ -n "$SESSION_START_LAST_STAGE" ] || SESSION_START_LAST_STAGE=unknown
+  SESSION_START_PENDING=$(
+    printf '%s\n' "$SESSION_START_STAGES" | tr ' ' '\n' |
+      awk -v from="$SESSION_START_LAST_STAGE" '$0 == from {seen = 1} seen' | tr '\n' ' '
+  )
+  [ -n "${SESSION_START_PENDING# }" ] || SESSION_START_PENDING='(unknown - the digest may be incomplete anywhere)'
+  BAR='●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+  printf '\n%s\n' "$BAR"
+  if [ "$SESSION_START_RC" -eq 124 ]; then
+    printf '●  STARTUP TRUNCATED - SESSION START HIT ITS %ss RUNTIME BOUND\n' "$SESSION_START_BUDGET"
+  else
+    printf '●  STARTUP TRUNCATED - SESSION START DIED UNEXPECTEDLY (exit %s, not its runtime bound)\n' "$SESSION_START_RC"
+  fi
+  printf '●  It stopped during the "%s" stage, so everything above is COMPLETE\n' "$SESSION_START_LAST_STAGE"
+  printf '●  only up to that point.\n'
+  printf '●  RECONCILE these stages before acting on anything they would have shown:\n'
+  printf '●    %s\n' "${SESSION_START_PENDING% }"
+  printf '●  Rerun bin/fm-session-start.sh now to finish taking the helm. If it truncates\n'
+  if [ "$SESSION_START_RC" -eq 124 ]; then
+    printf '●  again, raise FM_SESSION_START_TIMEOUT and report the slow stage - a stage that\n'
+    printf '●  cannot finish inside the bound is a fleet problem, not a reporting detail.\n'
+  else
+    printf '●  again, report the exit status and the stage - raising the runtime bound\n'
+    printf '●  cannot help a digest that died, and a stage that dies is a fleet problem.\n'
+  fi
+  printf '%s\n' "$BAR"
 }
 
 if [ -z "${FM_SESSION_START_STAGE_FILE:-}" ]; then
@@ -336,12 +374,6 @@ if [ -z "${FM_SESSION_START_STAGE_FILE:-}" ]; then
     FM_SESSION_START_FOREGROUND_FILE=$(mktemp "${TMPDIR:-/tmp}/fm-session-start-foreground.XXXXXX" 2>/dev/null) || FM_SESSION_START_FOREGROUND_FILE=
   fi
   export FM_SESSION_START_FOREGROUND_FILE
-  SESSION_START_BUDGET=${FM_SESSION_START_TIMEOUT:-120}
-  # A non-positive or non-numeric budget is not a budget (`timeout 0` disables
-  # the deadline outright), so an unusable value falls back to the default
-  # rather than silently removing the bound.
-  case "$SESSION_START_BUDGET" in ''|*[!0-9]*) SESSION_START_BUDGET=120 ;; esac
-  [ "$SESSION_START_BUDGET" -gt 0 ] 2>/dev/null || SESSION_START_BUDGET=120
   SESSION_START_STAGE_FILE=$(mktemp "${TMPDIR:-/tmp}/fm-session-start-stage.XXXXXX" 2>/dev/null) || SESSION_START_STAGE_FILE=
   if [ -z "$SESSION_START_STAGE_FILE" ]; then
     # Without a breadcrumb the bound still holds; only the banner's precision
@@ -373,37 +405,11 @@ if [ -z "${FM_SESSION_START_STAGE_FILE:-}" ]; then
   # other status means the child died or was killed mid-stage, which truncates
   # silently when unbanned - the parent must banner it, never exit 0 around it.
   if [ "$SESSION_START_RC" -ne 0 ]; then
-    SESSION_START_LAST_STAGE=$(cat "$SESSION_START_STAGE_FILE" 2>/dev/null) || SESSION_START_LAST_STAGE=
-    [ -n "$SESSION_START_LAST_STAGE" ] || SESSION_START_LAST_STAGE=unknown
-    SESSION_START_PENDING=$(
-      printf '%s\n' "$SESSION_START_STAGES" | tr ' ' '\n' |
-        awk -v from="$SESSION_START_LAST_STAGE" '$0 == from {seen = 1} seen' | tr '\n' ' '
-    )
-    [ -n "${SESSION_START_PENDING# }" ] || SESSION_START_PENDING='(unknown - the digest may be incomplete anywhere)'
-    BAR='●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-    printf '\n%s\n' "$BAR"
-    if [ "$SESSION_START_RC" -eq 124 ]; then
-      printf '●  STARTUP TRUNCATED - SESSION START HIT ITS %ss RUNTIME BOUND\n' "$SESSION_START_BUDGET"
-    else
-      printf '●  STARTUP TRUNCATED - SESSION START DIED UNEXPECTEDLY (exit %s, not its runtime bound)\n' "$SESSION_START_RC"
-    fi
-    printf '●  It stopped during the "%s" stage, so everything above is COMPLETE\n' "$SESSION_START_LAST_STAGE"
-    printf '●  only up to that point.\n'
-    printf '●  RECONCILE these stages before acting on anything they would have shown:\n'
-    printf '●    %s\n' "${SESSION_START_PENDING% }"
-    printf '●  Rerun bin/fm-session-start.sh now to finish taking the helm. If it truncates\n'
-    if [ "$SESSION_START_RC" -eq 124 ]; then
-      printf '●  again, raise FM_SESSION_START_TIMEOUT and report the slow stage - a stage that\n'
-      printf '●  cannot finish inside the bound is a fleet problem, not a reporting detail.\n'
-    else
-      printf '●  again, report the exit status and the stage - raising the runtime bound\n'
-      printf '●  cannot help a digest that died, and a stage that dies is a fleet problem.\n'
-    fi
-    printf '%s\n' "$BAR"
+    FM_TIMEOUT_MECHANISM_OVERRIDE=bash fm_run_timed "$SESSION_START_BUDGET" print_startup_truncation || true
   fi
   if [ "$SESSION_START_RC" -eq 0 ] && [ -n "$FM_SESSION_START_FOREGROUND_FILE" ] && [ -s "$FM_SESSION_START_FOREGROUND_FILE" ]; then
     if fm_session_lock_owned_by_self "$STATE"; then
-      printf '\nFOREGROUND NETWORK CHECKS (transient Codex tool)\n'
+      fm_run_timed "$SESSION_START_BUDGET" printf '\nFOREGROUND NETWORK CHECKS (transient Codex tool)\n' || true
       NETWORK_STAGE_LOCKED=1
       [ "$REEMIT" -eq 0 ] || NETWORK_STAGE_LOCKED=0
       if "$SCRIPT_DIR/fm-startup-network.sh" run --locked "$NETWORK_STAGE_LOCKED" --harvest-pid $$; then
@@ -418,7 +424,7 @@ if [ -z "${FM_SESSION_START_STAGE_FILE:-}" ]; then
           'SESSION_START_COMPLETION: startup remains incomplete because foreground checks could not finish or publish.' || true
       fi
     else
-      printf 'SESSION_START_COMPLETION: startup remains incomplete because ownership could not be re-verified before foreground checks.\n'
+      fm_run_timed "$SESSION_START_BUDGET" printf 'SESSION_START_COMPLETION: startup remains incomplete because ownership could not be re-verified before foreground checks.\n' || true
     fi
   fi
   rm -f "$SESSION_START_STAGE_FILE" 2>/dev/null || true

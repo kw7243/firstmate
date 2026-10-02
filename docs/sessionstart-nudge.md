@@ -26,8 +26,8 @@ The tier is a property of the harness surface, not of the home.
 
 | Tier | What the adapter does | Used by |
 | --- | --- | --- |
-| Run | Executes `bin/fm-session-start.sh` through the native session-open adapter and gates its ordered digest into model context before the first turn. | Claude, `codex exec`, Pi / pi-signed, omp, Cursor |
-| Nudge | Asks the agent to run the digest through the native adapter or the tracked session-start instruction. | Grok, OpenCode, and run-tier sources routed to the nudge |
+| Run | Executes `bin/fm-session-start.sh` through the native session-open adapter and gates its ordered digest into model context before the first turn. | Claude, verified `codex exec` contexts, Pi / pi-signed, omp, Cursor |
+| Nudge | Asks the agent to run the digest through the native adapter or the tracked session-start instruction. | Grok, OpenCode, and run-tier contexts routed to the nudge |
 
 Codex's interactive TUI has no tracked session-open, compaction, or re-emit channel and is not covered by either tier.
 
@@ -36,7 +36,7 @@ Codex's interactive TUI has no tracked session-open, compaction, or re-emit chan
 | Harness surface | Tier | Details |
 | --- | --- | --- |
 | Claude | Run | [Claude](#claude) |
-| Codex exec | Run | [Codex exec](#codex-exec) |
+| Codex exec | Run or nudge | [Codex exec](#codex-exec) |
 | Codex interactive TUI | Uncovered | [Codex interactive TUI](#codex-interactive-tui) |
 | Pi / pi-signed | Run | [Pi and pi-signed](#pi-and-pi-signed) |
 | OpenCode | Nudge | [OpenCode](#opencode) |
@@ -62,6 +62,8 @@ The run wrapper learns the source in one of two ways:
 
 - It takes `--source <name>` when the adapter knows the source natively.
 - Otherwise it reads the `source` field from a Claude/Codex-shaped JSON hook payload on stdin.
+
+Linux Codex contexts without verified thread identity use [the ownership deferral](#codex-ownership-recovery) before this source routing.
 
 A re-emit (`--reemit`) reprints the digest for a process that already has the helm and lost only its context.
 
@@ -138,8 +140,9 @@ For existing claims and identity failures, see [Codex ownership recovery](#codex
 
 The Linux Codex ownership check reads the thread identity from the initial environment at the native tool boundary and requires the caller's identity to agree.
 The session-open wrapper reads the hook payload's `source`; it does not accept its `session_id` as ownership proof.
-These are separate inputs: a successful native tool call does not establish that a failing hook received the same identity or process ancestry.
-A hook that cannot prove ownership remains read-only, and its native tool retry still needs to pass the shared ownership check.
+When a known Linux Codex context lacks verified thread identity, the run wrapper delegates to the existing operational nudge instead of attempting the digest in that context.
+This applies to every session-open source, including clear and compact, even when a session sidecar already exists.
+The instructed native tool call must still pass the unchanged ownership check; the nudge grants no ownership and direct lock acquisition without proof still refuses.
 
 The existing acquisition and foreground-check commands support recovery when their recorded owner can be classified in its original process namespace.
 The shared claim-lock helper serializes replacement of a dead claim; the startup worker also checks its recorded process birth before replacing a running record.
@@ -259,7 +262,7 @@ Native stdout context injection is supported.
 
 ### Codex exec
 
-Codex exec is a run-tier harness.
+Codex exec uses the run wrapper, with [ownership-based deferral](#codex-ownership-recovery) on Linux.
 The `.codex/hooks.json` transport does three things:
 
 1. It anchors to the hook process working directory.

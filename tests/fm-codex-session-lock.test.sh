@@ -401,6 +401,95 @@ for entry in start session-start; do
 done
 pass 'transient startup bounds stalled output, including the automatic report after fallback delivery fails'
 
+cp -a "$TMP_ROOT/foreground-root" "$TMP_ROOT/outer-output-root"
+cp "$ROOT/bin/fm-session-start.sh" "$TMP_ROOT/outer-output-root/bin/outer-session-start.sh"
+rm "$TMP_ROOT/outer-output-root/bin/fm-session-start.sh" "$TMP_ROOT/outer-output-root/bin/fm-startup-network.sh"
+cat > "$TMP_ROOT/outer-output-root/bin/fm-session-start.sh" <<'STUB'
+#!/usr/bin/env bash
+set -eu
+printf '%s\n%s\n' "$FM_SESSION_START_STAGE_FILE" "$FM_SESSION_START_FOREGROUND_FILE" > "$FM_HOME/temporary-paths"
+python3 - <<'PY'
+import os
+os.set_blocking(1, False)
+try:
+    while True:
+        os.write(1, b"x" * 4096)
+except BlockingIOError:
+    pass
+finally:
+    os.set_blocking(1, True)
+PY
+case "$FM_TEST_OUTER_OUTPUT" in
+  ownership) rm "$FM_HOME/state/.lock-session" ;;
+  completion)
+    mkdir "$FM_HOME/state/.session-start-complete"
+    chmod 500 "$FM_HOME/state/.session-start-complete"
+    ;;
+  baseline)
+    mkdir "$FM_HOME/state/.session-start-agents-baseline"
+    chmod 500 "$FM_HOME/state/.session-start-agents-baseline"
+    ;;
+  truncated)
+    printf 'context\n' > "$FM_SESSION_START_STAGE_FILE"
+    exit 124
+    ;;
+esac
+printf 'ready\nfixture-hash\n' > "$FM_SESSION_START_FOREGROUND_FILE"
+STUB
+cat > "$TMP_ROOT/outer-output-root/bin/fm-startup-network.sh" <<'STUB'
+#!/usr/bin/env bash
+printf 'network invoked\n' > "$FM_HOME/network-invoked"
+STUB
+chmod +x "$TMP_ROOT/outer-output-root/bin/fm-session-start.sh" "$TMP_ROOT/outer-output-root/bin/fm-startup-network.sh"
+cat > "$TMP_ROOT/outer-output.sh" <<'TOOL'
+set -eu
+bash "$FM_ROOT_OVERRIDE/bin/fm-lock.sh"
+export FM_TEST_OUTER_OUTPUT=$1 FM_SESSION_START_TIMEOUT=1
+python3 - <<'PY'
+import os, signal, subprocess
+process = subprocess.Popen(["bash", os.environ["FM_ROOT_OVERRIDE"] + "/bin/outer-session-start.sh", "--source", "startup"],
+                           stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True)
+try:
+    assert process.wait(timeout=8) == 0
+finally:
+    if process.poll() is None:
+        os.killpg(process.pid, signal.SIGKILL)
+        process.wait()
+    process.stdout.close()
+PY
+while IFS= read -r temporary; do
+  [ ! -e "$temporary" ]
+done < "$FM_HOME/temporary-paths"
+case "$1" in
+  ownership|truncated)
+    [ ! -e "$FM_HOME/network-invoked" ]
+    [ ! -f "$FM_HOME/state/.session-start-complete" ]
+    ;;
+  completion)
+    [ -f "$FM_HOME/network-invoked" ]
+    [ ! -f "$FM_HOME/state/.session-start-complete" ]
+    ;;
+  baseline)
+    [ -f "$FM_HOME/network-invoked" ]
+    [ -f "$FM_HOME/state/.session-start-complete" ]
+    [ ! -f "$FM_HOME/state/.session-start-agents-baseline" ]
+    ;;
+  header)
+    [ -f "$FM_HOME/network-invoked" ]
+    [ -f "$FM_HOME/state/.session-start-complete" ]
+    [ -f "$FM_HOME/state/.session-start-agents-baseline" ]
+    ;;
+esac
+TOOL
+for entry in header ownership completion baseline truncated; do
+  (
+    export FM_HOME="$TMP_ROOT/outer-output-$entry" FM_ROOT_OVERRIDE="$TMP_ROOT/outer-output-root"
+    run_tool "$first" "$TMP_ROOT/outer-output.sh" "$entry" > "$TMP_ROOT/outer-output-$entry.out" 2>&1 \
+      || fail "outer $entry output blocked cleanup: $(cat "$TMP_ROOT/outer-output-$entry.out")"
+  )
+done
+pass 'outer startup output stays bounded with no draining before the header, and parent cleanup completes'
+
 cat > "$TMP_ROOT/foreground-truncated.sh" <<'TOOL'
 set -eu
 FM_SESSION_START_TIMEOUT=10 FM_TEST_LOCAL_SLEEP=20 \

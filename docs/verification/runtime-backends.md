@@ -2476,7 +2476,12 @@ The original transient invocation left a running record and acquisition claim af
 The corrected native full startup and repeat entry completed with self ownership, a completion marker, and no acquisition claim; a separate slow-stage native check published its timeout and released its claim before returning.
 `tests/fm-codex-session-lock.test.sh` covers the corresponding foreground, truncated-digest, unknown-worker, and foreign-claim refusal paths with portable process fixtures.
 This proof covers prevention of abandoned transient startup workers; recovery of an existing foreign-namespace claim remains unverified.
-The failed hook's initial environment and ancestry were not captured, so the native-tool result does not establish hook identity provenance or resolve wrapped harness detection.
-Those recovery and hook questions remain open and require a bounded observation from the affected native, host, and actual hook contexts before changing the ownership rule.
+A subsequent authorized observation captured the actual failing hook on 2026-10-02: its caller had no thread marker, and all nine ancestors through the shared Codex process had empty initial thread-marker lists.
+The contemporaneous native and host controls both passed the production identity check with the same thread hash.
+The temporary failure-only diagnostic was removed afterward, with rollback reporting `result=reverted`, `exact_preimage=true`, and `observed=true`.
+This establishes why that hook could not prove thread ownership; it does not authorize substituting its payload or the shared server's environment for native proof.
+`tests/fm-sessionstart-nudge.test.sh` covers deferral of missing or mismatched Codex proof to the existing nudge across all sources, preservation of existing ownership records, direct-lock refusal, and normal routing with verified native proof.
+That portable process fixture checks the wrapper behavior; it is not a second live hook experiment.
+Recovery of the existing foreign-namespace claim still requires positive owner-lifetime evidence or a separately approved operator action.
 [Codex ownership recovery](../sessionstart-nudge.md#codex-ownership-recovery) owns the supported recovery boundary and the source-based assessment of secondmate restarts.
 Non-Linux Codex and the other harnesses retain their existing persistent-process startup path.
