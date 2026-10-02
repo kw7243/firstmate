@@ -1121,6 +1121,64 @@ EOF
   pass "fm-startup-network: a held publish lock ends the worker inside its budget with a failed-rerun record"
 }
 
+test_wake_delivery_is_bounded_and_preserves_the_report() {
+  local rec home root log lock_name publish_blocked rc began took
+  for lock_name in .wake-queue.lock .watcher-down.lock; do
+    for publish_blocked in 0 1; do
+      rec=$(new_world "wake-bound-$lock_name-$publish_blocked")
+      IFS='|' read -r home root log <<EOF
+$rec
+EOF
+      mkdir "$home/state/$lock_name"
+      printf '999999999\n' > "$home/state/$lock_name/pid"
+      printf 'foreign-boot/pid:[999999]\n' > "$home/state/$lock_name/pid-namespace"
+      if [ "$publish_blocked" -eq 1 ]; then
+        mkdir "$home/state/.startup-network.lock"
+        cp "$home/state/$lock_name/pid" "$home/state/.startup-network.lock/pid"
+        cp "$home/state/$lock_name/pid-namespace" "$home/state/.startup-network.lock/pid-namespace"
+      fi
+      began=$(date +%s)
+      rc=0
+      fm_run_timed 12 env PATH="$root/bin:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$root" \
+        FM_STARTUP_NETWORK_TIMEOUT=2 FM_SESSION_START_TIMEOUT=2 FM_FAKE_BOOTSTRAP_LOG="$log" \
+        FM_FAKE_BOOTSTRAP_OUT='retained finding' \
+        "$root/bin/fm-startup-network.sh" run --locked 0 > "$home/out" 2>&1 || rc=$?
+      took=$(( $(date +%s) - began ))
+      [ "$rc" -ne 124 ] && [ "$rc" -ne 0 ] || fail "blocked wake delivery did not return failure: $lock_name/$publish_blocked"
+      [ "$took" -le 8 ] || fail "blocked wake delivery outlived its budgets: ${took}s"
+      assert_grep 'wake delivery failed within its budget' "$home/state/.startup-network.report" 'wake delivery failure was not retained'
+      if [ "$publish_blocked" -eq 0 ]; then
+        assert_grep 'retained finding' "$home/state/.startup-network.report" 'blocked wake delivery discarded the finding'
+        assert_absent "$home/state/.startup-network.lock" 'blocked delivery retained its publication lock'
+      fi
+      if [ "$lock_name" = .watcher-down.lock ]; then
+        assert_absent "$home/state/.wake-queue.lock" 'blocked marker retained its wake lock'
+      fi
+      assert_grep 'foreign-boot' "$home/state/$lock_name/pid-namespace" 'blocked delivery altered the foreign owner'
+    done
+  done
+  pass 'fm-startup-network: all wake publication locks are bounded and findings survive delivery failure'
+}
+
+test_failed_wake_append_restores_recovery_state() {
+  local rec home root log rc=0
+  rec=$(new_world wake-write-failure)
+  IFS='|' read -r home root log <<EOF
+$rec
+EOF
+  mkdir "$home/state/.wake-queue"
+  printf 'announced:downtime:original-generation\n' > "$home/state/.watcher-down"
+  FM_SESSION_START_TIMEOUT=2 FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_OUT='retained finding' \
+    run_stage "$home" "$root" run --locked 0 > "$home/out" 2>&1 || rc=$?
+  [ "$rc" -ne 0 ] || fail 'failed wake append reported success'
+  [ "$(cat "$home/state/.watcher-down")" = announced:downtime:original-generation ] || fail 'failed wake append changed recovery state'
+  assert_grep 'retained finding' "$home/state/.startup-network.report" 'failed wake append discarded report'
+  assert_absent "$home/state/.wake-queue.lock" 'failed wake append retained queue lock'
+  assert_absent "$home/state/.watcher-down.lock" 'failed wake append retained recovery lock'
+  assert_absent "$home/state/.startup-network.lock" 'failed wake append retained publication lock'
+  pass 'fm-startup-network: failed bounded append restores recovery state and releases owned locks'
+}
+
 test_wait_fails_without_a_published_stage
 test_start_returns_without_holding_the_callers_stdout
 test_harvest_acknowledgement_suppresses_the_wake_and_no_claim_produces_it
@@ -1147,4 +1205,6 @@ test_timings_are_published_and_only_the_on_demand_report_prints_them
 test_a_bounded_run_still_publishes_the_timings_it_managed_to_record
 test_the_timing_artifact_cannot_carry_a_command_line_or_forge_records
 test_a_held_publish_lock_cannot_keep_the_worker_alive_past_its_budget
+test_wake_delivery_is_bounded_and_preserves_the_report
+test_failed_wake_append_restores_recovery_state
 echo "# fm-startup-network.test.sh: all assertions passed"

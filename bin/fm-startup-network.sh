@@ -402,16 +402,26 @@ report_requires_wake() {  # <state>
 }
 
 queue_result_wake() {  # <state>
-  fm_wake_append check startup-network \
-    "check: startup-network: deferred startup network checks finished ($1); read them with $FM_ROOT/bin/fm-startup-network.sh report" \
-    || true
+  local rc=0
+  if take_lock "$FM_WAKE_QUEUE_LOCK" "$(seconds_until "$DELIVERY_DEADLINE")"; then
+    fm_wake_append_locked check startup-network \
+      "check: startup-network: deferred startup network checks finished ($1); read them with $FM_ROOT/bin/fm-startup-network.sh report" \
+      "$(seconds_until "$DELIVERY_DEADLINE")" || rc=$?
+    fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+  else
+    rc=1
+  fi
+  if [ "$rc" -ne 0 ]; then
+    printf 'NETWORK_CHECKS: wake delivery failed within its budget; the retained result is available through %s/bin/fm-startup-network.sh report\n' "$FM_ROOT" >> "$REPORT_FILE"
+  fi
+  return "$rc"
 }
 
 # Bounded by DELIVERY_DEADLINE, which publish() sets from the delivery budget.
 # Once the deadline passes, a still-live claimant is no longer waited for: the
 # wake decision is made as if it were gone, exactly as the old iteration cap did.
 await_delivery() {  # <generation> <state>
-  local generation=$1 state=$2 claim_record claim_generation claim_pid claim_live
+  local generation=$1 state=$2 claim_record claim_generation claim_pid claim_live rc
   while :; do
     claim_live=0
     if ! take_lock "$PUBLISH_LOCK" "$(seconds_until "$DELIVERY_DEADLINE")"; then
@@ -443,9 +453,12 @@ EOF
       [ "$claim_live" -eq 1 ] || rm -f "$CLAIM_FILE" 2>/dev/null || true
     fi
     if [ "$claim_live" -eq 0 ]; then
-      ! report_requires_wake "$state" || queue_result_wake "$state"
+      rc=0
+      if report_requires_wake "$state"; then
+        queue_result_wake "$state" || rc=$?
+      fi
       fm_lock_release "$PUBLISH_LOCK"
-      return 0
+      return "$rc"
     fi
     fm_lock_release "$PUBLISH_LOCK"
     sleep 0.1
@@ -513,6 +526,7 @@ publish() {  # <generation> <state> <phases> <locked> <started> <rc> <output-fil
 # than a failure nobody is woken for.
 publish_lock_held() {  # <generation> <phases> <locked> <started> <lockdir> <output-file> <timing-file>
   local generation=$1 phases=$2 locked=$3 started=$4 lockdir=$5 out=$6 timings=${7:-}
+  DELIVERY_DEADLINE=${DELIVERY_DEADLINE:-$(( $(now) + $(delivery_budget) ))}
   printf 'NETWORK_CHECKS: the deferred check worker gave up because %s was still held by %s at its deadline, so %s may be incomplete; rerun %s/bin/fm-startup-network.sh run --locked %s once that lock is released\n' \
     "$lockdir" "$(held_by)" "$(phase_label "$phases")" "$FM_ROOT" "$locked" >> "$out"
   if [ "$(status_get generation)" != "$generation" ] \
@@ -525,6 +539,7 @@ publish_lock_held() {  # <generation> <phases> <locked> <started> <lockdir> <out
 
 cmd_run() {  # <locked> <session-generation> <worker-generation>
   local locked=$1 lock_pid=$2 generation=$3 phases started budget out rc sweep_locked=0 downgraded=0 internal=0 lease_held=0 timings stage_started stage_deadline
+  local DELIVERY_DEADLINE=
   mkdir -p "$STATE" 2>/dev/null || return 1
   started=$(now)
   budget=$(stage_budget)

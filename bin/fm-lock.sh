@@ -170,13 +170,22 @@ publish_lock_session_or_die() {
 # prior-session-sweep-is-finishing refusal is a takeover rule and does not
 # apply here.
 confirm_own_lock() {
-  local recorded waited=0
+  local recorded waited=0 claim_identity
+  local -a claim_stat=(stat -c '%d:%i')
+  [ "$_FM_UNAME" != Darwin ] || claim_stat=(/usr/bin/stat -f '%d:%i')
   if [ "$CLAIM_LOCK_HELD" -ne 1 ]; then
     while ! fm_lock_try_acquire "$CLAIM_LOCK"; do
       # Waiting cannot make a foreign namespace observable. Preserve its claim
       # and report uncertainty instead of consuming the whole startup deadline.
-      if [ -e "$CLAIM_LOCK" ] || [ -L "$CLAIM_LOCK" ]; then
-        fm_lock_same_namespace "$CLAIM_LOCK" || refuse_uncertain_owner
+      claim_identity=$("${claim_stat[@]}" "$CLAIM_LOCK" 2>/dev/null || true)
+      if ! fm_lock_same_namespace "$CLAIM_LOCK" \
+        && [ -n "$claim_identity" ] \
+        && [ "$claim_identity" = "$("${claim_stat[@]}" "$CLAIM_LOCK" 2>/dev/null || true)" ]; then
+        if [ "$_FM_UNAME" = Linux ] && [ ! -e "$CLAIM_LOCK/pid-namespace" ]; then
+          fm_lock_acquire_wait_max "$CLAIM_LOCK" 10 || refuse_uncertain_owner
+          break
+        fi
+        refuse_uncertain_owner
       fi
       sleep 0.1
     done

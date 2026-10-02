@@ -815,10 +815,14 @@ _fm_recovery_marker_restore_token_locked() {
 }
 
 _fm_wake_append_recovery_restore_locked() {
-  local marker="$STATE/.watcher-down" lock previous=$FM_WAKE_APPEND_RECOVERY_PREVIOUS_TOKEN
+  local marker="$STATE/.watcher-down" lock previous=$FM_WAKE_APPEND_RECOVERY_PREVIOUS_TOKEN bound=${1:-}
   [ -n "$previous" ] || return 0
   lock="${marker}.lock"
-  fm_lock_acquire_wait "$lock" || return 1
+  if [ -n "$bound" ]; then
+    fm_lock_acquire_wait_max "$lock" "$bound" || return 1
+  else
+    fm_lock_acquire_wait "$lock" || return 1
+  fi
   if ! fm_recovery_marker_read "$marker" \
     || [ "$FM_RECOVERY_MARKER_TOKEN" != "$FM_WAKE_APPEND_RECOVERY_PUBLISHED_TOKEN" ]; then
     fm_lock_release "$lock"
@@ -2057,7 +2061,7 @@ fm_wake_append() {
   return "$status"
 }
 
-# fm_wake_append_locked <kind> <key> <payload>
+# fm_wake_append_locked <kind> <key> <payload> [<lock-budget-seconds>]
 # Locked core of fm_wake_append: appends the wake row under an already-held
 # FM_WAKE_QUEUE_LOCK. Callers that must commit another durable record atomically
 # with the append (holding this lock excludes the drain's acknowledgement, which
@@ -2065,7 +2069,11 @@ fm_wake_append() {
 # their own write, then release.
 fm_wake_append_locked() {
   local kind=$1 key=$2 payload=$3 clean_key clean_payload epoch seq seq_file status
-  local recovery_marker
+  local recovery_marker bound=${4:-} deadline
+  if [ -n "$bound" ]; then
+    case "$bound" in *[!0-9]*|0) return 2 ;; esac
+    deadline=$((SECONDS + bound))
+  fi
   case "$kind" in
     signal|stale|check|heartbeat) ;;
     *) printf 'fm_wake_append: invalid wake kind: %s\n' "$kind" >&2; return 2 ;;
@@ -2078,7 +2086,7 @@ fm_wake_append_locked() {
   recovery_marker="$STATE/.watcher-down"
   status=0
 
-  _fm_recovery_marker_publish "$recovery_marker" downtime "" append || status=$?
+  _fm_recovery_marker_publish "$recovery_marker" downtime "$bound" append || status=$?
   if [ "$status" -eq 0 ]; then
     seq=$(cat "$seq_file" 2>/dev/null || echo 0)
     case "$seq" in
@@ -2091,7 +2099,11 @@ fm_wake_append_locked() {
     printf '%s\t%s\t%s\t%s\t%s\n' "$epoch" "$seq" "$kind" "$clean_key" "$clean_payload" >> "$FM_WAKE_QUEUE" || status=$?
   fi
   if [ "$status" -ne 0 ]; then
-    _fm_wake_append_recovery_restore_locked || true
+    if [ -n "$bound" ]; then
+      bound=$((deadline - SECONDS))
+      [ "$bound" -ge 0 ] || bound=0
+    fi
+    _fm_wake_append_recovery_restore_locked "$bound" || true
   else
     FM_WAKE_APPEND_RECOVERY_PREVIOUS_TOKEN=
     FM_WAKE_APPEND_RECOVERY_PUBLISHED_TOKEN=

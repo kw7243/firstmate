@@ -132,7 +132,28 @@ The local digest makes no external-network call.
 Persistent hosts run them in a detached worker while the digest is composed.
 A transient Linux Codex tool prints the local digest first, then runs the checks in the foreground before returning, because ending its namespace kills detached descendants too.
 This preserves the existing local-digest and network-stage deadlines without abandoning a worker's acquisition claim.
-An unknown claim from another namespace is preserved and refused promptly; that diagnostic does not recover an already-abandoned claim.
+For existing claims and identity failures, see [Codex ownership recovery](#codex-ownership-recovery).
+
+### Codex ownership recovery
+
+The Linux Codex ownership check reads the thread identity from the initial environment at the native tool boundary and requires the caller's identity to agree.
+The session-open wrapper reads the hook payload's `source`; it does not accept its `session_id` as ownership proof.
+These are separate inputs: a successful native tool call does not establish that a failing hook received the same identity or process ancestry.
+A hook that cannot prove ownership remains read-only, and its native tool retry still needs to pass the shared ownership check.
+
+The existing acquisition and foreground-check commands support recovery when their recorded owner can be classified in its original process namespace.
+The shared claim-lock helper serializes replacement of a dead claim; the startup worker also checks its recorded process birth before replacing a running record.
+Their command headers own the invocation and record formats: [`fm-lock.sh`](../bin/fm-lock.sh) and [`fm-startup-network.sh`](../bin/fm-startup-network.sh).
+Neither a matching session identity nor an old timestamp proves that a sibling sweep finished.
+An unknown foreign-namespace claim or worker record stays intact until positive lifetime evidence is available; bounded refusal is not completed recovery.
+Do not infer death from a PID missing in another namespace or from matching namespace inode numbers alone.
+
+Restarting a secondmate is not a supported repair for this primary ownership failure.
+Each secondmate has its own home and session lock, so replacing its agent does not release the primary's acquisition claim or change the primary hook's identity provenance.
+A secondmate finishing its turn can let a healthy parent sweep finish, but cannot revive a worker whose tool namespace has ended.
+The restart helper refreshes that secondmate's instructions and launch wiring after its persistence acknowledgement; it provides no evidence that the primary's old claim is safe to replace.
+This assessment follows those ownership boundaries, not a live restart experiment.
+The live Codex evidence and its remaining limits are recorded in [runtime backend verification](verification/runtime-backends.md#linux-codex-session-identity).
 
 ### Digest timeout
 

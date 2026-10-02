@@ -2475,5 +2475,8 @@ The fixture keeps checks pending until after the local digest, so the transient 
 The original transient invocation left a running record and acquisition claim after its tool returned, while the same bounded host fixture published its timeout and released its claim.
 The corrected native full startup and repeat entry completed with self ownership, a completion marker, and no acquisition claim; a separate slow-stage native check published its timeout and released its claim before returning.
 `tests/fm-codex-session-lock.test.sh` covers the corresponding foreground, truncated-digest, unknown-worker, and foreign-claim refusal paths with portable process fixtures.
-This proof does not establish safe reclamation of a previously abandoned foreign-namespace claim or repair the separate hook identity and wrapped harness-detection limitations.
+This proof covers prevention of abandoned transient startup workers; recovery of an existing foreign-namespace claim remains unverified.
+The failed hook's initial environment and ancestry were not captured, so the native-tool result does not establish hook identity provenance or resolve wrapped harness detection.
+Those recovery and hook questions remain open and require a bounded observation from the affected native, host, and actual hook contexts before changing the ownership rule.
+[Codex ownership recovery](../sessionstart-nudge.md#codex-ownership-recovery) owns the supported recovery boundary and the source-based assessment of secondmate restarts.
 Non-Linux Codex and the other harnesses retain their existing persistent-process startup path.

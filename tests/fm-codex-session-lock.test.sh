@@ -244,7 +244,7 @@ if [ -n "${FM_TEST_DIGEST_OUTPUT:-}" ]; then
 fi
 printf 'sweep-started\n' >> "$FM_HOME/sweeps"
 sleep "${FM_TEST_SWEEP_SLEEP:-0}"
-printf 'BOOTSTRAP_INFO: fixture completed\n'
+printf '%s\n' "${FM_TEST_SWEEP_OUTPUT:-BOOTSTRAP_INFO: fixture completed}"
 STUB
 cp "$TMP_ROOT/foreground-root/bin/fm-inactive-reconcile.sh" "$TMP_ROOT/foreground-root/bin/fm-herdr-session-cleanup.sh"
 chmod +x "$TMP_ROOT/foreground-root/bin/fm-bootstrap.sh" "$TMP_ROOT/foreground-root/bin/fm-inactive-reconcile.sh" "$TMP_ROOT/foreground-root/bin/fm-herdr-session-cleanup.sh"
@@ -293,6 +293,38 @@ TOOL
     || fail "transient start abandoned its bounded worker: $(cat "$TMP_ROOT/foreground-bound.out")"
 )
 pass 'direct transient start publishes a bounded slow-stage result and releases its claim before returning'
+
+cat > "$TMP_ROOT/foreground-delivery.sh" <<'TOOL'
+set -eu
+bash "$FM_ROOT_OVERRIDE/bin/fm-lock.sh"
+mkdir "$FM_HOME/state/.wake-queue.lock"
+printf '999999999\n' > "$FM_HOME/state/.wake-queue.lock/pid"
+printf 'foreign-boot/pid:[999999]\n' > "$FM_HOME/state/.wake-queue.lock/pid-namespace"
+export FM_TEST_SWEEP_OUTPUT='actionable foreground finding' FM_SESSION_START_TIMEOUT=30 FM_STATUS_PRESENTATION_LOCK_TIMEOUT=1
+rc=0
+if [ "$1" = start ]; then
+  FM_SESSION_START_TIMEOUT=2 timeout 15 bash "$FM_ROOT_OVERRIDE/bin/fm-startup-network.sh" start --locked 1 --harvest-pid $$ > "$FM_HOME/result" 2>&1 || rc=$?
+  [ "$rc" -ne 0 ] && [ "$rc" -ne 124 ]
+else
+  timeout 75 bash "$FM_ROOT_OVERRIDE/bin/fm-session-start.sh" > "$FM_HOME/result" 2>&1 || rc=$?
+  [ "$rc" -eq 0 ]
+  grep -q 'startup remains incomplete' "$FM_HOME/result"
+  [ ! -e "$FM_HOME/state/.session-start-complete" ]
+fi
+grep -q 'actionable foreground finding' "$FM_HOME/state/.startup-network.report"
+grep -q 'wake delivery failed' "$FM_HOME/state/.startup-network.report"
+[ ! -e "$FM_HOME/state/.lock.acquire" ]
+[ ! -e "$FM_HOME/state/.startup-network.lock" ]
+grep -qx 'foreign-boot/pid:\[999999\]' "$FM_HOME/state/.wake-queue.lock/pid-namespace"
+TOOL
+for entry in start session-start; do
+  (
+    export FM_HOME="$TMP_ROOT/foreground-delivery-$entry" FM_ROOT_OVERRIDE="$TMP_ROOT/foreground-root"
+    run_tool "$first" "$TMP_ROOT/foreground-delivery.sh" "$entry" > "$TMP_ROOT/foreground-delivery-$entry.out" 2>&1 \
+      || fail "foreground $entry wake publication failed: $(cat "$TMP_ROOT/foreground-delivery-$entry.out" "$FM_HOME/result")"
+  )
+done
+pass 'both transient startup entries bound wake publication and release owned claims while preserving evidence'
 
 cat > "$TMP_ROOT/foreground-truncated.sh" <<'TOOL'
 set -eu
@@ -365,6 +397,74 @@ TOOL
     || fail "same-session foreign claim was not safely refused: $(cat "$TMP_ROOT/foreign-claim.out")"
 )
 pass 'same-session entry promptly refuses an unverifiable claim without changing ownership, and forged identity remains refused'
+
+mkdir "$TMP_ROOT/race-bin"
+cat > "$TMP_ROOT/race-bin/stat" <<'SH'
+#!/usr/bin/env bash
+"$FM_TEST_REAL_STAT" "$@"
+rc=$?
+if [ "${*: -1}" = "$FM_HOME/state/.lock.acquire" ] && [ "$rc" -eq 0 ] && [ ! -e "$FM_HOME/race-done" ]; then
+  touch "$FM_HOME/race-armed"
+fi
+if [ "${*: -1}" = "$FM_HOME/state/.lock.acquire" ] && [ "${FM_TEST_PARTIAL_CLAIM:-0}" -eq 1 ] && [ -e "$FM_HOME/race-done" ]; then
+  rmdir "$FM_HOME/state/.lock.acquire" 2>/dev/null || true
+fi
+exit "$rc"
+SH
+cat > "$TMP_ROOT/race-bin/cat" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = "$FM_HOME/state/.lock.acquire/pid-namespace" ] && [ -e "$FM_HOME/race-armed" ] && [ ! -e "$FM_HOME/race-done" ]; then
+  if [ "${FM_TEST_PARTIAL_CLAIM:-0}" -eq 1 ]; then
+    rm "$FM_HOME/state/.lock.acquire/pid" "$FM_HOME/state/.lock.acquire/pid-namespace"
+  else
+    mv "$FM_HOME/state/.lock.acquire" "$FM_HOME/released-claim"
+  fi
+  touch "$FM_HOME/race-done"
+  if [ "$FM_TEST_REPLACE_CLAIM" -eq 1 ]; then
+    ln -s "$FM_HOME/replacement" "$FM_HOME/state/.lock.acquire"
+  fi
+  exit 1
+fi
+exec "$FM_TEST_REAL_CAT" "$@"
+SH
+chmod +x "$TMP_ROOT/race-bin/stat" "$TMP_ROOT/race-bin/cat"
+cat > "$TMP_ROOT/claim-race.sh" <<'TOOL'
+set -eu
+bash "$ROOT/bin/fm-lock.sh"
+. "$ROOT/bin/fm-session-lock-lib.sh"
+. "$ROOT/bin/fm-wake-lib.sh"
+mkdir "$FM_HOME/claim" "$FM_HOME/replacement"
+printf '%s\n' $$ > "$FM_HOME/claim/pid"
+fm_process_namespace > "$FM_HOME/claim/pid-namespace"
+printf '999999999\n' > "$FM_HOME/replacement/pid"
+cp "$FM_HOME/claim/pid-namespace" "$FM_HOME/replacement/pid-namespace"
+if [ "$1" = link ]; then
+  ln -s "$FM_HOME/claim" "$STATE/.lock.acquire"
+else
+  mv "$FM_HOME/claim" "$STATE/.lock.acquire"
+fi
+PATH="$FM_TEST_RACE_BIN:$PATH" timeout 10 bash "$ROOT/bin/fm-lock.sh"
+[ -e "$FM_HOME/race-done" ]
+[ ! -e "$STATE/.lock.acquire" ]
+fm_session_lock_owned_by_self "$STATE"
+TOOL
+export FM_TEST_REAL_STAT FM_TEST_REAL_CAT FM_TEST_RACE_BIN
+FM_TEST_REAL_STAT=$(command -v stat)
+FM_TEST_REAL_CAT=$(command -v cat)
+FM_TEST_RACE_BIN="$TMP_ROOT/race-bin"
+for representation in link directory partial; do
+  for replacement in 0 1; do
+    [ "$representation:$replacement" != partial:1 ] || continue
+    (
+      export FM_HOME="$TMP_ROOT/claim-race-$representation-$replacement" FM_TEST_REPLACE_CLAIM="$replacement"
+      export FM_TEST_PARTIAL_CLAIM=0
+      [ "$representation" != partial ] || FM_TEST_PARTIAL_CLAIM=1
+      run_tool "$first" "$TMP_ROOT/claim-race.sh" "$representation" > "$TMP_ROOT/claim-race.out" 2>&1 \
+        || fail "claim release race caused refusal: $(cat "$TMP_ROOT/claim-race.out")"
+    )
+  done
+done
+pass 'same-session acquisition retries removed and replaced claims in both lock representations'
 
 # An unannotated PID 1 is never ownership evidence for a native Codex call.
 FM_HOME="$TMP_ROOT/home"
