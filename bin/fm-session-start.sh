@@ -421,6 +421,7 @@ if [ -z "${FM_SESSION_START_STAGE_FILE:-}" ]; then
           record_session_start_completion "$(sed -n '2p' "$FM_SESSION_START_FOREGROUND_FILE")"
         fi
       else
+        # shellcheck disable=SC2016  # Positional parameters expand inside the child bash, not here.
         fm_run_timed "$SESSION_START_BUDGET" bash -c '
           "$1" report
           printf "%s\n" "$2"
