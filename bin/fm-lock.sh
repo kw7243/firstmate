@@ -163,9 +163,10 @@ publish_lock_session_or_die() {
 
 # This session already holds the lock. Non-Codex line 1 stays as recorded;
 # Codex continues to the serialized publication of both process coordinates.
-# A same-session confirmation waits for the claim lock so the sidecar refresh
-# completes. After the wait, the lock is re-read and the sidecar is refreshed
-# only when this session still owns it; otherwise the claim lock is released
+# A same-session confirmation waits for an observable claim holder, but refuses
+# a stable foreign-namespace claim; matching session identity cannot prove that
+# its sweep ended. After acquisition, the lock is re-read and the sidecar is
+# refreshed only when this session still owns it; otherwise the claim lock is released
 # and the caller continues with the ordinary live-owner or reclaim path. The
 # prior-session-sweep-is-finishing refusal is a takeover rule and does not
 # apply here.

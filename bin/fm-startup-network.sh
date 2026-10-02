@@ -9,10 +9,9 @@
 # those calls is individually bounded, so one unreachable host could consume the
 # whole FM_SESSION_START_TIMEOUT budget and truncate the digest outright, turning
 # a slow network into a startup that never printed the work queue at all.
-# This script runs exactly that work OFF the blocking path: the digest is
-# composed from bounded local reads while these checks run concurrently in a
-# detached worker, and their result is reported back inline when it finishes in
-# time, or as a durable wake when it does not. The locked startup's bounded
+# This script runs that work outside the local digest under the lifetime policy
+# in bin/fm-session-start.sh's header. Results can be printed inline or delivered
+# as a durable wake. The locked startup's bounded
 # inactive-outcome scan also runs here because its local current-state reads can
 # be just as slow; that scan publishes its own findings to the durable wake queue.
 #
@@ -21,15 +20,16 @@
 # FM_BOOTSTRAP_NETWORK=only phase. bin/fm-inactive-reconcile.sh remains the
 # owner of the startup scan and its separate watcher cadence. Deferral changes
 # WHEN they run, not WHETHER, and three properties make the later run safe:
-#   - The work is idempotent detection. A run whose report is lost (killed
-#     worker, truncated digest, crashed session) loses no finding: the next run
-#     re-derives the same inactive terminal child, dead secondmate, stuck clone,
-#     or undelivered handoff. There is no once-only signal to miss.
-#   - Results are durable and always surface. Network sweep output lands in
-#     state/.startup-network.report and reaches the agent either inline in the
-#     digest or, when it finishes too late for the digest to inline it, as a
-#     `check: startup-network` wake. Inactive-scan findings land directly in the
-#     ordinary durable wake queue. The report wakes only when the late result is
+#   - The work is idempotent detection. Once ownership permits a retry, a run
+#     whose report was lost (killed worker, truncated digest, crashed session)
+#     can re-derive the same inactive terminal child, dead secondmate, stuck
+#     clone, or undelivered handoff. There is no once-only signal to miss.
+#   - Published results are durable. Network sweep output lands in
+#     state/.startup-network.report. Harvest tries to print it inline; an
+#     unacknowledged actionable result gets a bounded `check: startup-network`
+#     wake attempt. If delivery fails, the report retains that diagnostic for
+#     `... report`. Inactive-scan findings land directly in the ordinary durable
+#     wake queue. The report wakes only when the unacknowledged result is
 #     itself actionable (state is not "done", or bootstrap emitted something
 #     other than its explicit BOOTSTRAP_INFO no-action record;
 #     report_requires_wake owns that transport test). A late-finishing clean run is not captain-facing progress
@@ -39,8 +39,8 @@
 #     suppresses the wake, so a claimant that exits first cannot lose the
 #     result. While the worker is still running the digest states by name what
 #     is not yet confirmed.
-#   - Mutation authority is leased. The worker outlives the command that launched
-#     it, so it takes the same acquisition lease a new session must hold before
+#   - Mutation authority is leased. A detached worker can outlive its launcher;
+#     every mutating run takes the same acquisition lease a new session holds before
 #     replacing a dead owner, re-checks the captured owner under that lease, and
 #     holds it through the bounded mutating run. A takeover stays read-only until
 #     that run settles, so old and new owners can never sweep concurrently.
@@ -48,7 +48,7 @@
 # Usage: fm-startup-network.sh start --locked <0|1> --harvest-pid <pid>
 #          Launch the detached worker and return immediately on a persistent
 #          process host. A transient Codex tool runs the checks in the foreground
-#          instead, so its namespace cannot end while they hold a claim. Single-flight: a
+#          instead, using the `run` contract below. On persistent hosts a
 #          running worker is reused only when its phases cover this request and,
 #          for locked work, it belongs to the same lock owner. A probe-only
 #          worker therefore cannot satisfy a later locked request. When worker
@@ -67,8 +67,10 @@
 #          directly to redo the stage by hand from the lock-owning harness.
 #          --harvest-pid prints and acknowledges inline for that live claimant
 #          before the fallback-wake decision, as transient start does.
-#          Exits non-zero when the stage was refused or could not publish,
-#          including a lock a live process still held at its deadline.
+#          A running record not proven dead refuses another foreground run.
+#          Exits non-zero when refused or unable to publish or deliver, including
+#          a lock a live process still held at its deadline. A published timeout
+#          or failed check result can still exit zero; inspect the report.
 #        fm-startup-network.sh harvest --pid <pid>
 #          Print the digest's NETWORK CHECKS section and release the inline-print
 #          claim. Called by bin/fm-session-start.sh, not by hand.
@@ -80,7 +82,7 @@
 #          only a slow run raises.
 #        fm-startup-network.sh wait [<seconds>]
 #          Block until the report is published, up to <seconds> (default 120).
-#          For operators and tests only; a session start never waits.
+#          For operators and tests only; session start does not call `wait`.
 #
 # STATE, all under this home's state/ and gitignored with it:
 #   .startup-network.status   key=value record - generation, lock_pid, state,
@@ -97,7 +99,8 @@
 #   .startup-network.report   the sweep output, byte for byte as
 #                             bin/fm-bootstrap.sh produced it, plus a
 #                             NETWORK_CHECKS: line whenever the stage itself
-#                             could not complete or had to downgrade.
+#                             could not complete, had to downgrade, or failed
+#                             to deliver its wake within the budget.
 #   .startup-network.claim    the generation and pid of a session start that
 #                             intends to print the result inline; a matching live
 #                             claimant gives harvest a bounded chance to finish.
@@ -122,6 +125,9 @@
 # aggregate deadline covering both the inactive-outcome scan and network sweeps
 # plus every lock the worker waits on before them.
 # Publication and delivery are bounded the same way by FM_SESSION_START_TIMEOUT.
+# Harvest output uses the remaining delivery budget and is acknowledged only
+# after successful printing. Failed or stalled output leaves the report intact,
+# releases the owned publication lock, and retains the fallback-wake attempt.
 # A lock that a live process still holds at either deadline ends the worker with
 # a failed record naming that holder and the rerun command, never a wait that
 # outlives the budget with its output discarded.

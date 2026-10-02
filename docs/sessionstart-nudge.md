@@ -105,7 +105,7 @@ A lock another live session took meanwhile still produces the ordinary read-only
 
 ### Nudge wrapper on a run-tier harness
 
-On a run-tier harness, only `resume`, `reload`, and `fork` are routed to the nudge wrapper.
+The [source-routing rules](#source-routing) determine which run-tier calls reach the nudge wrapper.
 Its [shared ownership check](#nudge-wrapper-lock-check) decides whether to stay silent.
 
 ### Re-emit mechanics
@@ -183,7 +183,7 @@ So no supported host runs the digest unbounded.
 
 The child streams into the native transport as it runs.
 So everything emitted before the child stopped is retained for delivery.
-The parent then prints a `STARTUP TRUNCATED` banner on any nonzero child exit, not only the bound, that names:
+The parent then attempts to print a `STARTUP TRUNCATED` banner on any nonzero child exit, not only the bound, that names:
 
 - The stage that did not finish.
 - The stages that were therefore never emitted.
@@ -191,7 +191,8 @@ The parent then prints a `STARTUP TRUNCATED` banner on any nonzero child exit, n
 
 The parent still exits 0.
 The regression evidence for both shapes is in [`docs/verification/supervision.md`](verification/supervision.md#per-task-endpoint-reads-cannot-truncate-the-digest).
-The registered hook timeouts sit above that budget, so the harness never preempts the banner.
+The registered hook timeouts exceed the default local-digest budget but remain a separate transport limit.
+Outer messages also have bounded output attempts, so a stalled transport can prevent banner delivery without blocking parent cleanup; [`bin/fm-session-start.sh`](../bin/fm-session-start.sh)'s header owns those deadlines.
 
 On persistent hosts, the deferred startup stage deliberately runs in its own process group under its own deadline.
 So a truncated digest does neither of these:

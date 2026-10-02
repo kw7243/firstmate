@@ -38,7 +38,7 @@
 #                       stage rather than this synchronous bootstrap section.
 #   3. wake-drain     - presents durable wakes and advances recovery handling
 #                       state, so it only runs when locked. The local bounded
-#                       inactive-outcome startup scan runs in the deferred worker.
+#                       inactive-outcome startup scan runs in the network stage.
 #                       First, on every harness and away posture, it seeds the
 #                       outcome store's display tail copy when that is absent
 #                       (bin/fm-branch-outcome.sh seed-tail).
@@ -57,8 +57,9 @@
 #                       ceiling is tasks x the per-read bound
 #                       (FM_SESSION_START_ENDPOINT_TIMEOUT, default 10s) and
 #                       can itself reach the digest's runtime bound.
-#   7. network checks - the result of the deferred network stage started back at
-#                       step 1, harvested WITHOUT waiting for it.
+#   7. network checks - harvest the persistent host's deferred result without
+#                       waiting for completion, or name the pending foreground
+#                       checks under the lifetime policy below.
 #   8. context digest - data/projects.md, data/secondmates.md, data/captain.md,
 #                       data/captain-shared.md, data/learnings.md: read-only,
 #                       always safe, always runs.
@@ -71,31 +72,32 @@
 # EVERY nonzero child exit, not only the bound: a child that dies or is killed
 # mid-stage must never truncate the digest silently.
 #
-# NO NETWORK BEFORE THE LOCAL DIGEST. This digest runs on a session-open hook that
+# NO NETWORK IN THE LOCAL DIGEST. This digest runs on a session-open hook that
 # blocks session initialization, so anything it waits for is time the captain
 # waits before the first turn - and every external-network call it used to make
 # was individually unbounded. One unreachable remote secondmate could burn the
 # entire FM_SESSION_START_TIMEOUT and truncate the digest, so a slow network
 # could cost the work queue itself.
-# So no step between here and the last line below makes an external-network
-# call. The five that did - `gh auth status`, secondmate liveness, secondmate
+# So no local digest stage makes an external-network call.
+# The five that did - `gh auth status`, secondmate liveness, secondmate
 # convergence, pending remote handoff delivery, and the fleet-sync fetch run
 # after acquisition, under their own bounds.
 # A transient Linux Codex tool cannot retain detached descendants. In that
 # context the outer caller runs the same bounded checks in the foreground AFTER
 # the local digest, before publishing completion and returning from the tool.
 # The local digest and network stage keep their separate existing deadlines.
-# On a persistent process host, the checks are started as one detached bounded worker right after the lock (step 1) and
-# harvested at step 7 without ever blocking on it. The bounded inactive-outcome
-# startup scan joins that worker because its local current-state reads can also
+# On a persistent process host, the checks start as one detached bounded worker
+# right after the lock (step 1) and are harvested at step 7 without waiting for
+# completion. The bounded inactive-outcome startup scan joins that worker
+# because its local current-state reads can also
 # be slow. bin/fm-startup-network.sh owns that stage and its safety argument;
 # bin/fm-bootstrap.sh and bin/fm-inactive-reconcile.sh remain the owners of the
 # work itself and still run it.
 # The digest is therefore composed from bounded local reads and local
 # subprocesses only, while slow network or inactive-state reconciliation delays
-# a reported check rather than startup.
-# What this deliberately trades: on a slow network the digest prints "IN
-# PROGRESS" and names exactly which checks are not yet confirmed, instead of
+# a reported check rather than the local digest.
+# What this deliberately trades: on a persistent host with a slow network the
+# digest prints "IN PROGRESS" and names which checks are not yet confirmed, instead of
 # waiting for them. It never reports an unconfirmed check as passed.
 #
 # ORDERING, and why FLEET STATE now runs before CONTEXT: this digest is
@@ -188,18 +190,20 @@
 # listing are unbounded subprocesses, while each per-task endpoint read runs
 # in its own crash-isolated child under FM_SESSION_START_ENDPOINT_TIMEOUT
 # (default 10s). So the whole digest still runs as ONE bounded child of this
-# script (FM_SESSION_START_TIMEOUT, default 120s). The deferred network stage
-# deliberately sits OUTSIDE that bound,
-# in its own process group under its own aggregate deadline, so a truncated
-# digest neither waits for it nor orphans it unbounded. The
-# child writes the digest straight to this script's stdout, so everything it
-# emitted before the child stopped is already delivered; the parent then prints
+# script (FM_SESSION_START_TIMEOUT, default 120s). The network stage follows the
+# separate deadline and lifetime policy above. The child writes the digest
+# straight to this script's stdout, so everything it emitted before stopping
+# has entered the transport; the parent then attempts
 # a loud STARTUP TRUNCATED banner on ANY nonzero child exit - the runtime bound
 # or an unexpected child death, named with its exit status - naming the stage
 # that did not finish and the sections that were therefore never emitted, and
 # still exits 0. The child
 # records its progress in FM_SESSION_START_STAGE_FILE, which is also the flag
 # that tells a child it is the child - the parent never recurses.
+# Each outer message, including the truncation banner and foreground header,
+# gets its own FM_SESSION_START_TIMEOUT bound; a stalled sink may lose that
+# message but cannot prevent parent-owned cleanup. This is not one aggregate
+# deadline for the local digest, foreground checks, and outer messages.
 # Hosts without timeout, gtimeout, or perl use the shared pure-Bash watchdog, so
 # the digest never runs without the same hard bound and process-group cleanup.
 #
@@ -776,10 +780,8 @@ if [ "$READ_ONLY" -eq 0 ]; then
   if [ "$REEMIT" -eq 0 ]; then
     "$SCRIPT_DIR/fm-home-summary-refresh.sh" --best-effort || true
   fi
-  # Every network call and the potentially slow inactive-outcome startup scan
-  # are launched HERE, detached and bounded, so they run concurrently with the
-  # whole digest below instead of in front of it. Step 7 harvests whatever has
-  # finished, without ever waiting.
+  # Persistent hosts launch the network stage here; transient Codex leaves it
+  # to the outer caller under the lifetime policy in this script's header.
   # --reemit passes --locked 0 for the same reason it runs bootstrap detect-only:
   # this process already ran the mutating sweeps at its own startup, so only the
   # read-only GitHub-auth probe is owed. A read-only session starts nothing at
@@ -798,8 +800,8 @@ fi
 
 # --- 2. bootstrap --------------------------------------------------------
 # FM_BOOTSTRAP_NETWORK=skip on every path: bootstrap's own network half is what
-# the deferred stage above is running right now, and running it twice would both
-# re-block this digest and race the worker's sweeps against themselves.
+# the separate network stage owns; running it here would duplicate those sweeps
+# and put external calls back inside the local digest's deadline.
 stage bootstrap
 subsection "BOOTSTRAP"
 if [ "$READ_ONLY" -eq 1 ]; then
@@ -822,7 +824,7 @@ else
 fi
 
 # --- 3. wake-drain ---------------------------------------------------------
-# The inactive-outcome startup scan runs in the deferred worker launched above,
+# The inactive-outcome startup scan belongs to the separate network stage,
 # where its potentially slow current-state reads cannot block this digest. It
 # publishes findings through the same durable queue drained here; the watcher's
 # separate 900-second cadence remains unchanged.
@@ -1057,10 +1059,9 @@ fi
 # Deliberately here and not later: these lines are actionable (a stuck clone, a
 # secondmate that could not be relaunched, broken GitHub auth), and the section
 # after this one is the curated memory a truncated tail is meant to take first.
-# Deliberately here and not earlier: this is the last point in the digest, so the
-# worker started at step 1 has had the whole composition above to finish in. It
-# is a NON-BLOCKING read either way - whatever the worker has published by now is
-# printed, and whatever it has not is named as not yet confirmed.
+# Deliberately here and not earlier: a persistent host's worker has had the
+# composition above to finish in. Harvest never waits for checks to finish;
+# unconfirmed checks, including the pending foreground run, are named as such.
 stage network-checks
 section "NETWORK CHECKS"
 if [ "$READ_ONLY" -eq 1 ]; then

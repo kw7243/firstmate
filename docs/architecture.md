@@ -166,7 +166,7 @@ Optional Relay integrates with the watcher only after explicit opt-in; [configur
 Session ownership and its derived generation are owned by `bin/fm-session-lock-lib.sh`; `bin/fm-lock.sh` owns serialized publication and its record format.
 Linux Codex tool calls can enter different PID namespaces while retaining one native thread identity, so a numeric PID cannot identify their session across calls.
 The native tool-boundary identity binds repeat entry and deferred work; process namespace and birth coordinates distinguish proved dead owners from owners whose liveness is unknown.
-Same-session entry waits for its startup sweep to release the shared acquisition claim before refreshing ownership coordinates; competing sessions retain the takeover refusal.
+Same-session claim acquisition follows `bin/fm-lock.sh`'s serialization and uncertainty rules; competing sessions retain the takeover refusal.
 Shared transient lock primitives in `bin/fm-wake-lib.sh` also require namespace agreement before interpreting a PID on Linux.
 Legacy Linux transient locks without those coordinates remain unknown and are preserved; migration must establish that their owners ended before retiring their records.
 These checks preserve ambiguous ownership rather than infer death from age or an absent PID in another namespace.

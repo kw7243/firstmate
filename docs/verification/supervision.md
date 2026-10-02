@@ -57,10 +57,10 @@ A file named both by `-e` and by auto-discovery loads twice (two factory calls, 
 
 ### Run-tier source vocabulary and context-reset injection
 
-The run tier depends on three facts only the vendor can supply: the session-open source it reports, whether hook stdout reaches model context on a context-RESET open rather than only a cold one, and whether a worker the hook detaches survives the hook returning.
+The run tier depends on vendor evidence for its session-open source and whether hook stdout reaches model context on a context-RESET open rather than only a cold one; persistent-host execution also requires detached-worker survival.
 The first two were measured on 2026-08-05 against a throwaway Firstmate-shaped lab carrying each harness's own tracked registration with a recorder standing in for `bin/fm-sessionstart-run.sh`.
 Each open printed a source-stamped token, and the model was asked to quote that token back, so producing hook stdout could never be mistaken for delivering it.
-The third is recorded below.
+Persistent-host lifetime evidence is recorded below; [Linux Codex lifetime evidence](runtime-backends.md#2026-10-02-transient-codex-startup-lifetime) covers the transient tool boundary.
 
 | Harness | Version verified | Cold open | Context reset | Context-preserving reopen |
 | --- | --- | --- | --- | --- |
@@ -71,7 +71,7 @@ The third is recorded below.
 Two harness-specific consequences are load-bearing rather than incidental.
 
 Codex's interactive TUI fired no project `SessionStart` hook at all in the same lab where `codex exec` fired it reliably, which matches the earlier 2026-07-28 finding for 0.145.0.
-Codex's run tier is therefore verified only for `codex exec` startup and context-preserving resume.
+That Codex transport evidence covers only `codex exec` startup and context-preserving resume; current routing also applies the [ownership deferral](../sessionstart-nudge.md#codex-ownership-recovery).
 The interactive TUI is a known uncovered gap: Firstmate has no tracked session-open, compaction, or re-emit channel there, ships no global hook, and does not claim instruction-refresh delivery for that surface.
 
 Pi compaction was verified on 2026-08-05 with Pi 0.82.0 in the same throwaway lab after setting `.pi/settings.json` `compaction.keepRecentTokens` to 200 and completing one substantial assistant-prose turn before issuing `/compact`.
@@ -141,7 +141,7 @@ Codex exec exposes only startup and context-preserving resume through tracked re
 
 ### Detached session-open workers survive the hook
 
-Session start composes its digest from local reads and runs every external-network call in a worker detached by the hook (`bin/fm-startup-network.sh`), so a harness that reaped the hook's process tree would silently stop running the sweeps rather than merely delaying them.
+This measurement covers the persistent-host path in the [startup lifetime policy](../sessionstart-nudge.md#network-work-has-its-own-deadline).
 Verified on 2026-08-06 with Claude Code 2.1.222 in a throwaway lab whose `bin/fm-bootstrap.sh` sleeps 6s before writing a marker, so the marker can exist only if the worker outlived the hook and the whole `claude -p` process.
 
 ```text
@@ -180,7 +180,7 @@ The unreachable route was preserved rather than relaunched in both runs, and the
 
 Codex and Pi were not installed as run-tier labs in this measurement, so their evidence for this fact is NOT refreshed; `tests/fm-sessionstart-hook-live-e2e.test.sh` asserts it for each installed Claude, Codex exec, and Pi adapter and is the command that refreshes their record.
 Cursor's separate primary live guard covers its source-free session-open transport but does not claim this detached-worker measurement.
-A harness that did reap the worker degrades loudly rather than silently: the leftover record reads as an abandoned run needing a rerun, and the next session start re-derives every finding, because these sweeps are idempotent detectors.
+Rerunning an interrupted worker remains subject to the [ownership recovery boundary](../sessionstart-nudge.md#codex-ownership-recovery).
 
 Current deterministic and live entry points:
 

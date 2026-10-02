@@ -8,11 +8,10 @@ metadata:
 
 # Session-start recovery
 
-The digest itself makes no external-network call and never waits for one.
-Every network check a session start owes - GitHub auth, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, and project clone refresh - runs off the digest's blocking path in a bounded worker owned by `bin/fm-startup-network.sh` and is reported in the digest's own `NETWORK CHECKS` section.
-The locked startup inactive-outcome scan joins that worker so a slow local current-state read cannot block the digest; its findings use the ordinary durable wake queue.
+The [startup lifetime policy](../../../docs/sessionstart-nudge.md#network-work-has-its-own-deadline) owns when the separately bounded checks run and where their results appear.
+`bin/fm-startup-network.sh` owns their report and delivery; the inactive-outcome scan's findings use the ordinary durable wake queue.
 
-1. **Lock** - acquires the per-home session lock first, before anything mutates shared state, then starts the deferred startup stage above.
+1. **Lock** - acquires the per-home session lock first, before anything mutates shared state.
 2. **Bootstrap** - detect-only checks (tool/version problems, the worktree-tangle check, harness override, dispatch-profile validation, backlog-backend status) always run, but routine confirmations stay silent by default.
    When the lock could not be acquired, the worktree-tangle check uses read-only advisory wording without a checkout repair command.
    Home-local stale Herdr projection cleanup and the six bootstrap MUTATING sweeps - same-home backlog reconciliation, fleet sync, secondmate convergence, secondmate liveness, pending remote handoff retry, and Relay artifact writes - run only when this session actually holds the lock from step 1; the four network ones among them run in the deferred stage rather than in this section.
