@@ -26,8 +26,8 @@ The tier is a property of the harness surface, not of the home.
 
 | Tier | What the adapter does | Used by |
 | --- | --- | --- |
-| Run | Executes `bin/fm-session-start.sh` through the native session-open adapter and gates its ordered digest into model context before the first turn. | Claude, `codex exec`, Pi / pi-signed, omp, Cursor |
-| Nudge | Asks the agent to run the digest through the native adapter or the tracked session-start instruction. | Grok, OpenCode, and run-tier sources routed to the nudge |
+| Run | Executes `bin/fm-session-start.sh` through the native session-open adapter and gates its ordered digest into model context before the first turn. | Claude, verified `codex exec` contexts, Pi / pi-signed, omp, Cursor |
+| Nudge | Asks the agent to run the digest through the native adapter or the tracked session-start instruction. | Grok, OpenCode, and run-tier contexts routed to the nudge |
 
 Codex's interactive TUI has no tracked session-open, compaction, or re-emit channel and is not covered by either tier.
 
@@ -36,7 +36,7 @@ Codex's interactive TUI has no tracked session-open, compaction, or re-emit chan
 | Harness surface | Tier | Details |
 | --- | --- | --- |
 | Claude | Run | [Claude](#claude) |
-| Codex exec | Run | [Codex exec](#codex-exec) |
+| Codex exec | Run or nudge | [Codex exec](#codex-exec) |
 | Codex interactive TUI | Uncovered | [Codex interactive TUI](#codex-interactive-tui) |
 | Pi / pi-signed | Run | [Pi and pi-signed](#pi-and-pi-signed) |
 | OpenCode | Nudge | [OpenCode](#opencode) |
@@ -62,6 +62,8 @@ The run wrapper learns the source in one of two ways:
 
 - It takes `--source <name>` when the adapter knows the source natively.
 - Otherwise it reads the `source` field from a Claude/Codex-shaped JSON hook payload on stdin.
+
+Linux Codex contexts without verified thread identity use [the ownership deferral](#codex-ownership-recovery) before this source routing.
 
 A re-emit (`--reemit`) reprints the digest for a process that already has the helm and lost only its context.
 
@@ -90,7 +92,7 @@ The full digest updates the completion record in this order:
 
 1. It acquires the lock.
 2. It clears the completion record.
-3. It republishes the session generation only after every digest stage completes and the deferred checks are successfully scheduled or covered by an existing worker.
+3. It republishes the session generation only after every digest stage completes and the checks are successfully scheduled or covered by an existing worker; a transient Codex tool first finishes its foreground check invocation.
 
 So `clear` or `compact` cannot skip startup sweeps after a truncated run or a refused deferred-stage request.
 Scheduling does not mean the checks passed; their result still arrives through the deferred report.
@@ -103,7 +105,7 @@ A lock another live session took meanwhile still produces the ordinary read-only
 
 ### Nudge wrapper on a run-tier harness
 
-On a run-tier harness, only `resume`, `reload`, and `fork` are routed to the nudge wrapper.
+The [source-routing rules](#source-routing) determine which run-tier calls reach the nudge wrapper.
 Its [shared ownership check](#nudge-wrapper-lock-check) decides whether to stay silent.
 
 ### Re-emit mechanics
@@ -125,11 +127,36 @@ While the digest runs, the run tier blocks one of two things:
 
 So `bin/fm-session-start.sh` bounds itself rather than betting on an unbounded prerequisite.
 
-### Network work stays off the blocking path
+### Network work has its own deadline
 
-The digest makes no external-network call at all.
-Every network call it owes runs off the blocking path, in the separately bounded deferred stage owned by `bin/fm-startup-network.sh`.
-So an unreachable host can no longer consume this budget.
+The local digest makes no external-network call.
+`bin/fm-startup-network.sh` owns the separately bounded checks.
+Persistent hosts run them in a detached worker while the digest is composed.
+A transient Linux Codex tool prints the local digest first, then runs the checks in the foreground before returning, because ending its namespace kills detached descendants too.
+This preserves the existing local-digest and network-stage deadlines without abandoning a worker's acquisition claim.
+For existing claims and identity failures, see [Codex ownership recovery](#codex-ownership-recovery).
+
+### Codex ownership recovery
+
+The Linux Codex ownership check reads the thread identity from the initial environment at the native tool boundary and requires the caller's identity to agree.
+The session-open wrapper reads the hook payload's `source`; it does not accept its `session_id` as ownership proof.
+When a known Linux Codex context lacks verified thread identity, the run wrapper delegates to the existing operational nudge instead of attempting the digest in that context.
+This applies to every session-open source, including clear and compact, even when a session sidecar already exists.
+The instructed native tool call must still pass the unchanged ownership check; the nudge grants no ownership and direct lock acquisition without proof still refuses.
+
+The existing acquisition and foreground-check commands support recovery when their recorded owner can be classified in its original process namespace.
+The shared claim-lock helper serializes replacement of a dead claim; the startup worker also checks its recorded process birth before replacing a running record.
+Their command headers own the invocation and record formats: [`fm-lock.sh`](../bin/fm-lock.sh) and [`fm-startup-network.sh`](../bin/fm-startup-network.sh).
+Neither a matching session identity nor an old timestamp proves that a sibling sweep finished.
+An unknown foreign-namespace claim or worker record stays intact until positive lifetime evidence is available; bounded refusal is not completed recovery.
+Do not infer death from a PID missing in another namespace or from matching namespace inode numbers alone.
+
+Restarting a secondmate is not a supported repair for this primary ownership failure.
+Each secondmate has its own home and session lock, so replacing its agent does not release the primary's acquisition claim or change the primary hook's identity provenance.
+A secondmate finishing its turn can let a healthy parent sweep finish, but cannot revive a worker whose tool namespace has ended.
+The restart helper refreshes that secondmate's instructions and launch wiring after its persistence acknowledgement; it provides no evidence that the primary's old claim is safe to replace.
+This assessment follows those ownership boundaries, not a live restart experiment.
+The live Codex evidence and its remaining limits are recorded in [runtime backend verification](verification/runtime-backends.md#linux-codex-session-identity).
 
 ### Digest timeout
 
@@ -156,7 +183,7 @@ So no supported host runs the digest unbounded.
 
 The child streams into the native transport as it runs.
 So everything emitted before the child stopped is retained for delivery.
-The parent then prints a `STARTUP TRUNCATED` banner on any nonzero child exit, not only the bound, that names:
+The parent then attempts to print a `STARTUP TRUNCATED` banner on any nonzero child exit, not only the bound, that names:
 
 - The stage that did not finish.
 - The stages that were therefore never emitted.
@@ -164,13 +191,16 @@ The parent then prints a `STARTUP TRUNCATED` banner on any nonzero child exit, n
 
 The parent still exits 0.
 The regression evidence for both shapes is in [`docs/verification/supervision.md`](verification/supervision.md#per-task-endpoint-reads-cannot-truncate-the-digest).
-The registered hook timeouts sit above that budget, so the harness never preempts the banner.
+The registered hook timeouts exceed the default local-digest budget but remain a separate transport limit.
+Outer messages also have bounded output attempts, so a stalled transport can prevent banner delivery without blocking parent cleanup; [`bin/fm-session-start.sh`](../bin/fm-session-start.sh)'s header owns those deadlines.
 
-The deferred startup stage deliberately runs in its own process group under its own deadline.
+On persistent hosts, the deferred startup stage deliberately runs in its own process group under its own deadline.
 So a truncated digest does neither of these:
 
 - Kill the network checks and inactive-outcome scan it was not waiting for.
 - Orphan unbounded network work.
+
+A transient Codex startup that truncates its local digest never starts the foreground checks or records completion.
 
 ## Shared wrapper and safety
 
@@ -233,7 +263,7 @@ Native stdout context injection is supported.
 
 ### Codex exec
 
-Codex exec is a run-tier harness.
+Codex exec uses the run wrapper, with [ownership-based deferral](#codex-ownership-recovery) on Linux.
 The `.codex/hooks.json` transport does three things:
 
 1. It anchors to the hook process working directory.

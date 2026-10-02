@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # Session-open entry point for harnesses that RUN the digest instead of asking
 # the agent to. It is the one command those harnesses' session-open adapters
-# invoke, and it decides, from the session-open source, whether this open needs
-# the full digest, a context re-emit, or nothing at all.
+# invoke, and it routes the session-open source to a full digest, a context
+# re-emit, or the nudge wrapper.
 #
 # Why running beats nudging: bin/fm-sessionstart-nudge.sh can only ASK the agent
 # to take the helm, and an agent can defer that, including when a first-command
 # skill has its own read-only path. When the native adapter injects this
 # command's stdout into model context, running the digest here removes that
-# discretion - the helm is taken before the model's first turn, whatever the
-# first turn is.
+# discretion when ownership can be verified. Codex contexts without that proof
+# follow docs/sessionstart-nudge.md's ownership deferral before source routing.
 #
 # Usage: fm-sessionstart-run.sh [--source <source>] [--pi-prerequisite]
 #   --source  The harness's own session-open source. When omitted, the source is
@@ -135,6 +135,10 @@ if [ -z "$SOURCE" ] && [ ! -t 0 ]; then
     seen == 1 { seen = 0 }
     $0 == "source" { seen = 1 }
   ')
+fi
+
+if fm_session_lock_codex_ancestor_pid >/dev/null && ! fm_session_lock_trusted_codex_session_id >/dev/null; then
+  exec "$SCRIPT_DIR/fm-sessionstart-nudge.sh"
 fi
 
 case "$SOURCE" in

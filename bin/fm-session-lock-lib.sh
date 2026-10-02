@@ -246,6 +246,12 @@ fm_session_lock_codex_ancestor_pid() {  # [<ancestry-pids>]
   printf '%s\n' "$pid"
 }
 
+# A Codex namespace init ends with its foreground tool command. Detached work
+# cannot outlive that boundary, even after nohup or a new process group.
+fm_session_lock_transient_codex() {
+  [ "$(fm_session_lock_codex_ancestor_pid)" = 1 ]
+}
+
 fm_session_lock_trusted_codex_session_id() {  # [<ancestry-pids>]
   local anchor
   anchor=$(fm_session_lock_codex_ancestor_pid "${1:-}") || return 1

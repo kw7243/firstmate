@@ -38,7 +38,7 @@
 #                       stage rather than this synchronous bootstrap section.
 #   3. wake-drain     - presents durable wakes and advances recovery handling
 #                       state, so it only runs when locked. The local bounded
-#                       inactive-outcome startup scan runs in the deferred worker.
+#                       inactive-outcome startup scan runs in the network stage.
 #                       First, on every harness and away posture, it seeds the
 #                       outcome store's display tail copy when that is absent
 #                       (bin/fm-branch-outcome.sh seed-tail).
@@ -57,8 +57,9 @@
 #                       ceiling is tasks x the per-read bound
 #                       (FM_SESSION_START_ENDPOINT_TIMEOUT, default 10s) and
 #                       can itself reach the digest's runtime bound.
-#   7. network checks - the result of the deferred network stage started back at
-#                       step 1, harvested WITHOUT waiting for it.
+#   7. network checks - harvest the persistent host's deferred result without
+#                       waiting for completion, or name the pending foreground
+#                       checks under the lifetime policy below.
 #   8. context digest - data/projects.md, data/secondmates.md, data/captain.md,
 #                       data/captain-shared.md, data/learnings.md: read-only,
 #                       always safe, always runs.
@@ -71,26 +72,32 @@
 # EVERY nonzero child exit, not only the bound: a child that dies or is killed
 # mid-stage must never truncate the digest silently.
 #
-# NO NETWORK ON THE BLOCKING PATH. This digest runs on a session-open hook that
+# NO NETWORK IN THE LOCAL DIGEST. This digest runs on a session-open hook that
 # blocks session initialization, so anything it waits for is time the captain
 # waits before the first turn - and every external-network call it used to make
 # was individually unbounded. One unreachable remote secondmate could burn the
 # entire FM_SESSION_START_TIMEOUT and truncate the digest, so a slow network
 # could cost the work queue itself.
-# So no step between here and the last line below makes an external-network
-# call. The five that did - `gh auth status`, secondmate liveness, secondmate
-# convergence, pending remote handoff delivery, and the fleet-sync fetch - are
-# started as one detached bounded worker right after the lock (step 1) and
-# harvested at step 7 without ever blocking on it. The bounded inactive-outcome
-# startup scan joins that worker because its local current-state reads can also
+# So no local digest stage makes an external-network call.
+# The five that did - `gh auth status`, secondmate liveness, secondmate
+# convergence, pending remote handoff delivery, and the fleet-sync fetch run
+# after acquisition, under their own bounds.
+# A transient Linux Codex tool cannot retain detached descendants. In that
+# context the outer caller runs the same bounded checks in the foreground AFTER
+# the local digest, before publishing completion and returning from the tool.
+# The local digest and network stage keep their separate existing deadlines.
+# On a persistent process host, the checks start as one detached bounded worker
+# right after the lock (step 1) and are harvested at step 7 without waiting for
+# completion. The bounded inactive-outcome startup scan joins that worker
+# because its local current-state reads can also
 # be slow. bin/fm-startup-network.sh owns that stage and its safety argument;
 # bin/fm-bootstrap.sh and bin/fm-inactive-reconcile.sh remain the owners of the
 # work itself and still run it.
 # The digest is therefore composed from bounded local reads and local
 # subprocesses only, while slow network or inactive-state reconciliation delays
-# a reported check rather than startup.
-# What this deliberately trades: on a slow network the digest prints "IN
-# PROGRESS" and names exactly which checks are not yet confirmed, instead of
+# a reported check rather than the local digest.
+# What this deliberately trades: on a persistent host with a slow network the
+# digest prints "IN PROGRESS" and names which checks are not yet confirmed, instead of
 # waiting for them. It never reports an unconfirmed check as passed.
 #
 # ORDERING, and why FLEET STATE now runs before CONTEXT: this digest is
@@ -183,18 +190,20 @@
 # listing are unbounded subprocesses, while each per-task endpoint read runs
 # in its own crash-isolated child under FM_SESSION_START_ENDPOINT_TIMEOUT
 # (default 10s). So the whole digest still runs as ONE bounded child of this
-# script (FM_SESSION_START_TIMEOUT, default 120s). The deferred network stage
-# deliberately sits OUTSIDE that bound,
-# in its own process group under its own aggregate deadline, so a truncated
-# digest neither waits for it nor orphans it unbounded. The
-# child writes the digest straight to this script's stdout, so everything it
-# emitted before the child stopped is already delivered; the parent then prints
+# script (FM_SESSION_START_TIMEOUT, default 120s). The network stage follows the
+# separate deadline and lifetime policy above. The child writes the digest
+# straight to this script's stdout, so everything it emitted before stopping
+# has entered the transport; the parent then attempts
 # a loud STARTUP TRUNCATED banner on ANY nonzero child exit - the runtime bound
 # or an unexpected child death, named with its exit status - naming the stage
 # that did not finish and the sections that were therefore never emitted, and
 # still exits 0. The child
 # records its progress in FM_SESSION_START_STAGE_FILE, which is also the flag
 # that tells a child it is the child - the parent never recurses.
+# Each outer message, including the truncation banner and foreground header,
+# gets its own FM_SESSION_START_TIMEOUT bound; a stalled sink may lose that
+# message but cannot prevent parent-owned cleanup. This is not one aggregate
+# deadline for the local digest, foreground checks, and outer messages.
 # Hosts without timeout, gtimeout, or perl use the shared pure-Bash watchdog, so
 # the digest never runs without the same hard bound and process-group cleanup.
 #
@@ -287,13 +296,89 @@ stage() {  # <stage-name>: breadcrumb for the parent's truncation banner
 # shellcheck source=bin/fm-session-lock-lib.sh
 . "$SCRIPT_DIR/fm-session-lock-lib.sh"
 
+SESSION_START_BUDGET=${FM_SESSION_START_TIMEOUT:-120}
+# A non-positive or non-numeric budget is not a budget (`timeout 0` disables
+# the deadline outright), so an unusable value falls back to the default
+# rather than silently removing the bound.
+case "$SESSION_START_BUDGET" in ''|*[!0-9]*) SESSION_START_BUDGET=120 ;; esac
+[ "$SESSION_START_BUDGET" -gt 0 ] 2>/dev/null || SESSION_START_BUDGET=120
+
+# The baseline describes instructions this true session started with, not the
+# most recently emitted instructions. It is intentionally immutable for this
+# lock owner: every later stale-context rebuild needs the current file again.
+write_agents_baseline() {  # <lock-pid> <agents-hash>
+  local lock_pid=$1 agents_hash=$2 tmp
+  [ -n "$lock_pid" ] && [ -n "$agents_hash" ] || return 1
+  tmp=$(mktemp "$STATE/.session-start-agents-baseline.XXXXXX" 2>/dev/null) || return 1
+  if printf '%s\n%s\n' "$lock_pid" "$agents_hash" > "$tmp" 2>/dev/null \
+    && mv -f "$tmp" "$AGENTS_BASELINE_FILE" 2>/dev/null; then
+    return 0
+  fi
+  rm -f "$tmp" 2>/dev/null || true
+  return 1
+}
+
+record_session_start_completion() {  # <agents-hash>
+  local AGENTS_START_HASH=$1 COMPLETION_RECORDED COMPLETION_PID COMPLETION_TMP
+  COMPLETION_RECORDED=0
+  COMPLETION_PID=$(fm_session_lock_generation "$STATE" 2>/dev/null || true)
+  case "$COMPLETION_PID" in
+    '') COMPLETION_PID= ;;
+  esac
+  COMPLETION_TMP=$(mktemp "$STATE/.session-start-complete.XXXXXX" 2>/dev/null || true)
+  if [ -n "$COMPLETION_PID" ] && [ -n "$COMPLETION_TMP" ] \
+    && printf '%s\n' "$COMPLETION_PID" > "$COMPLETION_TMP" 2>/dev/null \
+    && mv -f "$COMPLETION_TMP" "$COMPLETION_FILE" 2>/dev/null; then
+    COMPLETION_RECORDED=1
+  else
+    [ -z "$COMPLETION_TMP" ] || rm -f "$COMPLETION_TMP" 2>/dev/null || true
+    fm_run_timed "$SESSION_START_BUDGET" printf '\nSESSION_START_COMPLETION: not recorded - the next clear or compact will run a full startup.\n' || true
+  fi
+  if [ "$SESSION_SOURCE" = startup ] && [ "$COMPLETION_RECORDED" -eq 1 ] && [ -n "$AGENTS_START_HASH" ]; then
+    if ! write_agents_baseline "$COMPLETION_PID" "$AGENTS_START_HASH"; then
+      fm_run_timed "$SESSION_START_BUDGET" printf '\nSESSION_START_AGENTS_BASELINE: not recorded - a later supported rebuild will re-emit AGENTS.md.\n' || true
+    fi
+  fi
+}
+
+# shellcheck disable=SC2329 # Invoked indirectly by fm_run_timed's Bash watchdog.
+print_startup_truncation() {
+  local SESSION_START_LAST_STAGE SESSION_START_PENDING BAR
+  SESSION_START_LAST_STAGE=$(cat "$SESSION_START_STAGE_FILE" 2>/dev/null) || SESSION_START_LAST_STAGE=
+  [ -n "$SESSION_START_LAST_STAGE" ] || SESSION_START_LAST_STAGE=unknown
+  SESSION_START_PENDING=$(
+    printf '%s\n' "$SESSION_START_STAGES" | tr ' ' '\n' |
+      awk -v from="$SESSION_START_LAST_STAGE" '$0 == from {seen = 1} seen' | tr '\n' ' '
+  )
+  [ -n "${SESSION_START_PENDING# }" ] || SESSION_START_PENDING='(unknown - the digest may be incomplete anywhere)'
+  BAR='●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+  printf '\n%s\n' "$BAR"
+  if [ "$SESSION_START_RC" -eq 124 ]; then
+    printf '●  STARTUP TRUNCATED - SESSION START HIT ITS %ss RUNTIME BOUND\n' "$SESSION_START_BUDGET"
+  else
+    printf '●  STARTUP TRUNCATED - SESSION START DIED UNEXPECTEDLY (exit %s, not its runtime bound)\n' "$SESSION_START_RC"
+  fi
+  printf '●  It stopped during the "%s" stage, so everything above is COMPLETE\n' "$SESSION_START_LAST_STAGE"
+  printf '●  only up to that point.\n'
+  printf '●  RECONCILE these stages before acting on anything they would have shown:\n'
+  printf '●    %s\n' "${SESSION_START_PENDING% }"
+  printf '●  Rerun bin/fm-session-start.sh now to finish taking the helm. If it truncates\n'
+  if [ "$SESSION_START_RC" -eq 124 ]; then
+    printf '●  again, raise FM_SESSION_START_TIMEOUT and report the slow stage - a stage that\n'
+    printf '●  cannot finish inside the bound is a fleet problem, not a reporting detail.\n'
+  else
+    printf '●  again, report the exit status and the stage - raising the runtime bound\n'
+    printf '●  cannot help a digest that died, and a stage that dies is a fleet problem.\n'
+  fi
+  printf '%s\n' "$BAR"
+}
+
 if [ -z "${FM_SESSION_START_STAGE_FILE:-}" ]; then
-  SESSION_START_BUDGET=${FM_SESSION_START_TIMEOUT:-120}
-  # A non-positive or non-numeric budget is not a budget (`timeout 0` disables
-  # the deadline outright), so an unusable value falls back to the default
-  # rather than silently removing the bound.
-  case "$SESSION_START_BUDGET" in ''|*[!0-9]*) SESSION_START_BUDGET=120 ;; esac
-  [ "$SESSION_START_BUDGET" -gt 0 ] 2>/dev/null || SESSION_START_BUDGET=120
+  FM_SESSION_START_FOREGROUND_FILE=
+  if fm_session_lock_transient_codex; then
+    FM_SESSION_START_FOREGROUND_FILE=$(mktemp "${TMPDIR:-/tmp}/fm-session-start-foreground.XXXXXX" 2>/dev/null) || FM_SESSION_START_FOREGROUND_FILE=
+  fi
+  export FM_SESSION_START_FOREGROUND_FILE
   SESSION_START_STAGE_FILE=$(mktemp "${TMPDIR:-/tmp}/fm-session-start-stage.XXXXXX" 2>/dev/null) || SESSION_START_STAGE_FILE=
   if [ -z "$SESSION_START_STAGE_FILE" ]; then
     # Without a breadcrumb the bound still holds; only the banner's precision
@@ -325,35 +410,31 @@ if [ -z "${FM_SESSION_START_STAGE_FILE:-}" ]; then
   # other status means the child died or was killed mid-stage, which truncates
   # silently when unbanned - the parent must banner it, never exit 0 around it.
   if [ "$SESSION_START_RC" -ne 0 ]; then
-    SESSION_START_LAST_STAGE=$(cat "$SESSION_START_STAGE_FILE" 2>/dev/null) || SESSION_START_LAST_STAGE=
-    [ -n "$SESSION_START_LAST_STAGE" ] || SESSION_START_LAST_STAGE=unknown
-    SESSION_START_PENDING=$(
-      printf '%s\n' "$SESSION_START_STAGES" | tr ' ' '\n' |
-        awk -v from="$SESSION_START_LAST_STAGE" '$0 == from {seen = 1} seen' | tr '\n' ' '
-    )
-    [ -n "${SESSION_START_PENDING# }" ] || SESSION_START_PENDING='(unknown - the digest may be incomplete anywhere)'
-    BAR='●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-    printf '\n%s\n' "$BAR"
-    if [ "$SESSION_START_RC" -eq 124 ]; then
-      printf '●  STARTUP TRUNCATED - SESSION START HIT ITS %ss RUNTIME BOUND\n' "$SESSION_START_BUDGET"
+    FM_TIMEOUT_MECHANISM_OVERRIDE=bash fm_run_timed "$SESSION_START_BUDGET" print_startup_truncation || true
+  fi
+  if [ "$SESSION_START_RC" -eq 0 ] && [ -n "$FM_SESSION_START_FOREGROUND_FILE" ] && [ -s "$FM_SESSION_START_FOREGROUND_FILE" ]; then
+    if fm_session_lock_owned_by_self "$STATE"; then
+      fm_run_timed "$SESSION_START_BUDGET" printf '\nFOREGROUND NETWORK CHECKS (transient Codex tool)\n' || true
+      NETWORK_STAGE_LOCKED=1
+      [ "$REEMIT" -eq 0 ] || NETWORK_STAGE_LOCKED=0
+      if "$SCRIPT_DIR/fm-startup-network.sh" run --locked "$NETWORK_STAGE_LOCKED" --harvest-pid $$; then
+        if [ "$REEMIT" -eq 0 ]; then
+          record_session_start_completion "$(sed -n '2p' "$FM_SESSION_START_FOREGROUND_FILE")"
+        fi
+      else
+        # shellcheck disable=SC2016  # Positional parameters expand inside the child bash, not here.
+        fm_run_timed "$SESSION_START_BUDGET" bash -c '
+          "$1" report
+          printf "%s\n" "$2"
+        ' _ "$SCRIPT_DIR/fm-startup-network.sh" \
+          'SESSION_START_COMPLETION: startup remains incomplete because foreground checks could not finish or publish.' || true
+      fi
     else
-      printf '●  STARTUP TRUNCATED - SESSION START DIED UNEXPECTEDLY (exit %s, not its runtime bound)\n' "$SESSION_START_RC"
+      fm_run_timed "$SESSION_START_BUDGET" printf 'SESSION_START_COMPLETION: startup remains incomplete because ownership could not be re-verified before foreground checks.\n' || true
     fi
-    printf '●  It stopped during the "%s" stage, so everything above is COMPLETE\n' "$SESSION_START_LAST_STAGE"
-    printf '●  only up to that point.\n'
-    printf '●  RECONCILE these stages before acting on anything they would have shown:\n'
-    printf '●    %s\n' "${SESSION_START_PENDING% }"
-    printf '●  Rerun bin/fm-session-start.sh now to finish taking the helm. If it truncates\n'
-    if [ "$SESSION_START_RC" -eq 124 ]; then
-      printf '●  again, raise FM_SESSION_START_TIMEOUT and report the slow stage - a stage that\n'
-      printf '●  cannot finish inside the bound is a fleet problem, not a reporting detail.\n'
-    else
-      printf '●  again, report the exit status and the stage - raising the runtime bound\n'
-      printf '●  cannot help a digest that died, and a stage that dies is a fleet problem.\n'
-    fi
-    printf '%s\n' "$BAR"
   fi
   rm -f "$SESSION_START_STAGE_FILE" 2>/dev/null || true
+  [ -z "$FM_SESSION_START_FOREGROUND_FILE" ] || rm -f "$FM_SESSION_START_FOREGROUND_FILE" 2>/dev/null || true
   exit 0
 fi
 
@@ -605,21 +686,6 @@ hash_file_sha256() {
   return 1
 }
 
-# The baseline describes instructions this true session started with, not the
-# most recently emitted instructions. It is intentionally immutable for this
-# lock owner: every later stale-context rebuild needs the current file again.
-write_agents_baseline() {  # <lock-pid> <agents-hash>
-  local lock_pid=$1 agents_hash=$2 tmp
-  [ -n "$lock_pid" ] && [ -n "$agents_hash" ] || return 1
-  tmp=$(mktemp "$STATE/.session-start-agents-baseline.XXXXXX" 2>/dev/null) || return 1
-  if printf '%s\n%s\n' "$lock_pid" "$agents_hash" > "$tmp" 2>/dev/null \
-    && mv -f "$tmp" "$AGENTS_BASELINE_FILE" 2>/dev/null; then
-    return 0
-  fi
-  rm -f "$tmp" 2>/dev/null || true
-  return 1
-}
-
 agents_baseline_drifted() {  # <rebuilding-session-pid>
   local lock_pid=$1 baseline_pid baseline_hash current_hash
   [ -f "$AGENTS_BASELINE_FILE" ] && [ ! -L "$AGENTS_BASELINE_FILE" ] || return 0
@@ -701,6 +767,8 @@ fi
 REBUILDING_SESSION_PID=$(fm_harness_ancestry_pid 2>/dev/null || true)
 print_agents_refresh_if_required "$REBUILDING_SESSION_PID"
 
+FOREGROUND_NETWORK=0
+fm_session_lock_transient_codex && FOREGROUND_NETWORK=1
 NETWORK_STAGE_RC=0
 NETWORK_STAGE_OUT=
 if [ "$READ_ONLY" -eq 0 ]; then
@@ -714,10 +782,8 @@ if [ "$READ_ONLY" -eq 0 ]; then
   if [ "$REEMIT" -eq 0 ]; then
     "$SCRIPT_DIR/fm-home-summary-refresh.sh" --best-effort || true
   fi
-  # Every network call and the potentially slow inactive-outcome startup scan
-  # are launched HERE, detached and bounded, so they run concurrently with the
-  # whole digest below instead of in front of it. Step 7 harvests whatever has
-  # finished, without ever waiting.
+  # Persistent hosts launch the network stage here; transient Codex leaves it
+  # to the outer caller under the lifetime policy in this script's header.
   # --reemit passes --locked 0 for the same reason it runs bootstrap detect-only:
   # this process already ran the mutating sweeps at its own startup, so only the
   # read-only GitHub-auth probe is owed. A read-only session starts nothing at
@@ -725,14 +791,19 @@ if [ "$READ_ONLY" -eq 0 ]; then
   # steer, or merge anyway, so it has no action left for an auth verdict to gate.
   NETWORK_STAGE_LOCKED=1
   [ "$REEMIT" -eq 0 ] || NETWORK_STAGE_LOCKED=0
-  NETWORK_STAGE_OUT=$("$SCRIPT_DIR/fm-startup-network.sh" start \
-    --locked "$NETWORK_STAGE_LOCKED" --harvest-pid $$ 2>&1) || NETWORK_STAGE_RC=$?
+  if [ "$FOREGROUND_NETWORK" -eq 0 ]; then
+    NETWORK_STAGE_OUT=$("$SCRIPT_DIR/fm-startup-network.sh" start \
+      --locked "$NETWORK_STAGE_LOCKED" --harvest-pid $$ 2>&1) || NETWORK_STAGE_RC=$?
+  elif [ -z "${FM_SESSION_START_FOREGROUND_FILE:-}" ]; then
+    NETWORK_STAGE_RC=1
+    NETWORK_STAGE_OUT='NETWORK_CHECKS: cannot retain the foreground startup request; startup remains incomplete.'
+  fi
 fi
 
 # --- 2. bootstrap --------------------------------------------------------
 # FM_BOOTSTRAP_NETWORK=skip on every path: bootstrap's own network half is what
-# the deferred stage above is running right now, and running it twice would both
-# re-block this digest and race the worker's sweeps against themselves.
+# the separate network stage owns; running it here would duplicate those sweeps
+# and put external calls back inside the local digest's deadline.
 stage bootstrap
 subsection "BOOTSTRAP"
 if [ "$READ_ONLY" -eq 1 ]; then
@@ -755,7 +826,7 @@ else
 fi
 
 # --- 3. wake-drain ---------------------------------------------------------
-# The inactive-outcome startup scan runs in the deferred worker launched above,
+# The inactive-outcome startup scan belongs to the separate network stage,
 # where its potentially slow current-state reads cannot block this digest. It
 # publishes findings through the same durable queue drained here; the watcher's
 # separate 900-second cadence remains unchanged.
@@ -990,10 +1061,9 @@ fi
 # Deliberately here and not later: these lines are actionable (a stuck clone, a
 # secondmate that could not be relaunched, broken GitHub auth), and the section
 # after this one is the curated memory a truncated tail is meant to take first.
-# Deliberately here and not earlier: this is the last point in the digest, so the
-# worker started at step 1 has had the whole composition above to finish in. It
-# is a NON-BLOCKING read either way - whatever the worker has published by now is
-# printed, and whatever it has not is named as not yet confirmed.
+# Deliberately here and not earlier: a persistent host's worker has had the
+# composition above to finish in. Harvest never waits for checks to finish;
+# unconfirmed checks, including the pending foreground run, are named as such.
 stage network-checks
 section "NETWORK CHECKS"
 if [ "$READ_ONLY" -eq 1 ]; then
@@ -1001,6 +1071,8 @@ if [ "$READ_ONLY" -eq 1 ]; then
   printf 'secondmate liveness and convergence, and pending handoff delivery were not run.\n'
   printf 'They need the fleet lock, and this session must not spawn, steer, or merge, so it\n'
   printf 'has no action they would gate. The session holding the lock runs them.\n'
+elif [ "$FOREGROUND_NETWORK" -eq 1 ] && [ "$NETWORK_STAGE_RC" -eq 0 ]; then
+  printf 'Pending: checks run in the foreground after this local digest, before the transient Codex tool returns.\n'
 else
   if [ "$NETWORK_STAGE_RC" -ne 0 ]; then
     printf '%s\n' "$NETWORK_STAGE_OUT"
@@ -1070,25 +1142,13 @@ section near the top of it governs what may still be read from disk.
 EOF
 fi
 
-if [ "$READ_ONLY" -eq 0 ] && [ "$REEMIT" -eq 0 ] && [ "$NETWORK_STAGE_RC" -eq 0 ]; then
-  COMPLETION_RECORDED=0
-  COMPLETION_PID=$(fm_session_lock_generation "$STATE" 2>/dev/null || true)
-  case "$COMPLETION_PID" in
-    '') COMPLETION_PID= ;;
-  esac
-  COMPLETION_TMP=$(mktemp "$STATE/.session-start-complete.XXXXXX" 2>/dev/null || true)
-  if [ -n "$COMPLETION_PID" ] && [ -n "$COMPLETION_TMP" ] \
-    && printf '%s\n' "$COMPLETION_PID" > "$COMPLETION_TMP" 2>/dev/null \
-    && mv -f "$COMPLETION_TMP" "$COMPLETION_FILE" 2>/dev/null; then
-    COMPLETION_RECORDED=1
-  else
-    [ -z "$COMPLETION_TMP" ] || rm -f "$COMPLETION_TMP" 2>/dev/null || true
-    printf '\nSESSION_START_COMPLETION: not recorded - the next clear or compact will run a full startup.\n'
-  fi
-  if [ "$SESSION_SOURCE" = startup ] && [ "$COMPLETION_RECORDED" -eq 1 ] && [ -n "$AGENTS_START_HASH" ]; then
-    if ! write_agents_baseline "$COMPLETION_PID" "$AGENTS_START_HASH"; then
-      printf '\nSESSION_START_AGENTS_BASELINE: not recorded - a later supported rebuild will re-emit AGENTS.md.\n'
-    fi
+if [ "$READ_ONLY" -eq 0 ] && [ "$NETWORK_STAGE_RC" -eq 0 ]; then
+  if [ "$FOREGROUND_NETWORK" -eq 1 ]; then
+    # Only a fully rendered, owned digest requests the foreground stage. The
+    # outer caller stays alive beyond the local digest's independent deadline.
+    printf 'ready\n%s\n' "$AGENTS_START_HASH" > "$FM_SESSION_START_FOREGROUND_FILE"
+  elif [ "$REEMIT" -eq 0 ]; then
+    record_session_start_completion "$AGENTS_START_HASH"
   fi
 fi
 

@@ -99,7 +99,7 @@ The pause path still never reads a secondmate's endpoint liveness - dead-or-miss
 Its initial normal-mode status signal still surfaces through the no-verb path, while a daemon-backed away posture self-handles that routine signal and owns later external-wait rechecks.
 Fresh stale panes use the same current-state read before trusting the status log, so an active run or a proven busy worker outranks an old captain-relevant status-log line left behind before validation.
 No-change heartbeats are also benign.
-Separately from heartbeat backoff and wedge handling, the watcher poll runs `bin/fm-inactive-reconcile.sh` on its own bounded cadence, while locked session start sends the same bounded local scan through `bin/fm-startup-network.sh`'s deferred worker so current-state reads never block the digest.
+Separately from heartbeat backoff and wedge handling, the watcher poll runs `bin/fm-inactive-reconcile.sh` on its own bounded cadence, while locked session start sends the same bounded local scan through `bin/fm-startup-network.sh`, using the [startup lifetime policy](sessionstart-nudge.md#network-work-has-its-own-deadline).
 In each home the scan considers only that home's long-inactive direct ordinary crewmates, excludes captain-held work, and accepts only `done` or `failed` from `bin/fm-crew-state.sh`.
 A secondmate retains a durable receipt for its idempotent report through the established parent route, and main-home captain presentation retains a separate receipt; neither path performs a forge or PR check.
 A secondmate home's terminal child ledger lines, PR registrations, captain holds, and merges are published on that same parent route by the scripts that record them, so no captain-facing outcome depends on the mate model appending it ([secondmate-parent-channel.md](secondmate-parent-channel.md)).
@@ -166,7 +166,7 @@ Optional Relay integrates with the watcher only after explicit opt-in; [configur
 Session ownership and its derived generation are owned by `bin/fm-session-lock-lib.sh`; `bin/fm-lock.sh` owns serialized publication and its record format.
 Linux Codex tool calls can enter different PID namespaces while retaining one native thread identity, so a numeric PID cannot identify their session across calls.
 The native tool-boundary identity binds repeat entry and deferred work; process namespace and birth coordinates distinguish proved dead owners from owners whose liveness is unknown.
-Same-session entry waits for its startup sweep to release the shared acquisition claim before refreshing ownership coordinates; competing sessions retain the takeover refusal.
+Same-session claim acquisition follows `bin/fm-lock.sh`'s serialization and uncertainty rules; competing sessions retain the takeover refusal.
 Shared transient lock primitives in `bin/fm-wake-lib.sh` also require namespace agreement before interpreting a PID on Linux.
 Legacy Linux transient locks without those coordinates remain unknown and are preserved; migration must establish that their owners ended before retiring their records.
 These checks preserve ambiguous ownership rather than infer death from age or an absent PID in another namespace.

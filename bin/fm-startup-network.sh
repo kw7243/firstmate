@@ -9,10 +9,9 @@
 # those calls is individually bounded, so one unreachable host could consume the
 # whole FM_SESSION_START_TIMEOUT budget and truncate the digest outright, turning
 # a slow network into a startup that never printed the work queue at all.
-# This script runs exactly that work OFF the blocking path: the digest is
-# composed from bounded local reads while these checks run concurrently in a
-# detached worker, and their result is reported back inline when it finishes in
-# time, or as a durable wake when it does not. The locked startup's bounded
+# This script runs that work outside the local digest under the lifetime policy
+# in bin/fm-session-start.sh's header. Results can be printed inline or delivered
+# as a durable wake. The locked startup's bounded
 # inactive-outcome scan also runs here because its local current-state reads can
 # be just as slow; that scan publishes its own findings to the durable wake queue.
 #
@@ -21,15 +20,16 @@
 # FM_BOOTSTRAP_NETWORK=only phase. bin/fm-inactive-reconcile.sh remains the
 # owner of the startup scan and its separate watcher cadence. Deferral changes
 # WHEN they run, not WHETHER, and three properties make the later run safe:
-#   - The work is idempotent detection. A run whose report is lost (killed
-#     worker, truncated digest, crashed session) loses no finding: the next run
-#     re-derives the same inactive terminal child, dead secondmate, stuck clone,
-#     or undelivered handoff. There is no once-only signal to miss.
-#   - Results are durable and always surface. Network sweep output lands in
-#     state/.startup-network.report and reaches the agent either inline in the
-#     digest or, when it finishes too late for the digest to inline it, as a
-#     `check: startup-network` wake. Inactive-scan findings land directly in the
-#     ordinary durable wake queue. The report wakes only when the late result is
+#   - The work is idempotent detection. Once ownership permits a retry, a run
+#     whose report was lost (killed worker, truncated digest, crashed session)
+#     can re-derive the same inactive terminal child, dead secondmate, stuck
+#     clone, or undelivered handoff. There is no once-only signal to miss.
+#   - Published results are durable. Network sweep output lands in
+#     state/.startup-network.report. Harvest tries to print it inline; an
+#     unacknowledged actionable result gets a bounded `check: startup-network`
+#     wake attempt. If delivery fails, the report retains that diagnostic for
+#     `... report`. Inactive-scan findings land directly in the ordinary durable
+#     wake queue. The report wakes only when the unacknowledged result is
 #     itself actionable (state is not "done", or bootstrap emitted something
 #     other than its explicit BOOTSTRAP_INFO no-action record;
 #     report_requires_wake owns that transport test). A late-finishing clean run is not captain-facing progress
@@ -39,14 +39,16 @@
 #     suppresses the wake, so a claimant that exits first cannot lose the
 #     result. While the worker is still running the digest states by name what
 #     is not yet confirmed.
-#   - Mutation authority is leased. The worker outlives the command that launched
-#     it, so it takes the same acquisition lease a new session must hold before
+#   - Mutation authority is leased. A detached worker can outlive its launcher;
+#     every mutating run takes the same acquisition lease a new session holds before
 #     replacing a dead owner, re-checks the captured owner under that lease, and
 #     holds it through the bounded mutating run. A takeover stays read-only until
 #     that run settles, so old and new owners can never sweep concurrently.
 #
 # Usage: fm-startup-network.sh start --locked <0|1> --harvest-pid <pid>
-#          Launch the detached worker and return immediately. Single-flight: a
+#          Launch the detached worker and return immediately on a persistent
+#          process host. A transient Codex tool runs the checks in the foreground
+#          instead, using the `run` contract below. On persistent hosts a
 #          running worker is reused only when its phases cover this request and,
 #          for locked work, it belongs to the same lock owner. A probe-only
 #          worker therefore cannot satisfy a later locked request. When worker
@@ -59,12 +61,16 @@
 #          names the session-start process
 #          that will try to print the result inline, so the worker can tell
 #          whether a wake is still needed.
-#        fm-startup-network.sh run --locked <0|1>
+#        fm-startup-network.sh run --locked <0|1> [--harvest-pid <pid>]
 #          Run the checks in the foreground and publish the result. This is what
 #          `start` detaches with its private generation reservation; run it
 #          directly to redo the stage by hand from the lock-owning harness.
-#          Exits non-zero when the stage was refused or could not publish,
-#          including a lock a live process still held at its deadline.
+#          --harvest-pid prints and acknowledges inline for that live claimant
+#          before the fallback-wake decision, as transient start does.
+#          A running record not proven dead refuses another foreground run.
+#          Exits non-zero when refused or unable to publish or deliver, including
+#          a lock a live process still held at its deadline. A published timeout
+#          or failed check result can still exit zero; inspect the report.
 #        fm-startup-network.sh harvest --pid <pid>
 #          Print the digest's NETWORK CHECKS section and release the inline-print
 #          claim. Called by bin/fm-session-start.sh, not by hand.
@@ -76,7 +82,7 @@
 #          only a slow run raises.
 #        fm-startup-network.sh wait [<seconds>]
 #          Block until the report is published, up to <seconds> (default 120).
-#          For operators and tests only; a session start never waits.
+#          For operators and tests only; session start does not call `wait`.
 #
 # STATE, all under this home's state/ and gitignored with it:
 #   .startup-network.status   key=value record - generation, lock_pid, state,
@@ -93,7 +99,8 @@
 #   .startup-network.report   the sweep output, byte for byte as
 #                             bin/fm-bootstrap.sh produced it, plus a
 #                             NETWORK_CHECKS: line whenever the stage itself
-#                             could not complete or had to downgrade.
+#                             could not complete, had to downgrade, or failed
+#                             to deliver its wake within the budget.
 #   .startup-network.claim    the generation and pid of a session start that
 #                             intends to print the result inline; a matching live
 #                             claimant gives harvest a bounded chance to finish.
@@ -118,6 +125,9 @@
 # aggregate deadline covering both the inactive-outcome scan and network sweeps
 # plus every lock the worker waits on before them.
 # Publication and delivery are bounded the same way by FM_SESSION_START_TIMEOUT.
+# Harvest output uses the remaining delivery budget and is acknowledged only
+# after successful printing. Failed or stalled output leaves the report intact,
+# releases the owned publication lock, and retains the fallback-wake attempt.
 # A lock that a live process still holds at either deadline ends the worker with
 # a failed record naming that holder and the rerun command, never a wait that
 # outlives the budget with its output discarded.
@@ -283,6 +293,14 @@ cmd_start() {  # <locked> <harvest-pid>
     return 1
   fi
 
+  # A transient Codex init kills detached descendants when its tool returns.
+  # Keep this invocation foreground; the ordinary runner retains all existing
+  # stage/publication bounds and unknown-owner refusals.
+  if fm_session_lock_transient_codex; then
+    cmd_run "$locked" "" "" "$harvest_pid"
+    return
+  fi
+
   take_lock "$PUBLISH_LOCK" "$(delivery_budget)" || return 1
   if [ "$(status_get state)" = running ]; then
     liveness=$(worker_state)
@@ -392,16 +410,26 @@ report_requires_wake() {  # <state>
 }
 
 queue_result_wake() {  # <state>
-  fm_wake_append check startup-network \
-    "check: startup-network: deferred startup network checks finished ($1); read them with $FM_ROOT/bin/fm-startup-network.sh report" \
-    || true
+  local rc=0
+  if take_lock "$FM_WAKE_QUEUE_LOCK" "$(seconds_until "$DELIVERY_DEADLINE")"; then
+    fm_wake_append_locked check startup-network \
+      "check: startup-network: deferred startup network checks finished ($1); read them with $FM_ROOT/bin/fm-startup-network.sh report" \
+      "$(seconds_until "$DELIVERY_DEADLINE")" || rc=$?
+    fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+  else
+    rc=1
+  fi
+  if [ "$rc" -ne 0 ]; then
+    printf 'NETWORK_CHECKS: wake delivery failed within its budget; the retained result is available through %s/bin/fm-startup-network.sh report\n' "$FM_ROOT" >> "$REPORT_FILE"
+  fi
+  return "$rc"
 }
 
 # Bounded by DELIVERY_DEADLINE, which publish() sets from the delivery budget.
 # Once the deadline passes, a still-live claimant is no longer waited for: the
 # wake decision is made as if it were gone, exactly as the old iteration cap did.
 await_delivery() {  # <generation> <state>
-  local generation=$1 state=$2 claim_record claim_generation claim_pid claim_live
+  local generation=$1 state=$2 claim_record claim_generation claim_pid claim_live rc
   while :; do
     claim_live=0
     if ! take_lock "$PUBLISH_LOCK" "$(seconds_until "$DELIVERY_DEADLINE")"; then
@@ -433,9 +461,12 @@ EOF
       [ "$claim_live" -eq 1 ] || rm -f "$CLAIM_FILE" 2>/dev/null || true
     fi
     if [ "$claim_live" -eq 0 ]; then
-      ! report_requires_wake "$state" || queue_result_wake "$state"
+      rc=0
+      if report_requires_wake "$state"; then
+        queue_result_wake "$state" || rc=$?
+      fi
       fm_lock_release "$PUBLISH_LOCK"
-      return 0
+      return "$rc"
     fi
     fm_lock_release "$PUBLISH_LOCK"
     sleep 0.1
@@ -488,6 +519,9 @@ publish() {  # <generation> <state> <phases> <locked> <started> <rc> <output-fil
     return 0
   fi
   state=$(record_result "$generation" "$state" "$phases" "$locked" "$started" "$rc" "$out" "$timings")
+  if [ -n "$harvest_pid" ] && kill -0 "$harvest_pid" 2>/dev/null; then
+    harvest_locked "$harvest_pid" || true
+  fi
   fm_lock_release "$PUBLISH_LOCK"
   await_delivery "$generation" "$state"
 }
@@ -503,6 +537,7 @@ publish() {  # <generation> <state> <phases> <locked> <started> <rc> <output-fil
 # than a failure nobody is woken for.
 publish_lock_held() {  # <generation> <phases> <locked> <started> <lockdir> <output-file> <timing-file>
   local generation=$1 phases=$2 locked=$3 started=$4 lockdir=$5 out=$6 timings=${7:-}
+  DELIVERY_DEADLINE=${DELIVERY_DEADLINE:-$(( $(now) + $(delivery_budget) ))}
   printf 'NETWORK_CHECKS: the deferred check worker gave up because %s was still held by %s at its deadline, so %s may be incomplete; rerun %s/bin/fm-startup-network.sh run --locked %s once that lock is released\n' \
     "$lockdir" "$(held_by)" "$(phase_label "$phases")" "$FM_ROOT" "$locked" >> "$out"
   if [ "$(status_get generation)" != "$generation" ] \
@@ -513,8 +548,11 @@ publish_lock_held() {  # <generation> <phases> <locked> <started> <lockdir> <out
   queue_result_wake failed
 }
 
-cmd_run() {  # <locked> <session-generation> <worker-generation>
+cmd_run() {  # <locked> <session-generation> <worker-generation> [<harvest-pid>]
   local locked=$1 lock_pid=$2 generation=$3 phases started budget out rc sweep_locked=0 downgraded=0 internal=0 lease_held=0 timings stage_started stage_deadline
+  local harvest_pid=${4:-}
+  local DELIVERY_DEADLINE=
+  case "$harvest_pid" in ''|0*|*[!0-9]*) harvest_pid= ;; esac
   mkdir -p "$STATE" 2>/dev/null || return 1
   started=$(now)
   budget=$(stage_budget)
@@ -664,13 +702,13 @@ print_finished() {  # <state>
     ''|*[!0-9]*) ;;
     *) took=$((finished - started)) ;;
   esac
-  printf 'completed off the startup path in %ss: %s.\n' "$took" "$(phase_label "$phases")"
-  [ "$state" = 'done' ] || printf 'The stage itself did not finish cleanly (%s) - the NETWORK_CHECKS line below names what to rerun.\n' "$state"
+  printf 'check run ended after %ss: %s.\n' "$took" "$(phase_label "$phases")" || return 1
+  [ "$state" = 'done' ] || printf 'The stage itself did not finish cleanly (%s) - the NETWORK_CHECKS line below names what to rerun.\n' "$state" || return 1
   if [ "$report_published" = 0 ]; then
     printf 'NETWORK_CHECKS: could not publish the deferred check report, so %s results are unavailable; rerun %s/bin/fm-startup-network.sh run --locked %s\n' \
       "$(phase_label "$phases")" "$FM_ROOT" "$(status_get locked)"
   elif [ -s "$REPORT_FILE" ]; then
-    cat "$REPORT_FILE"
+    cat "$REPORT_FILE" || return 1
     printf 'These ran AFTER the sections above were composed, so re-read any record a line here names.\n'
   else
     printf '(silent - no problems found)\n'
@@ -720,13 +758,8 @@ print_state() {
   esac
 }
 
-cmd_harvest() {  # <pid>
+harvest_locked() (
   local pid=$1 generation state claim_record claim_generation claim_pid
-  if ! take_lock "$PUBLISH_LOCK" "$(delivery_budget)"; then
-    printf 'NETWORK_CHECKS: the deferred check record is locked by %s, so %s could not be confirmed; read %s/bin/fm-startup-network.sh report once that lock is released\n' \
-      "$(held_by)" "$(phase_label "$(status_get phases)")" "$FM_ROOT"
-    return 1
-  fi
   generation=$(status_get generation)
   # Another session's live claim is left alone; the worker reaps a dead one.
   if [ -f "$CLAIM_FILE" ]; then
@@ -740,14 +773,27 @@ EOF
     fi
   fi
   state=$(status_get state)
-  print_state
+  FM_TIMEOUT_MECHANISM_OVERRIDE=bash fm_run_timed "$(seconds_until "$DELIVERY_DEADLINE")" print_state || return 1
   case "$state" in
-    done|timeout|failed) [ "$(status_get report_published)" = 0 ] || write_atomic "$DELIVERED_FILE" <<EOF || true
+    done|timeout|failed) [ "$(status_get report_published)" = 0 ] || write_atomic "$DELIVERED_FILE" <<EOF || return 1
 delivered
 EOF
       ;;
   esac
+)
+
+cmd_harvest() {  # <pid>
+  local pid=$1 rc=0
+  local DELIVERY_DEADLINE=$(( $(now) + $(delivery_budget) ))
+  if ! take_lock "$PUBLISH_LOCK" "$(seconds_until "$DELIVERY_DEADLINE")"; then
+    fm_run_timed "$(seconds_until "$DELIVERY_DEADLINE")" \
+      printf 'NETWORK_CHECKS: the deferred check record is locked by %s, so %s could not be confirmed; read %s/bin/fm-startup-network.sh report once that lock is released\n' \
+      "$(held_by)" "$(phase_label "$(status_get phases)")" "$FM_ROOT" || true
+    return 1
+  fi
+  harvest_locked "$pid" || rc=$?
   fm_lock_release "$PUBLISH_LOCK"
+  return "$rc"
 }
 
 cmd_wait() {  # <seconds>
@@ -794,8 +840,8 @@ case "$MODE" in
       exit "$rc"
     }
     ;;
-  run) cmd_run "$LOCKED" "$LOCK_PID" "$GENERATION" || exit $? ;;
-  harvest) cmd_harvest "${HARVEST_PID:-}" ;;
+  run) cmd_run "$LOCKED" "$LOCK_PID" "$GENERATION" "$HARVEST_PID" || exit $? ;;
+  harvest) cmd_harvest "${HARVEST_PID:-}" || exit $? ;;
   report) print_state; print_timings ;;
   wait) cmd_wait "${1:-120}" || exit $? ;;
   -h|--help) usage ;;

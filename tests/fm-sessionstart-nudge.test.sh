@@ -1091,6 +1091,89 @@ test_run_reports_a_failed_session_start_as_digest_text() {
   pass "run wrapper: a session start that cannot take the lock still opens the session and says so"
 }
 
+test_codex_hook_without_thread_proof_defers_to_native_startup() {
+  local fixture="$TMP_ROOT/codex-hook-proof" root="$TMP_ROOT/codex-hook-primary" script
+  if [ "$(uname)" != Linux ]; then
+    printf '# skip: native Codex thread provenance is Linux-only\n'
+    return 0
+  fi
+  mkdir -p "$fixture"
+  cp /bin/bash "$fixture/codex"
+  make_run_primary "$root"
+  for script in "$ROOT"/bin/*.sh; do
+    ln -s "$script" "$root/bin/${script##*/}"
+  done
+  rm "$root/bin/fm-session-start.sh"
+  cat > "$root/bin/fm-session-start.sh" <<'SH'
+#!/usr/bin/env bash
+set -eu
+bash "$FM_ROOT_OVERRIDE/bin/fm-lock.sh"
+. "$FM_ROOT_OVERRIDE/bin/fm-session-lock-lib.sh"
+fm_session_lock_owned_by_self "$FM_HOME/state"
+fm_session_lock_generation "$FM_HOME/state" > "$FM_HOME/state/.session-start-complete"
+printf 'NATIVE_DIGEST:%s\n' "$*"
+SH
+  chmod +x "$root/bin/fm-session-start.sh"
+  fm_git_worktree "$fixture/linked-base" "$fixture/linked" fm/codex-unproved-hook
+  mkdir -p "$fixture/linked/bin" "$fixture/linked/state"
+  : > "$fixture/linked/AGENTS.md"
+  cat > "$fixture/tool.sh" <<'SH'
+set -eu
+mode=$1
+if [ "$mode" = native ]; then
+  out=$(bash "$FM_ROOT_OVERRIDE/bin/fm-sessionstart-run.sh" --source startup </dev/null)
+  case "$out" in *'NATIVE_DIGEST:--source startup'*) ;; *) exit 20 ;; esac
+  . "$FM_ROOT_OVERRIDE/bin/fm-session-lock-lib.sh"
+  fm_session_lock_owned_by_self "$FM_HOME/state"
+  [ "$(cat "$FM_HOME/state/.session-start-complete")" = "codex:$CODEX_THREAD_ID" ]
+  out=$(bash "$FM_ROOT_OVERRIDE/bin/fm-sessionstart-run.sh" --source compact </dev/null)
+  case "$out" in *'NATIVE_DIGEST:--reemit --source compact'*) ;; *) exit 21 ;; esac
+  exit 0
+fi
+if [ "$mode" = mismatch ]; then
+  export CODEX_THREAD_ID=22222222-2222-4222-8222-222222222222
+else
+  [ -z "${CODEX_THREAD_ID:-}" ]
+fi
+snapshot=$(mktemp -d "$FM_HOME/state-snapshot.XXXXXX")
+cp -a "$FM_HOME/state/." "$snapshot/"
+for transport in argument payload; do
+  for source in startup new clear compact resume reload fork somethingnew ''; do
+    if [ "$transport" = argument ]; then
+      out=$(bash "$FM_ROOT_OVERRIDE/bin/fm-sessionstart-run.sh" --source "$source" </dev/null 2>&1)
+    else
+      out=$(printf '{"hook_event_name":"SessionStart","source":"%s","session_id":"11111111-1111-4111-8111-111111111111"}' "$source" |
+        bash "$FM_ROOT_OVERRIDE/bin/fm-sessionstart-run.sh" 2>&1)
+    fi
+    [ "$out" = "$EXPECTED_NUDGE" ] || { printf '%s\n' "$out"; exit 22; }
+  done
+done
+if bash "$FM_ROOT_OVERRIDE/bin/fm-lock.sh" > "$FM_HOME/direct-refusal" 2>&1; then exit 23; fi
+grep -q 'cannot verify the Codex tool session identity' "$FM_HOME/direct-refusal"
+out=$(NO_MISTAKES_GATE=1 bash "$FM_ROOT_OVERRIDE/bin/fm-sessionstart-run.sh" --source startup </dev/null 2>&1)
+[ -z "$out" ]
+runner="$FM_ROOT_OVERRIDE/bin/fm-sessionstart-run.sh"
+out=$(FM_ROOT_OVERRIDE="$UNMARKED_LINKED" FM_HOME="$UNMARKED_LINKED" bash "$runner" --source startup </dev/null 2>&1)
+[ -z "$out" ]
+diff -r "$snapshot" "$FM_HOME/state"
+rm -rf "$snapshot"
+SH
+  cat > "$fixture/driver.sh" <<'SH'
+set -eu
+env -u CODEX_THREAD_ID bash "$1" missing
+CODEX_THREAD_ID=11111111-1111-4111-8111-111111111111 bash "$1" native
+env -u CODEX_THREAD_ID bash "$1" missing-owned
+CODEX_THREAD_ID=11111111-1111-4111-8111-111111111111 bash "$1" mismatch
+:
+SH
+  env -u CODEX_THREAD_ID -u CLAUDE_PID -u CLAUDE_CODE_SESSION_ID -u FM_STATE_OVERRIDE \
+    FM_GATE_REFUSE_BYPASS=0 FM_ROOT_OVERRIDE="$root" FM_HOME="$root" EXPECTED_NUDGE="$NUDGE_LINE" \
+    UNMARKED_LINKED="$fixture/linked" "$fixture/codex" "$fixture/driver.sh" "$fixture/tool.sh" \
+    > "$fixture/result" 2>&1 \
+      || fail "Codex hook provenance routing failed: $(cat "$fixture/result")"
+  pass 'run wrapper: unproved Codex hooks nudge without mutation while native proof preserves startup and re-emission'
+}
+
 test_genuine_primary_nudges
 test_gate_env_is_silent
 test_gate_common_dir_is_silent
@@ -1113,6 +1196,7 @@ test_run_gate_and_scope_are_silent
 test_run_creates_missing_state_on_a_fresh_primary
 test_run_reports_a_state_dir_it_cannot_create
 test_run_reports_a_failed_session_start_as_digest_text
+test_codex_hook_without_thread_proof_defers_to_native_startup
 test_pi_startup_classifies_cli_continuations
 test_pi_sessionstart_generation_prerequisite
 test_pi_reload_releases_sessionstart_exit_listener

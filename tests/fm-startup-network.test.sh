@@ -1121,6 +1121,176 @@ EOF
   pass "fm-startup-network: a held publish lock ends the worker inside its budget with a failed-rerun record"
 }
 
+test_wake_delivery_is_bounded_and_preserves_the_report() {
+  local rec home root log lock_name publish_blocked rc began took
+  for lock_name in .wake-queue.lock .watcher-down.lock; do
+    for publish_blocked in 0 1; do
+      rec=$(new_world "wake-bound-$lock_name-$publish_blocked")
+      IFS='|' read -r home root log <<EOF
+$rec
+EOF
+      mkdir "$home/state/$lock_name"
+      printf '999999999\n' > "$home/state/$lock_name/pid"
+      printf 'foreign-boot/pid:[999999]\n' > "$home/state/$lock_name/pid-namespace"
+      if [ "$publish_blocked" -eq 1 ]; then
+        mkdir "$home/state/.startup-network.lock"
+        cp "$home/state/$lock_name/pid" "$home/state/.startup-network.lock/pid"
+        cp "$home/state/$lock_name/pid-namespace" "$home/state/.startup-network.lock/pid-namespace"
+      fi
+      began=$(date +%s)
+      rc=0
+      fm_run_timed 12 env PATH="$root/bin:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$root" \
+        FM_STARTUP_NETWORK_TIMEOUT=2 FM_SESSION_START_TIMEOUT=2 FM_FAKE_BOOTSTRAP_LOG="$log" \
+        FM_FAKE_BOOTSTRAP_OUT='retained finding' \
+        "$root/bin/fm-startup-network.sh" run --locked 0 > "$home/out" 2>&1 || rc=$?
+      took=$(( $(date +%s) - began ))
+      [ "$rc" -ne 124 ] && [ "$rc" -ne 0 ] || fail "blocked wake delivery did not return failure: $lock_name/$publish_blocked"
+      [ "$took" -le 8 ] || fail "blocked wake delivery outlived its budgets: ${took}s"
+      assert_grep 'wake delivery failed within its budget' "$home/state/.startup-network.report" 'wake delivery failure was not retained'
+      if [ "$publish_blocked" -eq 0 ]; then
+        assert_grep 'retained finding' "$home/state/.startup-network.report" 'blocked wake delivery discarded the finding'
+        assert_absent "$home/state/.startup-network.lock" 'blocked delivery retained its publication lock'
+      fi
+      if [ "$lock_name" = .watcher-down.lock ]; then
+        assert_absent "$home/state/.wake-queue.lock" 'blocked marker retained its wake lock'
+      fi
+      assert_grep 'foreign-boot' "$home/state/$lock_name/pid-namespace" 'blocked delivery altered the foreign owner'
+    done
+  done
+  pass 'fm-startup-network: all wake publication locks are bounded and findings survive delivery failure'
+}
+
+test_failed_wake_append_restores_recovery_state() {
+  local rec home root log rc=0
+  rec=$(new_world wake-write-failure)
+  IFS='|' read -r home root log <<EOF
+$rec
+EOF
+  mkdir "$home/state/.wake-queue"
+  printf 'announced:downtime:original-generation\n' > "$home/state/.watcher-down"
+  FM_SESSION_START_TIMEOUT=2 FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_OUT='retained finding' \
+    run_stage "$home" "$root" run --locked 0 > "$home/out" 2>&1 || rc=$?
+  [ "$rc" -ne 0 ] || fail 'failed wake append reported success'
+  [ "$(cat "$home/state/.watcher-down")" = announced:downtime:original-generation ] || fail 'failed wake append changed recovery state'
+  assert_grep 'retained finding' "$home/state/.startup-network.report" 'failed wake append discarded report'
+  assert_absent "$home/state/.wake-queue.lock" 'failed wake append retained queue lock'
+  assert_absent "$home/state/.watcher-down.lock" 'failed wake append retained recovery lock'
+  assert_absent "$home/state/.startup-network.lock" 'failed wake append retained publication lock'
+  pass 'fm-startup-network: failed bounded append restores recovery state and releases owned locks'
+}
+
+test_foreground_inline_delivery_and_fallback() {
+  local mode rec home root log claimant rc
+  for mode in printed closed-output failed-ack dead-claim no-claim; do
+    rec=$(new_world "inline-$mode")
+    IFS='|' read -r home root log <<EOF
+$rec
+EOF
+    claimant=$$
+    [ "$mode" != dead-claim ] || claimant=999999999
+    [ "$mode" != no-claim ] || claimant=0
+    if [ "$mode" = failed-ack ]; then
+      mkdir "$home/state/.startup-network.delivered"
+      chmod 500 "$home/state/.startup-network.delivered"
+    fi
+    rc=0
+    if [ "$mode" = closed-output ]; then
+      FM_SESSION_START_TIMEOUT=2 FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_OUT='MISSING: inline fixture' \
+        run_stage "$home" "$root" run --locked 0 --harvest-pid "$claimant" >&- 2> "$home/stderr" || rc=$?
+    else
+      FM_SESSION_START_TIMEOUT=2 FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_OUT='MISSING: inline fixture' \
+        run_stage "$home" "$root" run --locked 0 --harvest-pid "$claimant" > "$home/stdout" 2> "$home/stderr" || rc=$?
+    fi
+    [ "$rc" -eq 0 ] || fail "inline $mode did not publish or deliver its fallback"
+    assert_grep 'MISSING: inline fixture' "$home/state/.startup-network.report" "inline $mode discarded the report"
+    assert_absent "$home/state/.startup-network.lock" "inline $mode retained its publication lock"
+    if [ "$mode" = printed ]; then
+      [ "$(grep -c 'MISSING: inline fixture' "$home/stdout")" -eq 1 ] || fail 'inline result was not printed exactly once'
+      [ -f "$home/state/.startup-network.delivered" ] || fail 'inline result was not acknowledged'
+      [ ! -s "$home/state/.wake-queue" ] || fail 'acknowledged inline result also woke the session'
+    else
+      [ ! -f "$home/state/.startup-network.delivered" ] || fail "inline $mode incorrectly acknowledged delivery"
+      [ "$(grep -c $'check\tstartup-network' "$home/state/.wake-queue")" -eq 1 ] || fail "inline $mode did not queue exactly one fallback"
+    fi
+    if [ "$mode" = failed-ack ]; then chmod 700 "$home/state/.startup-network.delivered"; fi
+  done
+
+  rc=0
+  run_stage "$home" "$root" harvest --pid '' >&- 2> "$home/harvest-stderr" || rc=$?
+  [ "$rc" -ne 0 ] || fail 'ordinary harvest swallowed failed printing'
+  [ ! -f "$home/state/.startup-network.delivered" ] || fail 'ordinary harvest acknowledged failed printing'
+  assert_absent "$home/state/.startup-network.lock" 'ordinary failed harvest retained its publication lock'
+  pass 'fm-startup-network: foreground delivery acknowledges printing before wake fallback, including failed sinks and receipts'
+}
+
+test_harvest_stalled_output_is_bounded() {
+  local mode rec home root log holder waited
+  for mode in run finished pending locked; do
+    rec=$(new_world "stalled-output-$mode")
+    IFS='|' read -r home root log <<EOF
+$rec
+EOF
+    holder=
+    case "$mode" in
+      finished|pending)
+        FM_SESSION_START_TIMEOUT=10 FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_OUT='MISSING: stalled output fixture' \
+          FM_FAKE_BOOTSTRAP_RELEASE_FILE="$home/release" \
+          run_stage "$home" "$root" start --locked 0 --harvest-pid $$
+        await_worker_record "$home"
+        if [ "$mode" = finished ]; then
+          touch "$home/release"
+          run_stage "$home" "$root" wait 10 || fail 'stalled output fixture did not finish'
+        fi
+        ;;
+      locked) holder=$(hold_publish_lock "$home") ;;
+    esac
+    PATH="$root/bin:$PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$root" FM_FAKE_HARNESS_PID=$$ \
+      FM_SESSION_START_TIMEOUT=2 FM_FAKE_BOOTSTRAP_LOG="$log" FM_FAKE_BOOTSTRAP_OUT='MISSING: stalled output fixture' \
+      python3 - "$root/bin/fm-startup-network.sh" "$mode" $$ <<'PY' || fail "stalled $mode output outlived its delivery budget"
+import os, signal, subprocess, sys
+script, mode, claimant = sys.argv[1:]
+reader, writer = os.pipe()
+os.set_blocking(writer, False)
+try:
+    while True:
+        os.write(writer, b"x" * 65536)
+except BlockingIOError:
+    pass
+os.set_blocking(writer, True)
+args = ["run", "--locked", "0", "--harvest-pid", claimant] if mode == "run" else ["harvest", "--pid", claimant]
+process = subprocess.Popen(["bash", script, *args], stdin=subprocess.DEVNULL,
+                           stdout=writer, stderr=writer, start_new_session=True)
+os.close(writer)
+try:
+    result = process.wait(timeout=8)
+    assert result == (0 if mode == "run" else 1), (mode, result)
+finally:
+    if process.poll() is None:
+        os.killpg(process.pid, signal.SIGKILL)
+        process.wait()
+    os.close(reader)
+PY
+    [ ! -f "$home/state/.startup-network.delivered" ] || fail "stalled $mode output was acknowledged"
+    if [ "$mode" = locked ]; then
+      [ "$(cat "$home/state/.startup-network.lock/pid")" = "$holder" ] || fail 'refused harvest changed another publication lock'
+      kill "$holder" 2>/dev/null || true
+    else
+      touch "$home/release"
+      run_stage "$home" "$root" wait 10 || fail "stalled $mode worker did not publish"
+      wait_for_startup_network_wake "$home" || fail "stalled $mode output lost fallback delivery"
+      waited=0
+      while [ -e "$home/state/.startup-network.lock" ] && [ "$waited" -lt 50 ]; do
+        sleep 0.1
+        waited=$((waited + 1))
+      done
+      assert_absent "$home/state/.startup-network.lock" "stalled $mode output retained its publication lock"
+      assert_grep 'MISSING: stalled output fixture' "$home/state/.startup-network.report" "stalled $mode output lost the report"
+      [ "$(grep -c $'check\tstartup-network' "$home/state/.wake-queue")" -eq 1 ] || fail "stalled $mode output duplicated its fallback"
+    fi
+  done
+  pass 'fm-startup-network: stalled harvest output is bounded, releases owned locks, and preserves fallback delivery'
+}
+
 test_wait_fails_without_a_published_stage
 test_start_returns_without_holding_the_callers_stdout
 test_harvest_acknowledgement_suppresses_the_wake_and_no_claim_produces_it
@@ -1147,4 +1317,8 @@ test_timings_are_published_and_only_the_on_demand_report_prints_them
 test_a_bounded_run_still_publishes_the_timings_it_managed_to_record
 test_the_timing_artifact_cannot_carry_a_command_line_or_forge_records
 test_a_held_publish_lock_cannot_keep_the_worker_alive_past_its_budget
+test_wake_delivery_is_bounded_and_preserves_the_report
+test_failed_wake_append_restores_recovery_state
+test_foreground_inline_delivery_and_fallback
+test_harvest_stalled_output_is_bounded
 echo "# fm-startup-network.test.sh: all assertions passed"
