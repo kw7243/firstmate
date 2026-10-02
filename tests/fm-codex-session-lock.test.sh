@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Each grouped fixture deliberately restores the outer home/root on exit.
+# shellcheck disable=SC2030,SC2031
 # Behavioral Linux ownership tests with real process ancestry. The copied bash
 # executable supplies a portable Codex-shaped boundary, not vendor evidence;
 # actual Codex verification is recorded in docs/verification/runtime-backends.md.
@@ -214,6 +216,155 @@ TOOL
   bash "$FM_ROOT_OVERRIDE/bin/fm-startup-network.sh" wait 10 >/dev/null || fail 'sweep did not publish'
 )
 pass 'Codex reemit waits for its own sweep, refreshes coordinates, and refuses a competing session'
+
+# Model only the transient-context signal; real Codex namespace lifetime is
+# covered by the native-tool probe, not by this host process fixture.
+mkdir -p "$TMP_ROOT/foreground-root/bin" "$TMP_ROOT/foreground-home/state"
+for script in "$ROOT"/bin/*.sh; do
+  case "${script##*/}" in fm-bootstrap.sh|fm-inactive-reconcile.sh|fm-herdr-session-cleanup.sh|fm-session-lock-lib.sh) continue ;; esac
+  ln -s "$script" "$TMP_ROOT/foreground-root/bin/${script##*/}"
+done
+ln -s "$ROOT/docs" "$TMP_ROOT/foreground-root/docs"
+cp "$ROOT/bin/fm-session-lock-lib.sh" "$TMP_ROOT/foreground-root/bin/fm-session-lock-lib.sh"
+printf '\nfm_session_lock_transient_codex() { return 0; }\n' >> "$TMP_ROOT/foreground-root/bin/fm-session-lock-lib.sh"
+cat > "$TMP_ROOT/foreground-root/bin/fm-inactive-reconcile.sh" <<'STUB'
+#!/usr/bin/env bash
+exit 0
+STUB
+cat > "$TMP_ROOT/foreground-root/bin/fm-bootstrap.sh" <<'STUB'
+#!/usr/bin/env bash
+set -eu
+if [ "${FM_BOOTSTRAP_NETWORK:-}" != only ]; then
+  sleep "${FM_TEST_LOCAL_SLEEP:-0}"
+  exit 0
+fi
+if [ -n "${FM_TEST_DIGEST_OUTPUT:-}" ]; then
+  grep -q 'NEXT STEP' "$FM_TEST_DIGEST_OUTPUT"
+  [ ! -e "$FM_HOME/state/.session-start-complete" ]
+fi
+printf 'sweep-started\n' >> "$FM_HOME/sweeps"
+sleep "${FM_TEST_SWEEP_SLEEP:-0}"
+printf 'BOOTSTRAP_INFO: fixture completed\n'
+STUB
+cp "$TMP_ROOT/foreground-root/bin/fm-inactive-reconcile.sh" "$TMP_ROOT/foreground-root/bin/fm-herdr-session-cleanup.sh"
+chmod +x "$TMP_ROOT/foreground-root/bin/fm-bootstrap.sh" "$TMP_ROOT/foreground-root/bin/fm-inactive-reconcile.sh" "$TMP_ROOT/foreground-root/bin/fm-herdr-session-cleanup.sh"
+cat > "$TMP_ROOT/foreground.sh" <<'TOOL'
+set -eu
+export FM_TEST_DIGEST_OUTPUT="$FM_HOME/digest.out"
+bash "$FM_ROOT_OVERRIDE/bin/fm-session-start.sh" > "$FM_TEST_DIGEST_OUTPUT" 2>&1
+. "$ROOT/bin/fm-session-lock-lib.sh"
+fm_session_lock_owned_by_self "$FM_HOME/state"
+[ "$(cat "$FM_HOME/state/.session-start-complete")" = "codex:$CODEX_THREAD_ID" ]
+[ ! -e "$FM_HOME/state/.lock.acquire" ]
+grep -qx state=done "$FM_HOME/state/.startup-network.status"
+grep -qx report_published=1 "$FM_HOME/state/.startup-network.status"
+[ "$(wc -l < "$FM_HOME/sweeps")" -eq 1 ]
+# Re-emission runs the read-only probe, retains the generation and completes.
+unset FM_TEST_DIGEST_OUTPUT
+bash "$FM_ROOT_OVERRIDE/bin/fm-session-start.sh" --reemit > "$FM_HOME/reemit.out" 2>&1
+fm_session_lock_owned_by_self "$FM_HOME/state"
+[ ! -e "$FM_HOME/state/.lock.acquire" ]
+grep -qx state=done "$FM_HOME/state/.startup-network.status"
+grep -qx phases=probe "$FM_HOME/state/.startup-network.status"
+TOOL
+(
+  export FM_HOME="$TMP_ROOT/foreground-home" FM_ROOT_OVERRIDE="$TMP_ROOT/foreground-root"
+  run_tool "$first" "$TMP_ROOT/foreground.sh" > "$TMP_ROOT/foreground.out" 2>&1 \
+    || fail "transient foreground startup failed: $(cat "$TMP_ROOT/foreground.out" "$FM_HOME/digest.out")"
+  assert_contains "$(cat "$FM_HOME/digest.out")" 'FOREGROUND NETWORK CHECKS' 'transient startup omitted its foreground result'
+  assert_not_contains "$(cat "$FM_HOME/digest.out")" '●  STARTUP TRUNCATED' 'transient startup exceeded its local bound'
+)
+pass 'transient startup prints its local digest before checks and publishes completion after releasing the claim'
+
+cat > "$TMP_ROOT/foreground-bound.sh" <<'TOOL'
+set -eu
+bash "$FM_ROOT_OVERRIDE/bin/fm-lock.sh"
+FM_TEST_SWEEP_SLEEP=10 FM_STARTUP_NETWORK_TIMEOUT=2 \
+  bash "$FM_ROOT_OVERRIDE/bin/fm-startup-network.sh" start --locked 1 --harvest-pid $$
+# start itself retains a transient invocation through timeout publication.
+grep -qx state=timeout "$FM_HOME/state/.startup-network.status"
+grep -qx report_published=1 "$FM_HOME/state/.startup-network.status"
+[ ! -e "$FM_HOME/state/.lock.acquire" ]
+bash "$FM_ROOT_OVERRIDE/bin/fm-lock.sh"
+TOOL
+(
+  export FM_HOME="$TMP_ROOT/foreground-bound-home" FM_ROOT_OVERRIDE="$TMP_ROOT/foreground-root"
+  run_tool "$first" "$TMP_ROOT/foreground-bound.sh" > "$TMP_ROOT/foreground-bound.out" 2>&1 \
+    || fail "transient start abandoned its bounded worker: $(cat "$TMP_ROOT/foreground-bound.out")"
+)
+pass 'direct transient start publishes a bounded slow-stage result and releases its claim before returning'
+
+cat > "$TMP_ROOT/foreground-truncated.sh" <<'TOOL'
+set -eu
+FM_SESSION_START_TIMEOUT=10 FM_TEST_LOCAL_SLEEP=20 \
+  bash "$FM_ROOT_OVERRIDE/bin/fm-session-start.sh" > "$FM_HOME/truncated.out" 2>&1
+grep -q '●  STARTUP TRUNCATED' "$FM_HOME/truncated.out"
+[ ! -e "$FM_HOME/state/.session-start-complete" ]
+[ ! -e "$FM_HOME/sweeps" ]
+[ ! -e "$FM_HOME/state/.startup-network.status" ]
+TOOL
+(
+  export FM_HOME="$TMP_ROOT/foreground-truncated-home" FM_ROOT_OVERRIDE="$TMP_ROOT/foreground-root"
+  mkdir -p "$FM_HOME"
+  run_tool "$first" "$TMP_ROOT/foreground-truncated.sh" > "$TMP_ROOT/foreground-truncated.out" 2>&1 \
+    || fail "truncated transient startup launched checks or recorded completion: $(cat "$TMP_ROOT/foreground-truncated.out")"
+)
+pass 'truncated transient local digest starts no checks and records no completion'
+
+cat > "$TMP_ROOT/foreground-unknown.sh" <<'TOOL'
+set -eu
+bash "$FM_ROOT_OVERRIDE/bin/fm-lock.sh"
+cat > "$FM_HOME/state/.startup-network.status" <<'STATUS'
+state=running
+pid=999999999
+pid_namespace=foreign-boot/pid:[999999]
+pid_starttime=1
+locked=1
+phases=probe,sweeps
+generation=unknown-generation
+STATUS
+cp "$FM_HOME/state/.startup-network.status" "$FM_HOME/record-before"
+bash "$FM_ROOT_OVERRIDE/bin/fm-session-start.sh" > "$FM_HOME/unknown.out" 2>&1
+cmp "$FM_HOME/record-before" "$FM_HOME/state/.startup-network.status"
+[ ! -e "$FM_HOME/state/.session-start-complete" ]
+[ ! -e "$FM_HOME/sweeps" ]
+grep -q 'startup remains incomplete' "$FM_HOME/unknown.out"
+TOOL
+(
+  export FM_HOME="$TMP_ROOT/foreground-unknown-home" FM_ROOT_OVERRIDE="$TMP_ROOT/foreground-root"
+  run_tool "$first" "$TMP_ROOT/foreground-unknown.sh" > "$TMP_ROOT/foreground-unknown.out" 2>&1 \
+    || fail "transient startup replaced an unknown worker: $(cat "$TMP_ROOT/foreground-unknown.out")"
+)
+pass 'transient startup preserves an unverifiable worker and leaves completion absent'
+
+cat > "$TMP_ROOT/foreign-claim.sh" <<'TOOL'
+set -eu
+. "$ROOT/bin/fm-session-lock-lib.sh"
+bash "$ROOT/bin/fm-lock.sh"
+. "$ROOT/bin/fm-wake-lib.sh"
+fm_lock_try_acquire "$STATE/.lock.acquire"
+printf 'foreign-boot/pid:[999999]\n' > "$STATE/.lock.acquire/pid-namespace"
+cp "$STATE/.lock" "$FM_HOME/pid-before"
+cp "$STATE/.lock-session" "$FM_HOME/session-before"
+cp "$STATE/.lock.acquire/pid" "$FM_HOME/claim-before"
+fm_session_lock_owned_by_self "$STATE"
+if timeout 15 bash "$ROOT/bin/fm-lock.sh" > "$FM_HOME/refusal" 2>&1; then exit 80; fi
+grep -q 'session owner cannot be verified' "$FM_HOME/refusal"
+cmp "$STATE/.lock" "$FM_HOME/pid-before"
+cmp "$STATE/.lock-session" "$FM_HOME/session-before"
+cmp "$STATE/.lock.acquire/pid" "$FM_HOME/claim-before"
+grep -qx 'foreign-boot/pid:\[999999\]' "$STATE/.lock.acquire/pid-namespace"
+# A descendant cannot manufacture native identity even when the record is ours.
+if CODEX_THREAD_ID=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa bash "$ROOT/bin/fm-lock.sh" > "$FM_HOME/identity-refusal" 2>&1; then exit 81; fi
+grep -q 'cannot verify the Codex tool session identity' "$FM_HOME/identity-refusal"
+cmp "$STATE/.lock-session" "$FM_HOME/session-before"
+TOOL
+(
+  export FM_HOME="$TMP_ROOT/foreign-claim-home"
+  run_tool "$first" "$TMP_ROOT/foreign-claim.sh" > "$TMP_ROOT/foreign-claim.out" 2>&1 \
+    || fail "same-session foreign claim was not safely refused: $(cat "$TMP_ROOT/foreign-claim.out")"
+)
+pass 'same-session entry promptly refuses an unverifiable claim without changing ownership, and forged identity remains refused'
 
 # An unannotated PID 1 is never ownership evidence for a native Codex call.
 FM_HOME="$TMP_ROOT/home"

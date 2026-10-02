@@ -71,7 +71,7 @@
 # EVERY nonzero child exit, not only the bound: a child that dies or is killed
 # mid-stage must never truncate the digest silently.
 #
-# NO NETWORK ON THE BLOCKING PATH. This digest runs on a session-open hook that
+# NO NETWORK BEFORE THE LOCAL DIGEST. This digest runs on a session-open hook that
 # blocks session initialization, so anything it waits for is time the captain
 # waits before the first turn - and every external-network call it used to make
 # was individually unbounded. One unreachable remote secondmate could burn the
@@ -79,8 +79,13 @@
 # could cost the work queue itself.
 # So no step between here and the last line below makes an external-network
 # call. The five that did - `gh auth status`, secondmate liveness, secondmate
-# convergence, pending remote handoff delivery, and the fleet-sync fetch - are
-# started as one detached bounded worker right after the lock (step 1) and
+# convergence, pending remote handoff delivery, and the fleet-sync fetch run
+# after acquisition, under their own bounds.
+# A transient Linux Codex tool cannot retain detached descendants. In that
+# context the outer caller runs the same bounded checks in the foreground AFTER
+# the local digest, before publishing completion and returning from the tool.
+# The local digest and network stage keep their separate existing deadlines.
+# On a persistent process host, the checks are started as one detached bounded worker right after the lock (step 1) and
 # harvested at step 7 without ever blocking on it. The bounded inactive-outcome
 # startup scan joins that worker because its local current-state reads can also
 # be slow. bin/fm-startup-network.sh owns that stage and its safety argument;
@@ -287,7 +292,50 @@ stage() {  # <stage-name>: breadcrumb for the parent's truncation banner
 # shellcheck source=bin/fm-session-lock-lib.sh
 . "$SCRIPT_DIR/fm-session-lock-lib.sh"
 
+# The baseline describes instructions this true session started with, not the
+# most recently emitted instructions. It is intentionally immutable for this
+# lock owner: every later stale-context rebuild needs the current file again.
+write_agents_baseline() {  # <lock-pid> <agents-hash>
+  local lock_pid=$1 agents_hash=$2 tmp
+  [ -n "$lock_pid" ] && [ -n "$agents_hash" ] || return 1
+  tmp=$(mktemp "$STATE/.session-start-agents-baseline.XXXXXX" 2>/dev/null) || return 1
+  if printf '%s\n%s\n' "$lock_pid" "$agents_hash" > "$tmp" 2>/dev/null \
+    && mv -f "$tmp" "$AGENTS_BASELINE_FILE" 2>/dev/null; then
+    return 0
+  fi
+  rm -f "$tmp" 2>/dev/null || true
+  return 1
+}
+
+record_session_start_completion() {  # <agents-hash>
+  local AGENTS_START_HASH=$1 COMPLETION_RECORDED COMPLETION_PID COMPLETION_TMP
+  COMPLETION_RECORDED=0
+  COMPLETION_PID=$(fm_session_lock_generation "$STATE" 2>/dev/null || true)
+  case "$COMPLETION_PID" in
+    '') COMPLETION_PID= ;;
+  esac
+  COMPLETION_TMP=$(mktemp "$STATE/.session-start-complete.XXXXXX" 2>/dev/null || true)
+  if [ -n "$COMPLETION_PID" ] && [ -n "$COMPLETION_TMP" ] \
+    && printf '%s\n' "$COMPLETION_PID" > "$COMPLETION_TMP" 2>/dev/null \
+    && mv -f "$COMPLETION_TMP" "$COMPLETION_FILE" 2>/dev/null; then
+    COMPLETION_RECORDED=1
+  else
+    [ -z "$COMPLETION_TMP" ] || rm -f "$COMPLETION_TMP" 2>/dev/null || true
+    printf '\nSESSION_START_COMPLETION: not recorded - the next clear or compact will run a full startup.\n'
+  fi
+  if [ "$SESSION_SOURCE" = startup ] && [ "$COMPLETION_RECORDED" -eq 1 ] && [ -n "$AGENTS_START_HASH" ]; then
+    if ! write_agents_baseline "$COMPLETION_PID" "$AGENTS_START_HASH"; then
+      printf '\nSESSION_START_AGENTS_BASELINE: not recorded - a later supported rebuild will re-emit AGENTS.md.\n'
+    fi
+  fi
+}
+
 if [ -z "${FM_SESSION_START_STAGE_FILE:-}" ]; then
+  FM_SESSION_START_FOREGROUND_FILE=
+  if fm_session_lock_transient_codex; then
+    FM_SESSION_START_FOREGROUND_FILE=$(mktemp "${TMPDIR:-/tmp}/fm-session-start-foreground.XXXXXX" 2>/dev/null) || FM_SESSION_START_FOREGROUND_FILE=
+  fi
+  export FM_SESSION_START_FOREGROUND_FILE
   SESSION_START_BUDGET=${FM_SESSION_START_TIMEOUT:-120}
   # A non-positive or non-numeric budget is not a budget (`timeout 0` disables
   # the deadline outright), so an unusable value falls back to the default
@@ -353,7 +401,26 @@ if [ -z "${FM_SESSION_START_STAGE_FILE:-}" ]; then
     fi
     printf '%s\n' "$BAR"
   fi
+  if [ "$SESSION_START_RC" -eq 0 ] && [ -n "$FM_SESSION_START_FOREGROUND_FILE" ] && [ -s "$FM_SESSION_START_FOREGROUND_FILE" ]; then
+    if fm_session_lock_owned_by_self "$STATE"; then
+      printf '\nFOREGROUND NETWORK CHECKS (transient Codex tool)\n'
+      NETWORK_STAGE_LOCKED=1
+      [ "$REEMIT" -eq 0 ] || NETWORK_STAGE_LOCKED=0
+      if "$SCRIPT_DIR/fm-startup-network.sh" run --locked "$NETWORK_STAGE_LOCKED"; then
+        "$SCRIPT_DIR/fm-startup-network.sh" harvest --pid "" || true
+        if [ "$REEMIT" -eq 0 ]; then
+          record_session_start_completion "$(sed -n '2p' "$FM_SESSION_START_FOREGROUND_FILE")"
+        fi
+      else
+        "$SCRIPT_DIR/fm-startup-network.sh" report
+        printf 'SESSION_START_COMPLETION: startup remains incomplete because foreground checks could not finish or publish.\n'
+      fi
+    else
+      printf 'SESSION_START_COMPLETION: startup remains incomplete because ownership could not be re-verified before foreground checks.\n'
+    fi
+  fi
   rm -f "$SESSION_START_STAGE_FILE" 2>/dev/null || true
+  [ -z "$FM_SESSION_START_FOREGROUND_FILE" ] || rm -f "$FM_SESSION_START_FOREGROUND_FILE" 2>/dev/null || true
   exit 0
 fi
 
@@ -605,21 +672,6 @@ hash_file_sha256() {
   return 1
 }
 
-# The baseline describes instructions this true session started with, not the
-# most recently emitted instructions. It is intentionally immutable for this
-# lock owner: every later stale-context rebuild needs the current file again.
-write_agents_baseline() {  # <lock-pid> <agents-hash>
-  local lock_pid=$1 agents_hash=$2 tmp
-  [ -n "$lock_pid" ] && [ -n "$agents_hash" ] || return 1
-  tmp=$(mktemp "$STATE/.session-start-agents-baseline.XXXXXX" 2>/dev/null) || return 1
-  if printf '%s\n%s\n' "$lock_pid" "$agents_hash" > "$tmp" 2>/dev/null \
-    && mv -f "$tmp" "$AGENTS_BASELINE_FILE" 2>/dev/null; then
-    return 0
-  fi
-  rm -f "$tmp" 2>/dev/null || true
-  return 1
-}
-
 agents_baseline_drifted() {  # <rebuilding-session-pid>
   local lock_pid=$1 baseline_pid baseline_hash current_hash
   [ -f "$AGENTS_BASELINE_FILE" ] && [ ! -L "$AGENTS_BASELINE_FILE" ] || return 0
@@ -701,6 +753,8 @@ fi
 REBUILDING_SESSION_PID=$(fm_harness_ancestry_pid 2>/dev/null || true)
 print_agents_refresh_if_required "$REBUILDING_SESSION_PID"
 
+FOREGROUND_NETWORK=0
+fm_session_lock_transient_codex && FOREGROUND_NETWORK=1
 NETWORK_STAGE_RC=0
 NETWORK_STAGE_OUT=
 if [ "$READ_ONLY" -eq 0 ]; then
@@ -725,8 +779,13 @@ if [ "$READ_ONLY" -eq 0 ]; then
   # steer, or merge anyway, so it has no action left for an auth verdict to gate.
   NETWORK_STAGE_LOCKED=1
   [ "$REEMIT" -eq 0 ] || NETWORK_STAGE_LOCKED=0
-  NETWORK_STAGE_OUT=$("$SCRIPT_DIR/fm-startup-network.sh" start \
-    --locked "$NETWORK_STAGE_LOCKED" --harvest-pid $$ 2>&1) || NETWORK_STAGE_RC=$?
+  if [ "$FOREGROUND_NETWORK" -eq 0 ]; then
+    NETWORK_STAGE_OUT=$("$SCRIPT_DIR/fm-startup-network.sh" start \
+      --locked "$NETWORK_STAGE_LOCKED" --harvest-pid $$ 2>&1) || NETWORK_STAGE_RC=$?
+  elif [ -z "${FM_SESSION_START_FOREGROUND_FILE:-}" ]; then
+    NETWORK_STAGE_RC=1
+    NETWORK_STAGE_OUT='NETWORK_CHECKS: cannot retain the foreground startup request; startup remains incomplete.'
+  fi
 fi
 
 # --- 2. bootstrap --------------------------------------------------------
@@ -1001,6 +1060,8 @@ if [ "$READ_ONLY" -eq 1 ]; then
   printf 'secondmate liveness and convergence, and pending handoff delivery were not run.\n'
   printf 'They need the fleet lock, and this session must not spawn, steer, or merge, so it\n'
   printf 'has no action they would gate. The session holding the lock runs them.\n'
+elif [ "$FOREGROUND_NETWORK" -eq 1 ] && [ "$NETWORK_STAGE_RC" -eq 0 ]; then
+  printf 'Pending: checks run in the foreground after this local digest, before the transient Codex tool returns.\n'
 else
   if [ "$NETWORK_STAGE_RC" -ne 0 ]; then
     printf '%s\n' "$NETWORK_STAGE_OUT"
@@ -1070,25 +1131,13 @@ section near the top of it governs what may still be read from disk.
 EOF
 fi
 
-if [ "$READ_ONLY" -eq 0 ] && [ "$REEMIT" -eq 0 ] && [ "$NETWORK_STAGE_RC" -eq 0 ]; then
-  COMPLETION_RECORDED=0
-  COMPLETION_PID=$(fm_session_lock_generation "$STATE" 2>/dev/null || true)
-  case "$COMPLETION_PID" in
-    '') COMPLETION_PID= ;;
-  esac
-  COMPLETION_TMP=$(mktemp "$STATE/.session-start-complete.XXXXXX" 2>/dev/null || true)
-  if [ -n "$COMPLETION_PID" ] && [ -n "$COMPLETION_TMP" ] \
-    && printf '%s\n' "$COMPLETION_PID" > "$COMPLETION_TMP" 2>/dev/null \
-    && mv -f "$COMPLETION_TMP" "$COMPLETION_FILE" 2>/dev/null; then
-    COMPLETION_RECORDED=1
-  else
-    [ -z "$COMPLETION_TMP" ] || rm -f "$COMPLETION_TMP" 2>/dev/null || true
-    printf '\nSESSION_START_COMPLETION: not recorded - the next clear or compact will run a full startup.\n'
-  fi
-  if [ "$SESSION_SOURCE" = startup ] && [ "$COMPLETION_RECORDED" -eq 1 ] && [ -n "$AGENTS_START_HASH" ]; then
-    if ! write_agents_baseline "$COMPLETION_PID" "$AGENTS_START_HASH"; then
-      printf '\nSESSION_START_AGENTS_BASELINE: not recorded - a later supported rebuild will re-emit AGENTS.md.\n'
-    fi
+if [ "$READ_ONLY" -eq 0 ] && [ "$NETWORK_STAGE_RC" -eq 0 ]; then
+  if [ "$FOREGROUND_NETWORK" -eq 1 ]; then
+    # Only a fully rendered, owned digest requests the foreground stage. The
+    # outer caller stays alive beyond the local digest's independent deadline.
+    printf 'ready\n%s\n' "$AGENTS_START_HASH" > "$FM_SESSION_START_FOREGROUND_FILE"
+  elif [ "$REEMIT" -eq 0 ]; then
+    record_session_start_completion "$AGENTS_START_HASH"
   fi
 fi
 

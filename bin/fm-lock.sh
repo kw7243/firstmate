@@ -54,6 +54,7 @@ fi
 me=$(fm_session_lock_anchor_pid) || { echo "error: cannot locate harness process in ancestry" >&2; exit 1; }
 if fm_session_lock_codex_ancestor_pid >/dev/null && ! fm_session_lock_trusted_codex_session_id >/dev/null; then
   echo "error: cannot verify the Codex tool session identity; operate read-only until resolved" >&2
+  echo "Retry bin/fm-session-start.sh from a native Codex tool call; a hook or inherited environment alone is not session proof." >&2
   exit 1
 fi
 probe=$(mktemp "$STATE/.lock-write.XXXXXX" 2>/dev/null) || {
@@ -171,7 +172,14 @@ publish_lock_session_or_die() {
 confirm_own_lock() {
   local recorded waited=0
   if [ "$CLAIM_LOCK_HELD" -ne 1 ]; then
-    fm_lock_acquire_wait "$CLAIM_LOCK" || refuse_uncertain_owner
+    while ! fm_lock_try_acquire "$CLAIM_LOCK"; do
+      # Waiting cannot make a foreign namespace observable. Preserve its claim
+      # and report uncertainty instead of consuming the whole startup deadline.
+      if [ -e "$CLAIM_LOCK" ] || [ -L "$CLAIM_LOCK" ]; then
+        fm_lock_same_namespace "$CLAIM_LOCK" || refuse_uncertain_owner
+      fi
+      sleep 0.1
+    done
     CLAIM_LOCK_HELD=1
     waited=1
   fi

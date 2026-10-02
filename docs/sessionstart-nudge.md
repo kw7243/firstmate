@@ -90,7 +90,7 @@ The full digest updates the completion record in this order:
 
 1. It acquires the lock.
 2. It clears the completion record.
-3. It republishes the session generation only after every digest stage completes and the deferred checks are successfully scheduled or covered by an existing worker.
+3. It republishes the session generation only after every digest stage completes and the checks are successfully scheduled or covered by an existing worker; a transient Codex tool first finishes its foreground check invocation.
 
 So `clear` or `compact` cannot skip startup sweeps after a truncated run or a refused deferred-stage request.
 Scheduling does not mean the checks passed; their result still arrives through the deferred report.
@@ -125,11 +125,14 @@ While the digest runs, the run tier blocks one of two things:
 
 So `bin/fm-session-start.sh` bounds itself rather than betting on an unbounded prerequisite.
 
-### Network work stays off the blocking path
+### Network work has its own deadline
 
-The digest makes no external-network call at all.
-Every network call it owes runs off the blocking path, in the separately bounded deferred stage owned by `bin/fm-startup-network.sh`.
-So an unreachable host can no longer consume this budget.
+The local digest makes no external-network call.
+`bin/fm-startup-network.sh` owns the separately bounded checks.
+Persistent hosts run them in a detached worker while the digest is composed.
+A transient Linux Codex tool prints the local digest first, then runs the checks in the foreground before returning, because ending its namespace kills detached descendants too.
+This preserves the existing local-digest and network-stage deadlines without abandoning a worker's acquisition claim.
+An unknown claim from another namespace is preserved and refused promptly; that diagnostic does not recover an already-abandoned claim.
 
 ### Digest timeout
 
@@ -166,11 +169,13 @@ The parent still exits 0.
 The regression evidence for both shapes is in [`docs/verification/supervision.md`](verification/supervision.md#per-task-endpoint-reads-cannot-truncate-the-digest).
 The registered hook timeouts sit above that budget, so the harness never preempts the banner.
 
-The deferred startup stage deliberately runs in its own process group under its own deadline.
+On persistent hosts, the deferred startup stage deliberately runs in its own process group under its own deadline.
 So a truncated digest does neither of these:
 
 - Kill the network checks and inactive-outcome scan it was not waiting for.
 - Orphan unbounded network work.
+
+A transient Codex startup that truncates its local digest never starts the foreground checks or records completion.
 
 ## Shared wrapper and safety
 

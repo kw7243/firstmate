@@ -46,7 +46,9 @@
 #     that run settles, so old and new owners can never sweep concurrently.
 #
 # Usage: fm-startup-network.sh start --locked <0|1> --harvest-pid <pid>
-#          Launch the detached worker and return immediately. Single-flight: a
+#          Launch the detached worker and return immediately on a persistent
+#          process host. A transient Codex tool runs the checks in the foreground
+#          instead, so its namespace cannot end while they hold a claim. Single-flight: a
 #          running worker is reused only when its phases cover this request and,
 #          for locked work, it belongs to the same lock owner. A probe-only
 #          worker therefore cannot satisfy a later locked request. When worker
@@ -281,6 +283,14 @@ cmd_start() {  # <locked> <harvest-pid>
   lock_pid=$(fm_session_lock_generation "$STATE" 2>/dev/null || true)
   if [ "$locked" = 1 ] && ! fm_session_lock_owned_by_self "$STATE"; then
     return 1
+  fi
+
+  # A transient Codex init kills detached descendants when its tool returns.
+  # Keep this invocation foreground; the ordinary runner retains all existing
+  # stage/publication bounds and unknown-owner refusals.
+  if fm_session_lock_transient_codex; then
+    cmd_run "$locked" "" ""
+    return
   fi
 
   take_lock "$PUBLISH_LOCK" "$(delivery_budget)" || return 1
@@ -664,7 +674,7 @@ print_finished() {  # <state>
     ''|*[!0-9]*) ;;
     *) took=$((finished - started)) ;;
   esac
-  printf 'completed off the startup path in %ss: %s.\n' "$took" "$(phase_label "$phases")"
+  printf 'check run ended after %ss: %s.\n' "$took" "$(phase_label "$phases")"
   [ "$state" = 'done' ] || printf 'The stage itself did not finish cleanly (%s) - the NETWORK_CHECKS line below names what to rerun.\n' "$state"
   if [ "$report_published" = 0 ]; then
     printf 'NETWORK_CHECKS: could not publish the deferred check report, so %s results are unavailable; rerun %s/bin/fm-startup-network.sh run --locked %s\n' \

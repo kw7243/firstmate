@@ -2436,7 +2436,7 @@ ok - codex-cli 0.153.4: native Codex tool identity verified; repeat stable; call
 
 The restricted version command warned that its read-only filesystem prevented creating PATH aliases, but exited 0 and every guard assertion ran.
 The guard checks the real native tool boundary; running it outside Codex fails with an explicit context diagnostic rather than passing a mock.
-It changes no home or ownership record.
+The identity assertions change no ownership record; the startup assertions use only a disposable home with fake sweep producers.
 `tests/fm-codex-session-lock.test.sh` supplies the portable Linux process regression for different threads sharing one process, dead and ambiguous owners, identity override, repeat entry, dependent records, and namespace-separated transient claims.
 Its context re-emit case checks same-session entry while a deferred sweep holds the acquisition claim, including serialized coordinate refresh and competing-session refusal.
 `tests/fm-startup-network.test.sh` covers non-Codex repeat entry during a sweep, deferred-worker liveness with foreign, missing, or mismatched process coordinates, and full startup remaining incomplete when an unknown probe cannot cover its sweeps.
@@ -2452,3 +2452,28 @@ The live smoke did not exercise repeat entry during a running sweep, foreign wat
 These facts do not establish primary notification continuity or authorize production migration.
 Non-Linux Codex retains its native ancestry path; this Linux namespace proof does not claim a macOS result.
 Other harnesses retain their ancestry or trusted Claude identity behavior and do not consume Codex thread provenance.
+
+### 2026-10-02 transient Codex startup lifetime
+
+Verified on Linux with codex-cli 0.160.0 in an ordinary native primary tool call and a persistent host worker tool call.
+The token-free guard now also exercises startup against a disposable home with fake bootstrap, inactive-reconciliation, and Herdr-cleanup producers:
+
+```sh
+bash tests/fm-codex-session-identity-live-e2e.test.sh
+```
+
+Both contexts reported:
+
+```text
+ok - codex-cli 0.160.0: native Codex tool identity verified; repeat stable; caller override rejected
+ok - codex-cli 0.160.0: real tool startup completed, published its result and released its claim
+```
+
+The native primary run printed `startup_context=transient`; the host run printed `startup_context=persistent`.
+The native version probe warned that it could not update PATH on the read-only filesystem; it exited zero and every assertion passed.
+The fixture keeps checks pending until after the local digest, so the transient assertion cannot pass merely because an early deferred worker finished quickly.
+The original transient invocation left a running record and acquisition claim after its tool returned, while the same bounded host fixture published its timeout and released its claim.
+The corrected native full startup and repeat entry completed with self ownership, a completion marker, and no acquisition claim; a separate slow-stage native check published its timeout and released its claim before returning.
+`tests/fm-codex-session-lock.test.sh` covers the corresponding foreground, truncated-digest, unknown-worker, and foreign-claim refusal paths with portable process fixtures.
+This proof does not establish safe reclamation of a previously abandoned foreign-namespace claim or repair the separate hook identity and wrapped harness-detection limitations.
+Non-Linux Codex and the other harnesses retain their existing persistent-process startup path.
