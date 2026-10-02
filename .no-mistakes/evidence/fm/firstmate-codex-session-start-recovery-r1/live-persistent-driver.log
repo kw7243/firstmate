@@ -1,0 +1,6 @@
+{"name": "live-host-native-identity", "command": ["bash", "-c", "set -eu; . bin/fm-session-lock-lib.sh; ! fm_session_lock_transient_codex; id=$(fm_session_lock_trusted_codex_session_id); printf \"%s\" \"$id\" | sha256sum; printf \"context=persistent\n\""], "exit": 0, "elapsed_seconds": 0.75}
+{"name": "live-host-lock", "command": ["bash", "bin/fm-lock.sh"], "exit": 0, "elapsed_seconds": 1.65}
+{"name": "live-persistent-deferred-start", "command": ["bash", "bin/fm-startup-network.sh", "start", "--locked", "1", "--harvest-pid", "999999999"], "exit": 0, "elapsed_seconds": 1.14}
+{"name": "live-persistent-wait", "command": ["bash", "bin/fm-startup-network.sh", "wait", "25"], "exit": 0, "elapsed_seconds": 2.2}
+{"name": "live-persistent-report", "command": ["bash", "bin/fm-startup-network.sh", "report"], "exit": 0, "elapsed_seconds": 0.1}
+disposable_lab_removed=true

@@ -1,0 +1,31 @@
+start_returned_seconds=1.14
+STATUS AT RETURN
+state=running
+pid=3185599
+pid_namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026531836]
+pid_starttime=389905802
+started=1790916711
+locked=1
+phases=probe,sweeps
+generation=1790916711.3184887.999999999
+lock_pid=codex:<native-thread-id>
+
+STATUS AFTER RELEASE
+state=done
+pid=3185599
+pid_namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026531836]
+pid_starttime=389905802
+started=1790916711
+finished=1790916714
+rc=0
+locked=1
+phases=probe,sweeps
+generation=1790916711.3184887.999999999
+lock_pid=codex:<native-thread-id>
+report_published=1
+
+WAKE
+1790916714	1	check	startup-network	check: startup-network: deferred startup network checks finished (done); read them with /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-07fh4ssy/code/bin/fm-startup-network.sh report
+
+acquisition_claim_absent=true
+publication_lock_absent=true

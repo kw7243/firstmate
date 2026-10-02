@@ -1,0 +1,10 @@
+{
+  "target_commit": "68093e5e01c8878f4c2480b0fb7ca730222caeda",
+  "prior_revision_for_counterfactual": "ee473a7",
+  "source_changes": false,
+  "test_changes": false,
+  "disposable_lab_and_test_directories_removed": true,
+  "final_git_status": "",
+  "live_product": "Codex CLI 0.160.0; actual Firstmate scripts from git archive snapshots; isolated homes and GitHub configuration; no product stubs",
+  "scope_limit": "No recovery of operator ownership records and no secondmate restart attempted."
+}

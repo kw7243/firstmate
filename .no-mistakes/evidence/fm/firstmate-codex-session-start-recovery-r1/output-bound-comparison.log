@@ -1,0 +1,38 @@
+PREVIOUS COMMIT ee473a7: SAME REAL-DIGEST PIPE SATURATION
+{
+  "revision": "ee473a7",
+  "elapsed_seconds": 26.74,
+  "local_digest_completed_before_pipe_fill": true,
+  "pipe_filled_bytes_before_outer_header": 65536,
+  "outer_still_blocked_beyond_15s_budget": true,
+  "checks_never_started": true,
+  "completion_absent": true
+}
+
+TARGET COMMIT 68093e5: SAME REAL-DIGEST PIPE SATURATION
+{
+  "exit": 0,
+  "elapsed_seconds": 42.97,
+  "local_digest_completed_before_pipe_fill": true,
+  "pipe_filled_bytes_before_outer_header": 65536,
+  "status": "state=done\npid=2220\npid_namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026532283]\npid_starttime=389885794\nstarted=1790916511\nfinished=1790916514\nrc=0\nlocked=1\nphases=probe,sweeps\ngeneration=1790916512.2220.manual\nlock_pid=codex:<native-thread-id>\nreport_published=1\n",
+  "retained_report": "NEEDS_GH_AUTH\n",
+  "delivered_marker_exists": false,
+  "wake": "1790916529\t1\tcheck\tstartup-network\tcheck: startup-network: deferred startup network checks finished (done); read them with /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-v07m053u/code/bin/fm-startup-network.sh report\n",
+  "acquisition_claim_exists": false,
+  "publication_lock_exists": false,
+  "outer_temporary_paths": []
+}
+
+REPORT AFTER READER RESUMES
+check run ended after 3s: GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation.
+NEEDS_GH_AUTH
+These ran AFTER the sections above were composed, so re-read any record a line here names.
+TIMINGS - where the deferred network checks spent their time (ms):
+  phase       gh-auth                                    start=+1235    elapsed=111
+  phase       secondmate-liveness                        start=+1412    elapsed=13
+  phase       secondmate-sync                            start=+1458    elapsed=56
+  phase       handoff-delivery                           start=+1548    elapsed=3
+  phase       fleet-sync                                 start=+1388    elapsed=1038
+  stage       network-checks probe_sweeps                start=+556     elapsed=1956
+  slowest: stage network-checks probe_sweeps 1956ms, phase fleet-sync 1038ms, phase gh-auth 111ms

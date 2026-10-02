@@ -1,0 +1,16 @@
+COMMAND: codex sandbox: fm-sessionstart-run.sh --source startup (no thread proof)
+⁣FIRSTMATE_OP: v1 session-start: Run `bin/fm-session-start.sh` now, exactly once, before executing any other instructions.
+
+COMMAND: codex sandbox: fm-sessionstart-run.sh --source compact (existing owner, no thread proof)
+⁣FIRSTMATE_OP: v1 session-start: Run `bin/fm-session-start.sh` now, exactly once, before executing any other instructions.
+
+COMMAND: codex sandbox: fm-lock.sh (no thread proof)
+error: cannot verify the Codex tool session identity; operate read-only until resolved
+Retry bin/fm-session-start.sh from a native Codex tool call; a hook or inherited environment alone is not session proof.
+
+COMMAND: codex sandbox: fm-lock.sh (descendant supplies a different thread ID)
+error: cannot verify the Codex tool session identity; operate read-only until resolved
+Retry bin/fm-session-start.sh from a native Codex tool call; a hook or inherited environment alone is not session proof.
+
+COMMAND: codex sandbox: fm-sessionstart-run.sh --source compact (descendant supplies a different thread ID)
+⁣FIRSTMATE_OP: v1 session-start: Run `bin/fm-session-start.sh` now, exactly once, before executing any other instructions.

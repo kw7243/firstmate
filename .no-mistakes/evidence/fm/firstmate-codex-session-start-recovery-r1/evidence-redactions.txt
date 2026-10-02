@@ -1,0 +1,1 @@
+Native thread UUIDs in product logs are replaced with <native-thread-id>. Identity SHA-256 values are retained. Disposable lab paths refer to homes removed after each probe. No production incident records were read or copied.

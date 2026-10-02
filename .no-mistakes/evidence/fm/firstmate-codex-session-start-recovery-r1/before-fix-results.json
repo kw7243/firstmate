@@ -1,0 +1,34 @@
+[
+  {
+    "name": "before-fix-unproved-hook",
+    "command": [
+      "codex",
+      "sandbox",
+      "-c",
+      "sandbox_mode=\"workspace-write\"",
+      "-c",
+      "sandbox_workspace_write.writable_roots=[\"/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-yxuwofeh\"]",
+      "bash",
+      "bin/fm-sessionstart-run.sh",
+      "--source",
+      "startup"
+    ],
+    "exit": 0,
+    "elapsed_seconds": 4.2
+  },
+  {
+    "name": "before-fix-blocked-before-header",
+    "command": [
+      "codex",
+      "sandbox",
+      "-c",
+      "sandbox_mode=\"workspace-write\"",
+      "-c",
+      "sandbox_workspace_write.writable_roots=[\"/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-yxuwofeh\"]",
+      "python3",
+      "/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-yxuwofeh/before-fix-inner.py"
+    ],
+    "exit": 0,
+    "elapsed_seconds": 26.95
+  }
+]

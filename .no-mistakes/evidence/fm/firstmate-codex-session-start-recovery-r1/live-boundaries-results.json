@@ -1,0 +1,136 @@
+[
+  {
+    "name": "boundary-acquire",
+    "command": [
+      "codex",
+      "sandbox",
+      "-c",
+      "sandbox_mode=\"workspace-write\"",
+      "-c",
+      "sandbox_workspace_write.writable_roots=[\"/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-qshgbtc0\"]",
+      "bash",
+      "bin/fm-lock.sh"
+    ],
+    "exit": 0,
+    "elapsed_seconds": 0.88
+  },
+  {
+    "name": "live-forged-descendant-identity",
+    "command": [
+      "codex",
+      "sandbox",
+      "-c",
+      "sandbox_mode=\"workspace-write\"",
+      "-c",
+      "sandbox_workspace_write.writable_roots=[\"/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-qshgbtc0\"]",
+      "bash",
+      "-c",
+      "export CODEX_THREAD_ID=00000000-0000-4000-8000-000000000000; bash bin/fm-lock.sh"
+    ],
+    "exit": 1,
+    "elapsed_seconds": 0.48
+  },
+  {
+    "name": "live-forged-hook-deferral",
+    "command": [
+      "codex",
+      "sandbox",
+      "-c",
+      "sandbox_mode=\"workspace-write\"",
+      "-c",
+      "sandbox_workspace_write.writable_roots=[\"/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-qshgbtc0\"]",
+      "bash",
+      "-c",
+      "export CODEX_THREAD_ID=00000000-0000-4000-8000-000000000000; bash bin/fm-sessionstart-run.sh --source compact"
+    ],
+    "exit": 0,
+    "elapsed_seconds": 0.67
+  },
+  {
+    "name": "live-contention-wake-queue.lock",
+    "command": [
+      "codex",
+      "sandbox",
+      "-c",
+      "sandbox_mode=\"workspace-write\"",
+      "-c",
+      "sandbox_workspace_write.writable_roots=[\"/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-qshgbtc0\"]",
+      "bash",
+      "bin/fm-startup-network.sh",
+      "start",
+      "--locked",
+      "1",
+      "--harvest-pid",
+      "999999999"
+    ],
+    "exit": 1,
+    "elapsed_seconds": 4.35
+  },
+  {
+    "name": "live-contention-wake-queue.lock-report",
+    "command": [
+      "codex",
+      "sandbox",
+      "-c",
+      "sandbox_mode=\"workspace-write\"",
+      "-c",
+      "sandbox_workspace_write.writable_roots=[\"/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-qshgbtc0\"]",
+      "bash",
+      "bin/fm-startup-network.sh",
+      "report"
+    ],
+    "exit": 0,
+    "elapsed_seconds": 0.24
+  },
+  {
+    "name": "live-contention-watcher-down.lock",
+    "command": [
+      "codex",
+      "sandbox",
+      "-c",
+      "sandbox_mode=\"workspace-write\"",
+      "-c",
+      "sandbox_workspace_write.writable_roots=[\"/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-qshgbtc0\"]",
+      "bash",
+      "bin/fm-startup-network.sh",
+      "start",
+      "--locked",
+      "1",
+      "--harvest-pid",
+      "999999999"
+    ],
+    "exit": 1,
+    "elapsed_seconds": 4.66
+  },
+  {
+    "name": "live-contention-watcher-down.lock-report",
+    "command": [
+      "codex",
+      "sandbox",
+      "-c",
+      "sandbox_mode=\"workspace-write\"",
+      "-c",
+      "sandbox_workspace_write.writable_roots=[\"/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-qshgbtc0\"]",
+      "bash",
+      "bin/fm-startup-network.sh",
+      "report"
+    ],
+    "exit": 0,
+    "elapsed_seconds": 0.23
+  },
+  {
+    "name": "live-truncated-local-digest",
+    "command": [
+      "codex",
+      "sandbox",
+      "-c",
+      "sandbox_mode=\"workspace-write\"",
+      "-c",
+      "sandbox_workspace_write.writable_roots=[\"/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-qshgbtc0\"]",
+      "python3",
+      "/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-qshgbtc0/truncated-inner.py"
+    ],
+    "exit": 0,
+    "elapsed_seconds": 30.74
+  }
+]

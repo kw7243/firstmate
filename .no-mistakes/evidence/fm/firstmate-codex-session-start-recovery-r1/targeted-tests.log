@@ -1,0 +1,156 @@
+FM_TEST_BEGIN 2026-10-02T04:41:50Z tests/fm-codex-session-lock.test.sh family=unclassified expected_gate_skip=none
+ok - Codex identity comes from the tool boundary, rejects override and excludes a competing live session
+ok - proved dead host owner can be replaced and repeated entry keeps its generation
+ok - foreign namespace and unknown leases remain protected regardless of age
+ok - distinct threads sharing one Codex process cannot take each other's lock
+ok - Codex reemit waits for its own sweep, refreshes coordinates, and refuses a competing session
+ok - transient startup prints its local digest before checks and publishes completion after releasing the claim
+ok - direct transient start publishes a bounded slow-stage result and releases its claim before returning
+ok - transient startup acknowledges inline without queue contention and bounds unclaimed fallback delivery
+ok - transient startup bounds stalled output, including the automatic report after fallback delivery fails
+ok - outer startup output stays bounded with no draining before the header, and parent cleanup completes
+ok - truncated transient local digest starts no checks and records no completion
+ok - transient startup preserves an unverifiable worker and leaves completion absent
+ok - same-session entry promptly refuses an unverifiable claim without changing ownership, and forged identity remains refused
+ok - same-session acquisition retries removed and replaced claims in both lock representations
+ok - bare PID 1 is refused without a verified session record
+ok - transient mutex never steals or releases a foreign or unqualified namespace owner
+FM_TEST_END 2026-10-02T04:46:05Z tests/fm-codex-session-lock.test.sh exit=0 duration_ms=255174 gate_skip=false
+FM_TEST_BEGIN 2026-10-02T04:46:06Z tests/fm-sessionstart-nudge.test.sh family=session-bootstrap expected_gate_skip=none
+ok - fm-sessionstart-nudge: a genuine primary gets one explicitly marked instruction line
+ok - fm-sessionstart-nudge: NO_MISTAKES_GATE is silent
+ok - fm-sessionstart-nudge: .no-mistakes gate common-dir is silent
+ok - fm-sessionstart-nudge: an unmarked linked task worktree is silent
+ok - fm-sessionstart-nudge: a marked linked secondmate home is a primary
+ok - fm-sessionstart-nudge: a checkout without state is silent
+ok - fm-sessionstart-nudge: a lock holder in process ancestry is already run
+# skip: unprivileged PID namespaces are unavailable here, so the namespace pid 1 lock owner is unverified
+ok - OpenCode session.created delivers the exact wrapper nudge once per session
+ok - run wrapper: startup runs the full digest and never also nudges
+ok - run wrapper: clear and compact re-emit the digest without repeating startup sweeps
+ok - run wrapper forwards only stale-cache rebuild sources to immutable-baseline instruction refresh
+ok - run wrapper refreshes a compact even when startup completion is unproven
+ok - run wrapper: clear falls back to full startup when completion is unproven
+ok - run wrapper: clear accepts completion only from the current harness
+ok - run wrapper: resume delegates to the nudge instead of re-running the digest
+ok - run wrapper: the hook payload's source field drives routing with no explicit argument
+ok - run wrapper: an unrecognized or absent source takes the helm rather than skipping it
+ok - run wrapper: ordinary ineligible opens stay silent-zero and Pi preflight gets an explicit silent stand-down
+ok - run wrapper: a fresh primary checkout gets its missing state dir created, a linked worktree still does not
+ok - run wrapper: a fresh primary that cannot create its state dir says so on stderr, then stands down
+ok - run wrapper: a session start that cannot take the lock still opens the session and says so
+ok - run wrapper: unproved Codex hooks nudge without mutation while native proof preserves startup and re-emission
+ok - Pi distinguishes header-proven restored CLI sessions from named create-if-missing startups
+ok - Pi provider preflight owns one generation-bound startup prerequisite with deterministic fallback, replacement, cancellation, timeout, and truncation
+ok - Pi reload shutdown releases its exit listener and stale startup generation
+ok - Pi retains a bounded digest prefix and loudly marks oversized preflight delivery
+FM_TEST_END 2026-10-02T04:51:18Z tests/fm-sessionstart-nudge.test.sh exit=0 duration_ms=312074 gate_skip=false
+FM_TEST_BEGIN 2026-10-02T04:51:18Z tests/fm-startup-network.test.sh family=session-bootstrap expected_gate_skip=none
+ok - fm-startup-network: wait fails when no deferred stage publishes before its deadline
+ok - fm-startup-network: start returns immediately and never holds the caller's stdout open
+ok - fm-startup-network: exactly one of the digest and the wake reports each actionable result
+ok - fm-startup-network: a claimant crash after publication still surfaces the result
+ok - fm-startup-network: a report-publication failure is failed, diagnosed, and still wakes
+ok - fm-startup-network: silent and explicitly informational successes never queue a main-blocking wake
+ok - fm-startup-network: an actionable state=done report still queues a wake
+ok - fm-startup-network: deferred invalid secondmate markers produce durable wakes
+ok - fm-startup-network: manual callers cannot forge mutation authority
+ok - fm-startup-network: an aggregate bound turns a wedged sweep into an actionable line
+ok - fm-startup-network: process identity distinguishes live, dead and reused worker PIDs
+ok - fm-startup-network: an exited worker awaiting reaping permits recovery
+ok - fm-startup-network: unknown worker coordinates preserve status, output and generation
+ok - fm-startup-network: namespace uncertainty preserves the original worker's publication
+ok - fm-startup-network: an unknown probe leaves full startup incomplete until a successful retry
+ok - fm-startup-network: locked requests supersede in-flight probe-only workers
+ok - fm-startup-network: a second start never launches a competing worker
+ok - fm-startup-network: start atomically reserves the generation harvest observes
+ok - fm-startup-network: a new lock owner gets a distinct worker generation
+ok - fm-startup-network: fleet-lock takeover cannot overlap a mutating sweep
+ok - fm-startup-network: same-session entry succeeds without changing an active sweep's owner
+ok - fm-startup-network: timing records share one origin so their offsets form a timeline
+ok - fm-startup-network: timings are durable and printed only on demand
+ok - fm-startup-network: a timed-out run still publishes the partial timings it recorded
+ok - fm-startup-network: the timing artifact cannot carry a command line or forge records
+ok - fm-startup-network: a held publish lock ends the worker inside its budget with a failed-rerun record
+ok - fm-startup-network: all wake publication locks are bounded and findings survive delivery failure
+ok - fm-startup-network: failed bounded append restores recovery state and releases owned locks
+ok - fm-startup-network: foreground delivery acknowledges printing before wake fallback, including failed sinks and receipts
+ok - fm-startup-network: stalled harvest output is bounded, releases owned locks, and preserves fallback delivery
+# fm-startup-network.test.sh: all assertions passed
+FM_TEST_END 2026-10-02T04:55:25Z tests/fm-startup-network.test.sh exit=0 duration_ms=246910 gate_skip=false
+FM_TEST_BEGIN 2026-10-02T04:55:25Z tests/fm-session-start.test.sh family=session-bootstrap expected_gate_skip=none
+ok - context digest distinguishes ABSENT, empty-but-present, and populated files
+ok - a lock refusal prints a loud read-only banner, skips every mutating step, and still completes the digest
+ok - session start stays read-only when lock ownership cannot be published
+ok - locked session start freezes trace context and lock refusal leaves it unchanged
+ok - concurrent session-lock acquisition admits exactly one live harness
+ok - digest sections are ordered safety-preamble first, live fleet state before curated memory
+ok - the read-once contract is stated once, ahead of the sources it governs
+ok - session start: configured and auto-detected Herdr homes never require tmux
+ok - session start: an absent recorded tmux window relaunches its Pi secondmate exactly once, off the blocking path
+ok - session start: a deferred relaunch is always reported, so the digest's stale endpoint record cannot stand
+ok - session start: inactive reconciliation runs after the digest and retains its durable wake
+ok - session start: an unreachable host delays a reported check, not the digest
+ok - session start: a deferred result the digest outran still reaches the agent as a wake
+ok - session start: a read-only session declares its skipped network checks rather than dropping them
+ok - session start: the tasks-axi compatibility verdict is computed once and reused
+ok - session start: an existing ambiguous Pi process prevents duplicate recovery
+ok - session start: transient tmux unreadability never licenses a relaunch
+ok - session start: the proven bare-shell recovery path remains intact
+ok - session start: a confirmed Herdr husk is closed and relaunched
+ok - status tail is bounded to the configured line count, with the full log path always printed
+ok - status tail lines are capped with a truncation marker while the full log stays reachable
+ok - orphan status logs are printed once with bounded tails
+ok - tmux endpoint liveness is reported per task: alive for a live window, dead for a gone one
+ok - herdr endpoint liveness is reported per task: alive, dead for exit 1, dead for any other probe status
+_: line 4: 3494343 Killed                  "$@"
+ok - a killed per-task endpoint read becomes that task's error line and the digest completes
+Terminated
+ok - a hung per-task endpoint read hits its configured bound, reports the task, and leaves nothing stuck
+ok - a padded-zero per-read bound falls back to the 10s default instead of removing the bound
+ok - the perl timeout fallback reports a signal death as a nonzero status
+Terminated
+ok - a digest child killed mid-stage is bannered by the parent, which still exits 0
+ok - fm-session-start.sh composes the real fm-lock.sh, fm-bootstrap.sh, and fm-wake-drain.sh output verbatim
+ok - locked Pi session start replays leading routine outcomes, preserves the captain barrier, and sweeps only dead leases
+ok - non-Pi session start neither sweeps nor replays Pi branch state
+ok - session start seeds an existing outcome store's absent display tail copy while away, moving no marker
+ok - compatible tasks-axi backlog rendering drops done rows and keeps every in-flight, held, and blocked row
+ok - the startup backlog bound cuts only dispatchable queued rows and discloses the remainder exactly
+ok - manual backlog rendering drops done rows, keeps every held or blocked title line, and bounds the rest
+ok - unavailable or incompatible tasks-axi falls back to compact manual backlog rendering
+ok - an empty fleet reports (none) for in-flight tasks and an absent AFK flag
+ok - session start emits X-mode cadence guidance in the harness supervision block
+ok - next step delegates watcher ownership to the AFK daemon
+ok - next step delegates watcher ownership to the daemon in quiet mode, distinctly from away mode
+ok - the AFK digest reads a quiet record as a present captain holding nothing, and an away record as hold-for-return
+ok - a legacy empty .afk flag (written before mode existed) still reads as away mode
+ok - session start emits exactly one detected harness block and reports Pi extension load state
+ok - session start preserves pi-signed primary identity while applying Pi extension guarantees
+ok - session start rejects stale Pi loaded markers
+ok - session start rejects a Pi watcher generation left in handoff
+ok - session start accepts current Pi markers written before lock acquisition
+ok - session start emits the omp block and reports omp extension load state
+ok - session start accepts current omp markers written before lock acquisition
+ok - session start rejects Pi sessions missing the turn-end guard marker
+ok - session start rejects Pi loaded markers from previous sessions
+ok - the pure-Bash watchdog bounds session start, kills its hung grandchild, and emits the truncation contract
+ok - the portable timeout path force-kills a command that ignores TERM
+ok - a session start inside its budget prints no truncation banner
+ok - the runtime bound leaves enough ancestry headroom for a deeply nested session to take the lock
+ok - --reemit reprints the digest without repeating startup's mutating sweeps and still drains queued wakes
+ok - true-start AGENTS baselines stay immutable while every drifted Pi compact re-emits the current contract
+ok - read-only Pi compact refreshes against the rebuilding session identity without mutation
+ok - Codex reset sources do not claim an unavailable instruction-refresh channel
+ok - instruction baselines require SHA-256 and successful startup completion
+ok - --reemit re-verifies lock ownership and keeps repair ownership with whoever holds it
+# fm-session-start.test.sh: all assertions passed
+FM_TEST_END 2026-10-02T05:03:15Z tests/fm-session-start.test.sh exit=0 duration_ms=469856 gate_skip=false
+FM_TEST_SUMMARY total=4 failed=0 skipped_gate=0 duration_ms=1284439
+FM_TEST_SUMMARY_FAMILY family=session-bootstrap count=3 duration_ms=1028840 failed=0
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=255174 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-session-start.test.sh duration_ms=469856
+FM_TEST_SLOWEST rank=2 script=tests/fm-sessionstart-nudge.test.sh duration_ms=312074
+FM_TEST_SLOWEST rank=3 script=tests/fm-codex-session-lock.test.sh duration_ms=255174
+FM_TEST_SLOWEST rank=4 script=tests/fm-startup-network.test.sh duration_ms=246910
+fm-test-run: wrote timing artifact: /home/ubuntu/.no-mistakes/evidence/01M3X7MZJANXVAHSVYGV3GR7YN/targeted-tests.json

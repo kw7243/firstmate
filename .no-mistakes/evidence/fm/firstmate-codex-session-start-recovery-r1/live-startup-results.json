@@ -1,0 +1,224 @@
+[
+  {
+    "name": "live-native-identity",
+    "command": [
+      "codex",
+      "sandbox",
+      "-c",
+      "sandbox_mode=\"workspace-write\"",
+      "-c",
+      "sandbox_workspace_write.writable_roots=[\"/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-cg5hgddl\"]",
+      "bash",
+      "-c",
+      ". bin/fm-session-lock-lib.sh; fm_session_lock_transient_codex; id=$(fm_session_lock_trusted_codex_session_id) || exit; printf \"%s\" \"$id\" | sha256sum; printf \"context=transient\n\""
+    ],
+    "exit": 0,
+    "elapsed_seconds": 0.39
+  },
+  {
+    "name": "live-hook-startup",
+    "command": [
+      "codex",
+      "sandbox",
+      "-c",
+      "sandbox_mode=\"workspace-write\"",
+      "-c",
+      "sandbox_workspace_write.writable_roots=[\"/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-cg5hgddl\"]",
+      "bash",
+      "bin/fm-sessionstart-run.sh",
+      "--source",
+      "startup"
+    ],
+    "exit": 0,
+    "elapsed_seconds": 0.43
+  },
+  {
+    "name": "live-hook-new",
+    "command": [
+      "codex",
+      "sandbox",
+      "-c",
+      "sandbox_mode=\"workspace-write\"",
+      "-c",
+      "sandbox_workspace_write.writable_roots=[\"/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-cg5hgddl\"]",
+      "bash",
+      "bin/fm-sessionstart-run.sh",
+      "--source",
+      "new"
+    ],
+    "exit": 0,
+    "elapsed_seconds": 0.45
+  },
+  {
+    "name": "live-hook-clear",
+    "command": [
+      "codex",
+      "sandbox",
+      "-c",
+      "sandbox_mode=\"workspace-write\"",
+      "-c",
+      "sandbox_workspace_write.writable_roots=[\"/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-cg5hgddl\"]",
+      "bash",
+      "bin/fm-sessionstart-run.sh",
+      "--source",
+      "clear"
+    ],
+    "exit": 0,
+    "elapsed_seconds": 0.45
+  },
+  {
+    "name": "live-hook-compact",
+    "command": [
+      "codex",
+      "sandbox",
+      "-c",
+      "sandbox_mode=\"workspace-write\"",
+      "-c",
+      "sandbox_workspace_write.writable_roots=[\"/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-cg5hgddl\"]",
+      "bash",
+      "bin/fm-sessionstart-run.sh",
+      "--source",
+      "compact"
+    ],
+    "exit": 0,
+    "elapsed_seconds": 0.42
+  },
+  {
+    "name": "live-hook-resume",
+    "command": [
+      "codex",
+      "sandbox",
+      "-c",
+      "sandbox_mode=\"workspace-write\"",
+      "-c",
+      "sandbox_workspace_write.writable_roots=[\"/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-cg5hgddl\"]",
+      "bash",
+      "bin/fm-sessionstart-run.sh",
+      "--source",
+      "resume"
+    ],
+    "exit": 0,
+    "elapsed_seconds": 0.44
+  },
+  {
+    "name": "live-hook-reload",
+    "command": [
+      "codex",
+      "sandbox",
+      "-c",
+      "sandbox_mode=\"workspace-write\"",
+      "-c",
+      "sandbox_workspace_write.writable_roots=[\"/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-cg5hgddl\"]",
+      "bash",
+      "bin/fm-sessionstart-run.sh",
+      "--source",
+      "reload"
+    ],
+    "exit": 0,
+    "elapsed_seconds": 0.41
+  },
+  {
+    "name": "live-hook-fork",
+    "command": [
+      "codex",
+      "sandbox",
+      "-c",
+      "sandbox_mode=\"workspace-write\"",
+      "-c",
+      "sandbox_workspace_write.writable_roots=[\"/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-cg5hgddl\"]",
+      "bash",
+      "bin/fm-sessionstart-run.sh",
+      "--source",
+      "fork"
+    ],
+    "exit": 0,
+    "elapsed_seconds": 0.44
+  },
+  {
+    "name": "live-hook-unknown",
+    "command": [
+      "codex",
+      "sandbox",
+      "-c",
+      "sandbox_mode=\"workspace-write\"",
+      "-c",
+      "sandbox_workspace_write.writable_roots=[\"/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-cg5hgddl\"]",
+      "bash",
+      "bin/fm-sessionstart-run.sh",
+      "--source",
+      "unknown"
+    ],
+    "exit": 0,
+    "elapsed_seconds": 0.48
+  },
+  {
+    "name": "live-direct-lock-refusal",
+    "command": [
+      "codex",
+      "sandbox",
+      "-c",
+      "sandbox_mode=\"workspace-write\"",
+      "-c",
+      "sandbox_workspace_write.writable_roots=[\"/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-cg5hgddl\"]",
+      "bash",
+      "bin/fm-lock.sh"
+    ],
+    "exit": 1,
+    "elapsed_seconds": 0.5
+  },
+  {
+    "name": "live-transient-startup",
+    "command": [
+      "codex",
+      "sandbox",
+      "-c",
+      "sandbox_mode=\"workspace-write\"",
+      "-c",
+      "sandbox_workspace_write.writable_roots=[\"/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-cg5hgddl\"]",
+      "bash",
+      "bin/fm-sessionstart-run.sh",
+      "--source",
+      "startup"
+    ],
+    "exit": 0,
+    "elapsed_seconds": 10.48
+  },
+  {
+    "name": "live-transient-compact",
+    "command": [
+      "codex",
+      "sandbox",
+      "-c",
+      "sandbox_mode=\"workspace-write\"",
+      "-c",
+      "sandbox_workspace_write.writable_roots=[\"/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-cg5hgddl\"]",
+      "bash",
+      "bin/fm-sessionstart-run.sh",
+      "--source",
+      "compact"
+    ],
+    "exit": 0,
+    "elapsed_seconds": 8.88
+  },
+  {
+    "name": "live-hook-existing-owner",
+    "command": [
+      "codex",
+      "sandbox",
+      "-c",
+      "sandbox_mode=\"workspace-write\"",
+      "-c",
+      "sandbox_workspace_write.writable_roots=[\"/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-cg5hgddl\"]",
+      "bash",
+      "bin/fm-sessionstart-run.sh",
+      "--source",
+      "compact"
+    ],
+    "exit": 0,
+    "elapsed_seconds": 0.66
+  },
+  {
+    "name": "hook-existing-owner-preserved",
+    "pass": true
+  }
+]

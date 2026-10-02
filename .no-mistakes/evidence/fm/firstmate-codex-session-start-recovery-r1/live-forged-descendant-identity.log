@@ -1,0 +1,2 @@
+error: cannot verify the Codex tool session identity; operate read-only until resolved
+Retry bin/fm-session-start.sh from a native Codex tool call; a hook or inherited environment alone is not session proof.

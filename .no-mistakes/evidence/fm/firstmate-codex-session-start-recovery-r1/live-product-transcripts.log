@@ -1,0 +1,537 @@
+Native thread UUIDs in product logs are replaced with <native-thread-id>. Identity SHA-256 values are retained. Disposable lab paths refer to homes removed after each probe. No production incident records were read or copied.
+
+
+=== Unproved and forged identity ===
+COMMAND: codex sandbox: fm-sessionstart-run.sh --source startup (no thread proof)
+⁣FIRSTMATE_OP: v1 session-start: Run `bin/fm-session-start.sh` now, exactly once, before executing any other instructions.
+
+COMMAND: codex sandbox: fm-sessionstart-run.sh --source compact (existing owner, no thread proof)
+⁣FIRSTMATE_OP: v1 session-start: Run `bin/fm-session-start.sh` now, exactly once, before executing any other instructions.
+
+COMMAND: codex sandbox: fm-lock.sh (no thread proof)
+error: cannot verify the Codex tool session identity; operate read-only until resolved
+Retry bin/fm-session-start.sh from a native Codex tool call; a hook or inherited environment alone is not session proof.
+
+COMMAND: codex sandbox: fm-lock.sh (descendant supplies a different thread ID)
+error: cannot verify the Codex tool session identity; operate read-only until resolved
+Retry bin/fm-session-start.sh from a native Codex tool call; a hook or inherited environment alone is not session proof.
+
+COMMAND: codex sandbox: fm-sessionstart-run.sh --source compact (descendant supplies a different thread ID)
+⁣FIRSTMATE_OP: v1 session-start: Run `bin/fm-session-start.sh` now, exactly once, before executing any other instructions.
+
+=== Transient full startup ===
+
+================================================================================
+SESSION START - /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-cg5hgddl
+================================================================================
+
+LOCK
+--------------------------------------------------------------------------------
+lock acquired: harness pid 1
+
+BOOTSTRAP
+--------------------------------------------------------------------------------
+PRESENTATION_UNAVAILABLE: lavish-axi (requires >=0.1.77; install: npm install -g lavish-axi && lavish-axi setup hooks) - nonvisual work may proceed with plain-text decisions and reports; install or upgrade before using Lavish
+
+WAKE QUEUE
+--------------------------------------------------------------------------------
+(no queued wakes)
+================================================================================
+SUPERVISION OPERATING INSTRUCTIONS - primary harness: codex
+================================================================================
+Current state:
+- Lock: held by this session; this session owns normal supervision unless away mode says otherwise.
+- Away/quiet mode: inactive.
+- X mode: inactive; use the default watcher cadence.
+- Ordinary wake: take the next foreground bin/fm-watch-checkpoint.sh checkpoint as directed below.
+
+Mode: Codex foreground checkpoint.
+
+When this session owns supervision and away mode is not active:
+1. Drain first with `bin/fm-wake-drain.sh`.
+   After handling all emitted wakes and reconciling open decisions and unread status lines, run the exact `--ack-through` command printed as `WAKE_ACK_REQUIRED`; until then the work remains durable for idempotent re-handling after interruption.
+2. Source `/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-cg5hgddl/config/x-mode.env` first when Relay is active.
+3. First cycle: run one foreground watcher checkpoint with `bin/fm-watch-checkpoint.sh --seconds "${FM_CODEX_WATCH_CHECKPOINT:-180}"`.
+4. Ordinary wake: if the command prints `signal:`, `stale:`, `check:`, or `heartbeat`, drain queued wakes, handle that wake, then start the next checkpoint.
+5. If the command prints `checkpoint:` or exits 124 with no wake, drain queued wakes anyway, process any queued user message now visible to Codex, then start the next checkpoint.
+6. Never use shell `&` or Codex background tasks for firstmate watcher supervision.
+7. Do not run `bin/fm-watch-arm.sh` as Codex's normal supervision command.
+   If it is ever shelled anyway, a backgrounded, piped, or bundled anti-pattern is denied automatically by the PreToolUse seatbelt (`bin/fm-arm-pretool-check.sh`) registered in `.codex/hooks.json`.
+8. Failure or missing cycle only: drain queued wakes, inspect the failure, then start a fresh foreground checkpoint.
+
+Codex cannot reason while a foreground tool call is running.
+The bounded checkpoint returns control regularly so user messages and queued wakes can be handled without relying on background-task wake semantics.
+
+
+================================================================================
+READ-ONCE CONTRACT
+================================================================================
+Everything below is printed in full for this session start: every state/*.meta,
+a compact data/backlog.md listing, a bounded tail of every state/*.status,
+data/projects.md, data/secondmates.md, data/captain.md, data/captain-shared.md,
+and data/learnings.md.
+Do NOT re-read any of them after reading this digest, and do NOT bulk-read
+data/backlog.md or state/*.status: re-reading everything defeats the entire
+point of this command.
+
+Go to a source directly only when:
+  - this digest flagged it ABSENT (then rebuild or create it per AGENTS.md),
+  - its contents looked unparseable or corrupt,
+  - an individual full status log is needed for older wake-event history, or a
+    status line was capped and its tail matters (each task's full log path is
+    printed with its tail),
+  - a full task body is needed (bin/fm-tasks-axi.sh show <id> --full, or data/backlog.md),
+  - the backlog listing disclosed omitted queued items and this turn needs them,
+  - the NETWORK CHECKS section reported its checks still IN PROGRESS and this
+    turn needs their verdict (bin/fm-startup-network.sh report),
+  - or a STARTUP TRUNCATED banner named the stage that would have printed it, in
+    which case that stage's sources were never emitted and must be reconciled.
+
+================================================================================
+FLEET STATE
+================================================================================
+
+data/backlog.md
+--------------------------------------------------------------------------------
+ABSENT
+
+Work under way (state/*.meta)
+--------------------------------------------------------------------------------
+(none)
+
+Orphan status logs (state/*.status without matching .meta)
+--------------------------------------------------------------------------------
+(none)
+
+AFK
+--------------------------------------------------------------------------------
+absent
+
+================================================================================
+NETWORK CHECKS
+================================================================================
+Pending: checks run in the foreground after this local digest, before the transient Codex tool returns.
+
+================================================================================
+CONTEXT
+================================================================================
+
+data/projects.md
+--------------------------------------------------------------------------------
+ABSENT
+
+data/secondmates.md
+--------------------------------------------------------------------------------
+ABSENT
+
+data/captain.md
+--------------------------------------------------------------------------------
+ABSENT
+
+data/captain-shared.md (shared, main-authoritative, read-only in secondmate homes)
+--------------------------------------------------------------------------------
+ABSENT
+
+data/learnings.md
+--------------------------------------------------------------------------------
+ABSENT
+
+================================================================================
+NEXT STEP
+================================================================================
+Follow the supervision operating instructions block above for harness 'codex'.
+This script never starts supervision itself.
+
+The digest above is complete for this session start. The READ-ONCE CONTRACT
+section near the top of it governs what may still be read from disk.
+
+FOREGROUND NETWORK CHECKS (transient Codex tool)
+check run ended after 2s: GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation.
+NEEDS_GH_AUTH
+These ran AFTER the sections above were composed, so re-read any record a line here names.
+
+=== Published completion, inline acknowledgement and no duplicate wake ===
+state=done
+pid=1647
+pid_namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026532226]
+pid_starttime=389865542
+started=1790916309
+finished=1790916311
+rc=0
+locked=1
+phases=probe,sweeps
+generation=1790916309.1647.manual
+lock_pid=codex:<native-thread-id>
+report_published=1
+
+REPORT
+NEEDS_GH_AUTH
+
+completion_matches_native_identity=true
+acquisition_claim_absent=true
+publication_lock_absent=true
+inline_acknowledged=true
+queued_duplicate=false
+
+=== Compact re-entry ===
+
+================================================================================
+SESSION START (CONTEXT RE-EMIT) - /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-cg5hgddl
+================================================================================
+This session already took the helm at its own startup and has only lost its
+context. Lock ownership is re-verified and the durable records below are
+reprinted, but the sweeps startup already reconciled - project clone refresh,
+secondmate convergence and liveness, pending remote handoff
+retry, X-mode artifact writes, and stale Herdr child cleanup - are NOT repeated.
+Queued wakes ARE still drained: they arrived after startup and are this turn work.
+
+LOCK
+--------------------------------------------------------------------------------
+lock acquired: harness pid 1
+
+BOOTSTRAP
+--------------------------------------------------------------------------------
+PRESENTATION_UNAVAILABLE: lavish-axi (requires >=0.1.77; install: npm install -g lavish-axi && lavish-axi setup hooks) - nonvisual work may proceed with plain-text decisions and reports; install or upgrade before using Lavish
+
+WAKE QUEUE
+--------------------------------------------------------------------------------
+(no queued wakes)
+================================================================================
+SUPERVISION OPERATING INSTRUCTIONS - primary harness: codex
+================================================================================
+Current state:
+- Lock: held by this session; this session owns normal supervision unless away mode says otherwise.
+- Away/quiet mode: inactive.
+- X mode: inactive; use the default watcher cadence.
+- Ordinary wake: take the next foreground bin/fm-watch-checkpoint.sh checkpoint as directed below.
+
+Mode: Codex foreground checkpoint.
+
+When this session owns supervision and away mode is not active:
+1. Drain first with `bin/fm-wake-drain.sh`.
+   After handling all emitted wakes and reconciling open decisions and unread status lines, run the exact `--ack-through` command printed as `WAKE_ACK_REQUIRED`; until then the work remains durable for idempotent re-handling after interruption.
+2. Source `/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-cg5hgddl/config/x-mode.env` first when Relay is active.
+3. First cycle: run one foreground watcher checkpoint with `bin/fm-watch-checkpoint.sh --seconds "${FM_CODEX_WATCH_CHECKPOINT:-180}"`.
+4. Ordinary wake: if the command prints `signal:`, `stale:`, `check:`, or `heartbeat`, drain queued wakes, handle that wake, then start the next checkpoint.
+5. If the command prints `checkpoint:` or exits 124 with no wake, drain queued wakes anyway, process any queued user message now visible to Codex, then start the next checkpoint.
+6. Never use shell `&` or Codex background tasks for firstmate watcher supervision.
+7. Do not run `bin/fm-watch-arm.sh` as Codex's normal supervision command.
+   If it is ever shelled anyway, a backgrounded, piped, or bundled anti-pattern is denied automatically by the PreToolUse seatbelt (`bin/fm-arm-pretool-check.sh`) registered in `.codex/hooks.json`.
+8. Failure or missing cycle only: drain queued wakes, inspect the failure, then start a fresh foreground checkpoint.
+
+Codex cannot reason while a foreground tool call is running.
+The bounded checkpoint returns control regularly so user messages and queued wakes can be handled without relying on background-task wake semantics.
+
+
+================================================================================
+READ-ONCE CONTRACT
+================================================================================
+Everything below is printed in full for this session start: every state/*.meta,
+a compact data/backlog.md listing, a bounded tail of every state/*.status,
+data/projects.md, data/secondmates.md, data/captain.md, data/captain-shared.md,
+and data/learnings.md.
+Do NOT re-read any of them after reading this digest, and do NOT bulk-read
+data/backlog.md or state/*.status: re-reading everything defeats the entire
+point of this command.
+
+Go to a source directly only when:
+  - this digest flagged it ABSENT (then rebuild or create it per AGENTS.md),
+  - its contents looked unparseable or corrupt,
+  - an individual full status log is needed for older wake-event history, or a
+    status line was capped and its tail matters (each task's full log path is
+    printed with its tail),
+  - a full task body is needed (bin/fm-tasks-axi.sh show <id> --full, or data/backlog.md),
+  - the backlog listing disclosed omitted queued items and this turn needs them,
+  - the NETWORK CHECKS section reported its checks still IN PROGRESS and this
+    turn needs their verdict (bin/fm-startup-network.sh report),
+  - or a STARTUP TRUNCATED banner named the stage that would have printed it, in
+    which case that stage's sources were never emitted and must be reconciled.
+
+================================================================================
+FLEET STATE
+================================================================================
+
+data/backlog.md
+--------------------------------------------------------------------------------
+ABSENT
+
+Work under way (state/*.meta)
+--------------------------------------------------------------------------------
+(none)
+
+Orphan status logs (state/*.status without matching .meta)
+--------------------------------------------------------------------------------
+(none)
+
+AFK
+--------------------------------------------------------------------------------
+absent
+
+================================================================================
+NETWORK CHECKS
+================================================================================
+Pending: checks run in the foreground after this local digest, before the transient Codex tool returns.
+
+================================================================================
+CONTEXT
+================================================================================
+
+data/projects.md
+--------------------------------------------------------------------------------
+ABSENT
+
+data/secondmates.md
+--------------------------------------------------------------------------------
+ABSENT
+
+data/captain.md
+--------------------------------------------------------------------------------
+ABSENT
+
+data/captain-shared.md (shared, main-authoritative, read-only in secondmate homes)
+--------------------------------------------------------------------------------
+ABSENT
+
+data/learnings.md
+--------------------------------------------------------------------------------
+ABSENT
+
+================================================================================
+NEXT STEP
+================================================================================
+Follow the supervision operating instructions block above for harness 'codex'.
+This script never starts supervision itself.
+
+The digest above is complete for this session start. The READ-ONCE CONTRACT
+section near the top of it governs what may still be read from disk.
+
+FOREGROUND NETWORK CHECKS (transient Codex tool)
+check run ended after 0s: GitHub authentication.
+NEEDS_GH_AUTH
+These ran AFTER the sections above were composed, so re-read any record a line here names.
+
+=== Unknown worker ===
+
+================================================================================
+SESSION START - /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-v07m053u
+================================================================================
+
+LOCK
+--------------------------------------------------------------------------------
+lock acquired: harness pid 1
+
+BOOTSTRAP
+--------------------------------------------------------------------------------
+PRESENTATION_UNAVAILABLE: lavish-axi (requires >=0.1.77; install: npm install -g lavish-axi && lavish-axi setup hooks) - nonvisual work may proceed with plain-text decisions and reports; install or upgrade before using Lavish
+
+WAKE QUEUE
+--------------------------------------------------------------------------------
+(no queued wakes)
+================================================================================
+SUPERVISION OPERATING INSTRUCTIONS - primary harness: codex
+================================================================================
+Current state:
+- Lock: held by this session; this session owns normal supervision unless away mode says otherwise.
+- Away/quiet mode: inactive.
+- X mode: inactive; use the default watcher cadence.
+- Ordinary wake: take the next foreground bin/fm-watch-checkpoint.sh checkpoint as directed below.
+
+Mode: Codex foreground checkpoint.
+
+When this session owns supervision and away mode is not active:
+1. Drain first with `bin/fm-wake-drain.sh`.
+   After handling all emitted wakes and reconciling open decisions and unread status lines, run the exact `--ack-through` command printed as `WAKE_ACK_REQUIRED`; until then the work remains durable for idempotent re-handling after interruption.
+2. Source `/home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-v07m053u/config/x-mode.env` first when Relay is active.
+3. First cycle: run one foreground watcher checkpoint with `bin/fm-watch-checkpoint.sh --seconds "${FM_CODEX_WATCH_CHECKPOINT:-180}"`.
+4. Ordinary wake: if the command prints `signal:`, `stale:`, `check:`, or `heartbeat`, drain queued wakes, handle that wake, then start the next checkpoint.
+5. If the command prints `checkpoint:` or exits 124 with no wake, drain queued wakes anyway, process any queued user message now visible to Codex, then start the next checkpoint.
+6. Never use shell `&` or Codex background tasks for firstmate watcher supervision.
+7. Do not run `bin/fm-watch-arm.sh` as Codex's normal supervision command.
+   If it is ever shelled anyway, a backgrounded, piped, or bundled anti-pattern is denied automatically by the PreToolUse seatbelt (`bin/fm-arm-pretool-check.sh`) registered in `.codex/hooks.json`.
+8. Failure or missing cycle only: drain queued wakes, inspect the failure, then start a fresh foreground checkpoint.
+
+Codex cannot reason while a foreground tool call is running.
+The bounded checkpoint returns control regularly so user messages and queued wakes can be handled without relying on background-task wake semantics.
+
+
+================================================================================
+READ-ONCE CONTRACT
+================================================================================
+Everything below is printed in full for this session start: every state/*.meta,
+a compact data/backlog.md listing, a bounded tail of every state/*.status,
+data/projects.md, data/secondmates.md, data/captain.md, data/captain-shared.md,
+and data/learnings.md.
+Do NOT re-read any of them after reading this digest, and do NOT bulk-read
+data/backlog.md or state/*.status: re-reading everything defeats the entire
+point of this command.
+
+Go to a source directly only when:
+  - this digest flagged it ABSENT (then rebuild or create it per AGENTS.md),
+  - its contents looked unparseable or corrupt,
+  - an individual full status log is needed for older wake-event history, or a
+    status line was capped and its tail matters (each task's full log path is
+    printed with its tail),
+  - a full task body is needed (bin/fm-tasks-axi.sh show <id> --full, or data/backlog.md),
+  - the backlog listing disclosed omitted queued items and this turn needs them,
+  - the NETWORK CHECKS section reported its checks still IN PROGRESS and this
+    turn needs their verdict (bin/fm-startup-network.sh report),
+  - or a STARTUP TRUNCATED banner named the stage that would have printed it, in
+    which case that stage's sources were never emitted and must be reconciled.
+
+================================================================================
+FLEET STATE
+================================================================================
+
+data/backlog.md
+--------------------------------------------------------------------------------
+ABSENT
+
+Work under way (state/*.meta)
+--------------------------------------------------------------------------------
+(none)
+
+Orphan status logs (state/*.status without matching .meta)
+--------------------------------------------------------------------------------
+(none)
+
+AFK
+--------------------------------------------------------------------------------
+absent
+
+================================================================================
+NETWORK CHECKS
+================================================================================
+Pending: checks run in the foreground after this local digest, before the transient Codex tool returns.
+
+================================================================================
+CONTEXT
+================================================================================
+
+data/projects.md
+--------------------------------------------------------------------------------
+ABSENT
+
+data/secondmates.md
+--------------------------------------------------------------------------------
+ABSENT
+
+data/captain.md
+--------------------------------------------------------------------------------
+ABSENT
+
+data/captain-shared.md (shared, main-authoritative, read-only in secondmate homes)
+--------------------------------------------------------------------------------
+ABSENT
+
+data/learnings.md
+--------------------------------------------------------------------------------
+ABSENT
+
+================================================================================
+NEXT STEP
+================================================================================
+Follow the supervision operating instructions block above for harness 'codex'.
+This script never starts supervision itself.
+
+The digest above is complete for this session start. The READ-ONCE CONTRACT
+section near the top of it governs what may still be read from disk.
+
+FOREGROUND NETWORK CHECKS (transient Codex tool)
+NETWORK_CHECKS: deferred worker liveness is unknown from this process namespace; GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation are not yet confirmed.
+The current generation is preserved; read /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-v07m053u/code/bin/fm-startup-network.sh report from the originating context to check its result.
+SESSION_START_COMPLETION: startup remains incomplete because foreground checks could not finish or publish.
+
+=== Foreign acquisition claim ===
+error: session owner cannot be verified in this process view; preserve the lock and operate read-only until resolved
+
+=== Stage lock deadline ===
+NETWORK_CHECKS: requested checks were not scheduled: GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation
+state=failed
+pid=26
+pid_namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026532246]
+pid_starttime=389883045
+started=1790916484
+finished=1790916486
+rc=124
+locked=1
+phases=probe,sweeps
+generation=1790916485.26.manual
+lock_pid=codex:<native-thread-id>
+report_published=1
+check run ended after 2s: GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation.
+The stage itself did not finish cleanly (failed) - the NETWORK_CHECKS line below names what to rerun.
+NETWORK_CHECKS: the deferred check worker gave up because /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-v07m053u/state/.lock.acquire was still held by pid 2 at its deadline, so GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation did not run; rerun /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-v07m053u/code/bin/fm-startup-network.sh run --locked 1 once that lease is released
+These ran AFTER the sections above were composed, so re-read any record a line here names.
+
+=== Undrained local digest ===
+{
+  "exit": 0,
+  "elapsed_seconds": 30.53,
+  "drained_bytes_after_return": 63246,
+  "local_context_reached": true,
+  "network_status_exists": false,
+  "completion_exists": false,
+  "acquisition_claim_exists": false,
+  "temporary_paths": []
+}
+
+=== Contended wake queue ===
+check run ended after 2s: GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation.
+NEEDS_GH_AUTH
+NETWORK_CHECKS: wake delivery failed within its budget; the retained result is available through /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-qshgbtc0/code/bin/fm-startup-network.sh report
+These ran AFTER the sections above were composed, so re-read any record a line here names.
+TIMINGS - where the deferred network checks spent their time (ms):
+  phase       gh-auth                                    start=+1098    elapsed=111
+  phase       secondmate-liveness                        start=+1277    elapsed=14
+  phase       secondmate-sync                            start=+1324    elapsed=63
+  phase       handoff-delivery                           start=+1430    elapsed=4
+  phase       fleet-sync                                 start=+1248    elapsed=1033
+  stage       network-checks probe_sweeps                start=+416     elapsed=1938
+  slowest: stage network-checks probe_sweeps 1938ms, phase fleet-sync 1033ms, phase gh-auth 111ms
+
+=== Contended recovery marker ===
+check run ended after 3s: GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation.
+NEEDS_GH_AUTH
+NETWORK_CHECKS: wake delivery failed within its budget; the retained result is available through /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-qshgbtc0/code/bin/fm-startup-network.sh report
+These ran AFTER the sections above were composed, so re-read any record a line here names.
+TIMINGS - where the deferred network checks spent their time (ms):
+  phase       gh-auth                                    start=+1007    elapsed=89
+  phase       secondmate-liveness                        start=+1167    elapsed=16
+  phase       secondmate-sync                            start=+1217    elapsed=63
+  phase       handoff-delivery                           start=+1318    elapsed=2
+  phase       fleet-sync                                 start=+1139    elapsed=1041
+  stage       network-checks probe_sweeps                start=+393     elapsed=1880
+  slowest: stage network-checks probe_sweeps 1880ms, phase fleet-sync 1041ms, phase gh-auth 89ms
+
+=== Persistent deferred host ===
+start_returned_seconds=1.14
+STATUS AT RETURN
+state=running
+pid=3185599
+pid_namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026531836]
+pid_starttime=389905802
+started=1790916711
+locked=1
+phases=probe,sweeps
+generation=1790916711.3184887.999999999
+lock_pid=codex:<native-thread-id>
+
+STATUS AFTER RELEASE
+state=done
+pid=3185599
+pid_namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026531836]
+pid_starttime=389905802
+started=1790916711
+finished=1790916714
+rc=0
+locked=1
+phases=probe,sweeps
+generation=1790916711.3184887.999999999
+lock_pid=codex:<native-thread-id>
+report_published=1
+
+WAKE
+1790916714	1	check	startup-network	check: startup-network: deferred startup network checks finished (done); read them with /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-07fh4ssy/code/bin/fm-startup-network.sh report
+
+acquisition_claim_absent=true
+publication_lock_absent=true

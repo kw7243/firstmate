@@ -1,0 +1,10 @@
+{
+  "exit": 0,
+  "elapsed_seconds": 30.53,
+  "drained_bytes_after_return": 63246,
+  "local_context_reached": true,
+  "network_status_exists": false,
+  "completion_exists": false,
+  "acquisition_claim_exists": false,
+  "temporary_paths": []
+}

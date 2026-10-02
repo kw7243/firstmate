@@ -1,0 +1,12 @@
+check run ended after 3s: GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation.
+NEEDS_GH_AUTH
+NETWORK_CHECKS: wake delivery failed within its budget; the retained result is available through /home/ubuntu/.no-mistakes/worktrees/9c45ef16ef2c/01M3X7MZJANXVAHSVYGV3GR7YN/.test-tmp/fm-lab-live-qshgbtc0/code/bin/fm-startup-network.sh report
+These ran AFTER the sections above were composed, so re-read any record a line here names.
+TIMINGS - where the deferred network checks spent their time (ms):
+  phase       gh-auth                                    start=+1007    elapsed=89
+  phase       secondmate-liveness                        start=+1167    elapsed=16
+  phase       secondmate-sync                            start=+1217    elapsed=63
+  phase       handoff-delivery                           start=+1318    elapsed=2
+  phase       fleet-sync                                 start=+1139    elapsed=1041
+  stage       network-checks probe_sweeps                start=+393     elapsed=1880
+  slowest: stage network-checks probe_sweeps 1880ms, phase fleet-sync 1041ms, phase gh-auth 89ms
