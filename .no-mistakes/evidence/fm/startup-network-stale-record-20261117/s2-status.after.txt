@@ -1,0 +1,12 @@
+state=done
+pid=3131617
+pid_namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026531836]
+pid_starttime=792953854
+started=1794947192
+finished=1794947194
+rc=0
+locked=1
+phases=probe,sweeps
+generation=1794947192.3130831.3127012
+lock_pid=3056186
+report_published=1

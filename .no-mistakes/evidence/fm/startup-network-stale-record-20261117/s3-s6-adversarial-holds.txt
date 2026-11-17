@@ -1,0 +1,87 @@
+
+########## S3 fresh unobservable record (started 10s ago, foreign namespace) must still hold
+-- record:
+state=running
+pid=6975
+pid_namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026532248]
+pid_starttime=422874409
+started=1794947225
+locked=1
+phases=probe,sweeps
+generation=held-gen
+lock_pid=codex:old
+-- $ report
+NETWORK_CHECKS: deferred worker liveness is unknown from this process namespace; GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation are not yet confirmed.
+The current generation is preserved: it is treated as abandoned in 260s, once its record outlives the 270s that worker can run. Read {run-worktree}/bin/fm-startup-network.sh report from the originating context to check its result.
+-- $ run --locked 0
+NETWORK_CHECKS: refused to start another run because the deferred check worker liveness is unknown from this process namespace (generation held-gen); it is treated as abandoned in 260s, once its record outlives the 270s that worker can run; read {run-worktree}/bin/fm-startup-network.sh report for its state
+(exit 1)
+-- status record UNCHANGED (generation held-gen)
+
+########## S4 unobservable record with no readable start must never expire
+-- record:
+state=running
+pid=6975
+pid_namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026532248]
+pid_starttime=422874409
+locked=1
+phases=probe,sweeps
+generation=held-gen
+lock_pid=codex:old
+-- $ report
+NETWORK_CHECKS: deferred worker liveness is unknown from this process namespace; GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation are not yet confirmed.
+The current generation is preserved: its record has no readable start, so it never expires; once its originating context is confirmed gone, move /tmp/fm-lab.KeflwO/state/.startup-network.status aside to clear it. Read {run-worktree}/bin/fm-startup-network.sh report from the originating context to check its result.
+-- $ run --locked 0
+NETWORK_CHECKS: refused to start another run because the deferred check worker liveness is unknown from this process namespace (generation held-gen); its record has no readable start, so it never expires; once its originating context is confirmed gone, move /tmp/fm-lab.KeflwO/state/.startup-network.status aside to clear it; read {run-worktree}/bin/fm-startup-network.sh report for its state
+(exit 1)
+-- status record UNCHANGED (generation held-gen)
+
+########## S5 record carrying its own lifetime=630, started 300s ago (> observer default 270s) must still hold
+-- record:
+state=running
+pid=6975
+pid_namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026532248]
+pid_starttime=422874409
+started=1794946936
+lifetime=630
+locked=1
+phases=probe,sweeps
+generation=held-gen
+lock_pid=codex:old
+-- $ report
+NETWORK_CHECKS: deferred worker liveness is unknown from this process namespace; GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation are not yet confirmed.
+The current generation is preserved: it is treated as abandoned in 330s, once its record outlives the 630s that worker can run. Read {run-worktree}/bin/fm-startup-network.sh report from the originating context to check its result.
+-- $ run --locked 0
+NETWORK_CHECKS: refused to start another run because the deferred check worker liveness is unknown from this process namespace (generation held-gen); it is treated as abandoned in 330s, once its record outlives the 630s that worker can run; read {run-worktree}/bin/fm-startup-network.sh report for its state
+(exit 1)
+-- status record UNCHANGED (generation held-gen)
+
+########## S6 record carrying lifetime=630, started 700s ago must expire and let a run proceed
+-- record:
+state=running
+pid=6975
+pid_namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026532248]
+pid_starttime=422874409
+started=1794946536
+lifetime=630
+locked=1
+phases=probe,sweeps
+generation=held-gen
+lock_pid=codex:old
+-- $ report
+NETWORK_CHECKS: the deferred check worker never published and its record outlived the 630s that worker can run, so GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation did not complete; rerun {run-worktree}/bin/fm-startup-network.sh run --locked 1
+-- $ run --locked 0
+(exit 0)
+-- status record now:
+state=done
+pid=3150525
+pid_namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026531836]
+pid_starttime=792958277
+started=1794947236
+finished=1794947237
+rc=0
+locked=0
+phases=probe
+generation=1794947236.3150525.manual
+lock_pid=
+report_published=1

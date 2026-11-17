@@ -1,0 +1,22 @@
+ ▐▛███▛█   Claude Code v2.1.326
+▝▜██████▀  Opus 5.5 · Claude Pro
+ ▝▝   ▝▝   ~/.no-mistakes/worktrees/9c45ef16ef2c/01M7NJ1BE7A0ABEWZBSCTEPYEJ
+❯ Run exactly this one Bash command and then print its full output verbatim, nothing else: bin/fm-session-start.sh --source startup 2>&1 | grep -n -A3 -i "network" ; echo "exit=${PIPESTATUS[0]}"
+  Ran 1 shell command
+● 92:  - the NETWORK CHECKS section reported its checks still IN PROGRESS and this
+  93:    turn needs their verdict (bin/fm-startup-network.sh report),
+  94-  - or a STARTUP TRUNCATED banner named the stage that would have printed it, in
+  95-    which case that stage's sources were never emitted and must be reconciled.
+  96-
+  --
+  118:NETWORK CHECKS
+  119-================================================================================
+  120-check run ended after 2s: GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive
+  terminal-outcome reconciliation.
+  121-(silent - no problems found)
+  exit=0
+✻ Churned for 20s · done 8:26 PM
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ Run bin/fm-startup-network.sh report and print its output
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle)

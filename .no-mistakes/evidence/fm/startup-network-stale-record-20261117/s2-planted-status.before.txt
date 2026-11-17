@@ -1,0 +1,9 @@
+state=running
+pid=6975
+pid_namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026532248]
+pid_starttime=422874409
+started=1791246397
+locked=1
+phases=probe,sweeps
+generation=1791246397.6830.13
+lock_pid=codex:01a10e4a-0ec1-7642-8680-824af7b1205d

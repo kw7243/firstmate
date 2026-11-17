@@ -1,0 +1,32 @@
+== [BASE-a567bad] lab FM_HOME=/tmp/fm-lab.nk1U1w; planted copy of the 2026-10-06 record:
+state=running
+pid=6975
+pid_namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026532248]
+pid_starttime=422874409
+started=1791246397
+locked=1
+phases=probe,sweeps
+generation=1791246397.6830.13
+lock_pid=codex:01a10e4a-0ec1-7642-8680-824af7b1205d
+== [BASE-a567bad] current pid namespace: pid:[4026531836]
+== [BASE-a567bad] $ fm-startup-network.sh report
+NETWORK_CHECKS: deferred worker liveness is unknown from this process namespace; GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation are not yet confirmed.
+The current generation is preserved; read /tmp/fm-test-drv.cmbWkl/bin/fm-startup-network.sh report from the originating context to check its result.
+(exit 0)
+== [BASE-a567bad] $ fm-startup-network.sh run --locked 1
+(exit 1, 0s)
+== [BASE-a567bad] status after run:
+state=running
+pid=6975
+pid_namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026532248]
+pid_starttime=422874409
+started=1791246397
+locked=1
+phases=probe,sweeps
+generation=1791246397.6830.13
+lock_pid=codex:01a10e4a-0ec1-7642-8680-824af7b1205d
+== [BASE-a567bad] report after run:
+NETWORK_CHECKS: deferred worker liveness is unknown from this process namespace; GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation are not yet confirmed.
+The current generation is preserved; read /tmp/fm-test-drv.cmbWkl/bin/fm-startup-network.sh report from the originating context to check its result.
+(exit 0)
+== [BASE-a567bad] lab removed

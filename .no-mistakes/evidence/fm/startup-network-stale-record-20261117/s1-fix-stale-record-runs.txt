@@ -1,0 +1,39 @@
+== [FIX-5c10133] lab FM_HOME=/tmp/fm-lab.aUJ2ZB; planted copy of the 2026-10-06 record:
+state=running
+pid=6975
+pid_namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026532248]
+pid_starttime=422874409
+started=1791246397
+locked=1
+phases=probe,sweeps
+generation=1791246397.6830.13
+lock_pid=codex:01a10e4a-0ec1-7642-8680-824af7b1205d
+== [FIX-5c10133] current pid namespace: pid:[4026531836]
+== [FIX-5c10133] $ fm-startup-network.sh report
+NETWORK_CHECKS: the deferred check worker never published and its record outlived the 270s that worker can run, so GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation did not complete; rerun {run-worktree}/bin/fm-startup-network.sh run --locked 1
+(exit 0)
+== [FIX-5c10133] $ fm-startup-network.sh run --locked 1
+(exit 0, 1s)
+== [FIX-5c10133] status after run:
+state=done
+pid=3050341
+pid_namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026531836]
+pid_starttime=792936495
+started=1794947018
+finished=1794947019
+rc=0
+locked=0
+phases=probe
+generation=1794947018.3050341.manual
+lock_pid=
+report_published=1
+== [FIX-5c10133] report after run:
+check run ended after 1s: GitHub authentication.
+NETWORK_CHECKS: the fleet lock was no longer held by the session that requested these, so dead-secondmate relaunch, secondmate convergence, pending handoff delivery, and project clone refresh were skipped; they belong to whichever session holds the lock now
+These ran AFTER the sections above were composed, so re-read any record a line here names.
+TIMINGS - where the deferred network checks spent their time (ms):
+  phase       gh-auth                                    start=+308     elapsed=302
+  stage       network-checks probe                       start=+198     elapsed=428
+  slowest: stage network-checks probe 428ms, phase gh-auth 302ms
+(exit 0)
+== [FIX-5c10133] lab removed

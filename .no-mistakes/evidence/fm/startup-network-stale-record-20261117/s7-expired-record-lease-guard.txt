@@ -1,0 +1,21 @@
+harness ancestor pid for the session lock: 3031408 (claude)
+-- lease .lock.acquire held by live pid 3156948 (namespace 2033171b-9858-4767-ad27-2c59662487fa/pid:[4026532248])
+-- $ FM_STARTUP_NETWORK_TIMEOUT=3 run --locked 1
+NETWORK_CHECKS: the deferred check worker gave up because /tmp/fm-lab.DzGWM5/state/.lock.acquire was still held by pid 3156948 at its deadline, so GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation did not run; rerun {run-worktree}/bin/fm-startup-network.sh run --locked 1 once that lease is released
+(exit 1, 4s)
+-- status record now:
+state=failed
+pid=3156955
+pid_namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026531836]
+pid_starttime=792959731
+started=1794947251
+finished=1794947255
+rc=124
+locked=1
+phases=probe,sweeps
+generation=1794947251.3156955.manual
+lock_pid=3031408
+report_published=1
+-- timings (no sweep phases expected):
+-- lease still held by 3156948: 3156948
+-- lab removed

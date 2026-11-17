@@ -1,0 +1,38 @@
+ok - fm-startup-network: wait fails when no deferred stage publishes before its deadline
+ok - fm-startup-network: start returns immediately and never holds the caller's stdout open
+ok - fm-startup-network: exactly one of the digest and the wake reports each actionable result
+ok - fm-startup-network: a claimant crash after publication still surfaces the result
+ok - fm-startup-network: a report-publication failure is failed, diagnosed, and still wakes
+ok - fm-startup-network: silent and explicitly informational successes never queue a main-blocking wake
+ok - fm-startup-network: an actionable state=done report still queues a wake
+ok - fm-startup-network: deferred invalid secondmate markers produce durable wakes
+ok - fm-startup-network: manual callers cannot forge mutation authority
+ok - fm-startup-network: an aggregate bound turns a wedged sweep into an actionable line
+ok - fm-startup-network: process identity distinguishes live, dead and reused worker PIDs
+ok - fm-startup-network: an exited worker awaiting reaping permits recovery
+NETWORK_CHECKS: refused to start another run because the deferred check worker liveness is unknown from this process namespace (generation preserved-foreign-dead); it is treated as abandoned in 267s, once its record outlives the 270s that worker can run; read /tmp/fm-startup-network-tests.wWmh5w/unknown-foreign-dead/root/bin/fm-startup-network.sh report for its state
+NETWORK_CHECKS: refused to start another run because the deferred check worker liveness is unknown from this process namespace (generation preserved-foreign-live); it is treated as abandoned in 268s, once its record outlives the 270s that worker can run; read /tmp/fm-startup-network-tests.wWmh5w/unknown-foreign-live/root/bin/fm-startup-network.sh report for its state
+NETWORK_CHECKS: refused to start another run because the deferred check worker liveness is unknown from this process namespace (generation preserved-missing-namespace); it is treated as abandoned in 268s, once its record outlives the 270s that worker can run; read /tmp/fm-startup-network-tests.wWmh5w/unknown-missing-namespace/root/bin/fm-startup-network.sh report for its state
+NETWORK_CHECKS: refused to start another run because the deferred check worker liveness is unknown from this process namespace (generation preserved-missing-start); it is treated as abandoned in 268s, once its record outlives the 270s that worker can run; read /tmp/fm-startup-network-tests.wWmh5w/unknown-missing-start/root/bin/fm-startup-network.sh report for its state
+NETWORK_CHECKS: the deferred check worker gave up because /tmp/fm-startup-network-tests.wWmh5w/unknown-missing-start/home/state/.startup-network.lock was still held by pid 3226059 at its deadline, so GitHub authentication may be incomplete; rerun /tmp/fm-startup-network-tests.wWmh5w/unknown-missing-start/root/bin/fm-startup-network.sh run --locked 0 once that lock is released
+ok - fm-startup-network: unknown worker coordinates preserve status, output and generation
+ok - fm-startup-network: an unobservable worker record stops blocking the checks after its lifetime
+ok - fm-startup-network: namespace uncertainty preserves the original worker's publication
+ok - fm-startup-network: an unknown probe leaves full startup incomplete until a successful retry
+ok - fm-startup-network: locked requests supersede in-flight probe-only workers
+ok - fm-startup-network: a second start never launches a competing worker
+ok - fm-startup-network: start atomically reserves the generation harvest observes
+ok - fm-startup-network: a new lock owner gets a distinct worker generation
+ok - fm-startup-network: fleet-lock takeover cannot overlap a mutating sweep
+ok - fm-startup-network: same-session entry succeeds without changing an active sweep's owner
+ok - fm-startup-network: timing records share one origin so their offsets form a timeline
+ok - fm-startup-network: timings are durable and printed only on demand
+ok - fm-startup-network: a timed-out run still publishes the partial timings it recorded
+ok - fm-startup-network: the timing artifact cannot carry a command line or forge records
+ok - fm-startup-network: a held publish lock ends the worker inside its budget with a failed-rerun record
+ok - fm-startup-network: all wake publication locks are bounded and findings survive delivery failure
+ok - fm-startup-network: failed bounded append restores recovery state and releases owned locks
+ok - fm-startup-network: foreground delivery acknowledges printing before wake fallback, including failed sinks and receipts
+ok - fm-startup-network: stalled harvest output is bounded, releases owned locks, and preserves fallback delivery
+# fm-startup-network.test.sh: all assertions passed
+rm: cannot remove '/tmp/fm-startup-network-tests.wWmh5w/owner-handoff/home/state': Directory not empty
