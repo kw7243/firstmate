@@ -510,11 +510,12 @@ pass 'truncated transient local digest starts no checks and records no completio
 cat > "$TMP_ROOT/foreground-unknown.sh" <<'TOOL'
 set -eu
 bash "$FM_ROOT_OVERRIDE/bin/fm-lock.sh"
-cat > "$FM_HOME/state/.startup-network.status" <<'STATUS'
+cat > "$FM_HOME/state/.startup-network.status" <<STATUS
 state=running
 pid=999999999
 pid_namespace=foreign-boot/pid:[999999]
 pid_starttime=1
+started=$(date +%s)
 locked=1
 phases=probe,sweeps
 generation=unknown-generation
