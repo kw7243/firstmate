@@ -645,7 +645,7 @@ EOF
 # run refuses without saying why. The acquisition lease, not the record, keeps
 # a still-running old sweep and a new one apart.
 test_unobservable_worker_record_expires_after_its_lifetime() {
-  local rec home root log status report err rc lifetime=40 namespace='foreign-boot/pid:[4026532248]'
+  local rec home root log status report err rc waited generation lifetime=40 namespace='foreign-boot/pid:[4026532248]'
   export FM_STARTUP_NETWORK_TIMEOUT=5 FM_SESSION_START_TIMEOUT=5
   write_unobservable_record() {  # <status-file> <age> [<namespace>] [<pid>]
     cat > "$1" <<EOF
@@ -672,7 +672,7 @@ EOF
   cp "$status" "$home/before.status"
   report=$(run_stage "$home" "$root" report)
   assert_contains "$report" 'worker liveness is unknown' "a fresh unobservable worker was not preserved: $report"
-  assert_contains "$report" "the ${lifetime}s any worker can run" "the report hid when the hold ends: $report"
+  assert_contains "$report" "the ${lifetime}s that worker can run" "the report hid when the hold ends: $report"
   err="$home/run.err"
   rc=0
   FM_FAKE_BOOTSTRAP_LOG="$log" run_stage "$home" "$root" run --locked 0 2> "$err" || rc=$?
@@ -692,7 +692,7 @@ EOF
   status="$home/state/.startup-network.status"
   write_unobservable_record "$status" $(( lifetime + 5 ))
   report=$(run_stage "$home" "$root" report)
-  assert_contains "$report" "outlived the ${lifetime}s any worker can run" \
+  assert_contains "$report" "outlived the ${lifetime}s that worker can run" \
     "an expired unobservable record still read as in progress: $report"
   assert_contains "$report" 'fm-startup-network.sh run --locked 1' "the expired record did not name the rerun: $report"
   assert_not_contains "$report" 'liveness is unknown' "an expired record was still reported as preserved"
@@ -704,8 +704,9 @@ EOF
     || fail "the expired generation was not replaced"
   assert_grep 'network=only detect_only=0' "$log" "the replacement worker did not run the sweeps"
 
-  # A record with no readable start can never be bounded, so it cannot hold
-  # the generation either.
+  # A record with no readable start has no bound, so nothing proves its worker
+  # stopped: it keeps the generation, and a refusal names the manual clearing
+  # step instead of a countdown.
   rec=$(new_world unobservable-unbounded)
   IFS='|' read -r home root log <<EOF
 $rec
@@ -713,9 +714,55 @@ EOF
   status="$home/state/.startup-network.status"
   write_unobservable_record "$status" 0
   sed -i.bak '/^started=/d' "$status"
-  FM_FAKE_BOOTSTRAP_LOG="$log" run_stage "$home" "$root" run --locked 0 \
-    || fail "an unbounded unobservable record blocked a manual run"
-  assert_grep 'network=only detect_only=1' "$log" "the unbounded record was not replaced"
+  cp "$status" "$home/before.status"
+  report=$(run_stage "$home" "$root" report)
+  assert_contains "$report" 'worker liveness is unknown' "an unbounded record was not preserved: $report"
+  assert_contains "$report" 'no readable start' "the report hid why the record never expires: $report"
+  err="$home/run.err"
+  rc=0
+  FM_FAKE_BOOTSTRAP_LOG="$log" run_stage "$home" "$root" run --locked 0 2> "$err" || rc=$?
+  [ "$rc" -ne 0 ] || fail "manual run superseded an unbounded unobservable record"
+  assert_grep 'refused to start another run' "$err" "manual run refused silently: $(cat "$err")"
+  assert_grep 'no readable start' "$err" "manual run refusal did not name its reason: $(cat "$err")"
+  assert_grep "move $status aside" "$err" "manual run refusal did not name the clearing step: $(cat "$err")"
+  assert_no_grep 'abandoned in s' "$err" "manual run refusal printed an empty countdown"
+  cmp -s "$status" "$home/before.status" || fail "a refused run changed the unbounded record"
+  [ ! -f "$log" ] || fail "a refused run started bootstrap work behind an unbounded record"
+
+  # A worker launched with larger budgets records its own lifetime: 300s stage
+  # plus 300s delivery plus 30s is 630s, per the documented bound. An observer
+  # whose own budgets give 40s must not expire it at 100s.
+  rec=$(new_world unobservable-larger-budget)
+  IFS='|' read -r home root log <<EOF
+$rec
+EOF
+  status="$home/state/.startup-network.status"
+  trap 'touch "$TMP_ROOT/unobservable-larger-budget/home/release-probe"; fm_test_cleanup' EXIT
+  FM_STARTUP_NETWORK_TIMEOUT=300 FM_SESSION_START_TIMEOUT=300 FM_FAKE_BOOTSTRAP_LOG="$log" \
+    FM_FAKE_BOOTSTRAP_RELEASE_FILE="$home/release-probe" \
+    run_stage "$home" "$root" start --locked 0 --harvest-pid 999999999 \
+    || fail "the larger-budget worker failed to start"
+  waited=0
+  while [ ! -s "$log" ] && [ "$waited" -lt 50 ]; do
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  assert_grep 'network=only detect_only=1' "$log" "the larger-budget worker was not running"
+  generation=$(sed -n 's/^generation=//p' "$status")
+  printf 'pid_namespace=%s\nstarted=%s\n' "$namespace" "$(( $(date +%s) - 100 ))" >> "$status"
+  report=$(run_stage "$home" "$root" report)
+  assert_contains "$report" 'worker liveness is unknown' "a larger-budget worker expired early: $report"
+  assert_contains "$report" 'the 630s that worker can run' "the report did not use the worker's own lifetime: $report"
+  err="$home/run.err"
+  rc=0
+  FM_FAKE_BOOTSTRAP_LOG="$log" run_stage "$home" "$root" run --locked 0 2> "$err" || rc=$?
+  [ "$rc" -ne 0 ] || fail "manual run superseded a larger-budget worker inside its lifetime"
+  touch "$home/release-probe"
+  trap fm_test_cleanup EXIT
+  run_stage "$home" "$root" wait 30 || fail "the larger-budget worker never published"
+  [ "$(sed -n 's/^generation=//p' "$status")" = "$generation" ] \
+    || fail "the larger-budget worker's generation was replaced"
+  [ "$(grep -c 'network=only' "$log")" = 1 ] || fail "a larger-budget worker caused duplicate work"
 
   # An old sweep that is in fact still running holds the acquisition lease from
   # its own namespace. Expiry of its record must not let a new sweep overlap it.
