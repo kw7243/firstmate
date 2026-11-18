@@ -1284,6 +1284,19 @@ if [ -f "$FM_HOME/$SUB_HOME_MARKER" ]; then
       else
         PUBLIC_FOLLOWUP_HOME=
         PUBLIC_FOLLOWUP_STATE=
+        # A parent home that exists but holds no registration for this
+        # secondmate (for example an archived, directly supervised home)
+        # refuses cleanup only when Relay could make that parent owe a public
+        # reply, like the legacy branch below. A recorded parent home that does
+        # not resolve to a real directory has an unknowable Relay state and
+        # stays refused, as do a live/durable binding conflict and an invalid
+        # id, which never reach this point.
+        if DURABLE_PARENT_HOME=$(public_followup_canonical_home \
+            "$PARENT_ROUTE_HOME") \
+          && ! fm_pf_relay_active "$DURABLE_PARENT_HOME" \
+          && ! fm_pf_relay_active "$FM_HOME"; then
+          PUBLIC_FOLLOWUP_PARENT_UNRESOLVED=0
+        fi
       fi
     fi
   else

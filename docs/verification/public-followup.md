@@ -22,6 +22,7 @@ The stock macOS compatibility lane additionally runs the focused first-registrat
 The relay is a fakebin `curl` in every case, so no public post is ever made; `tasks-axi` and `jq` are the real tools, because stubbing the obligation state machine would verify nothing.
 The remote-route cases fake only the SSH binary at the `FM_SSH_BIN` process seam and then run the real tracked `fm-remote-entrypoint.sh` against a local checkout standing in for the remote one, so the work that has to reach the remote home actually runs there; no host and no network are involved.
 The failed-result regression was refreshed separately on 2026-09-22 in the same environment with tasks-axi 0.2.6.
+The three durable-parent registration cases were refreshed separately on 2026-11-18 on Linux 6.8.0 (x86_64) with GNU bash 5.2.21, tasks-axi 0.2.6, and jq 1.7, each run alone through `FM_TEST_ONLY`.
 
 ## Restart end-to-end and regressions
 
@@ -44,7 +45,9 @@ ok - typed delivery refuses to post when its cleanup registration is missing
 ok - marked secondmate teardown resolves its parent and fails closed when unavailable
 ok - local seeding publishes durable parent state before its identity marker
 ok - a lost launch-time parent binding is recovered from the durable local record
-ok - a durable local parent record does not bypass a genuinely missing parent-side registration
+ok - a durable local parent record does not bypass a missing parent-side registration while Relay is active
+ok - a directly supervised home with an unregistered parent cleans up while Relay is off
+ok - a durable record naming a removed parent home still refuses cleanup
 ok - unknown durable parent fields remain forward-compatible
 ok - conflicting live and durable parent bindings fail closed
 ok - unsafe durable parent records fail closed before cleanup
