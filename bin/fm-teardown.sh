@@ -1284,6 +1284,15 @@ if [ -f "$FM_HOME/$SUB_HOME_MARKER" ]; then
       else
         PUBLIC_FOLLOWUP_HOME=
         PUBLIC_FOLLOWUP_STATE=
+        # An unresolvable parent (for example an archived, directly supervised
+        # home with no parent-side registration) refuses cleanup only when
+        # Relay could make that parent owe a public reply, like the legacy
+        # branch below. A live/durable binding conflict or an invalid id never
+        # reaches this point and stays refused.
+        if ! fm_pf_relay_active "$PARENT_ROUTE_HOME" \
+          && ! fm_pf_relay_active "$FM_HOME"; then
+          PUBLIC_FOLLOWUP_PARENT_UNRESOLVED=0
+        fi
       fi
     fi
   else
