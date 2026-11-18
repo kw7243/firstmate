@@ -973,6 +973,41 @@ test_secondmate_teardown_unregistered_parent_relay_off_succeeds() {
   pass "a directly supervised home with an unregistered parent cleans up while Relay is off"
 }
 
+# The durable record names a parent home that no longer exists (moved or
+# renamed). Its Relay state cannot be read, so the missing .env there must not
+# count as Relay off: teardown must keep refusing.
+test_secondmate_teardown_removed_parent_home_still_refuses() {
+  local parent child parent_resolved
+  parent=$(make_home teardown-removed-parent relay-off)
+  child="$TMP_ROOT/teardown-removed-parent-child"
+  FM_SECONDMATE_CHARTER='Removed-parent regression charter.' \
+    FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" mate "$child" --no-projects >/dev/null \
+    || fail "real secondmate seeding failed"
+  child=$(cd "$child" && pwd -P)
+  parent_resolved=$(cd "$parent" && pwd -P)
+  make_fake_curl "$child" >/dev/null
+  fm_fake_exit0 "$child/fakebin" tmux treehouse no-mistakes gh gh-axi
+  assert_local_secondmate_parent_record "$child" "$parent_resolved"
+  rm -rf "$parent"
+  fm_git_init_commit "$child/projects/worktree"
+  printf 'manual\n' > "$child/config/backlog-backend"
+  fm_write_meta "$child/state/work-clean.meta" \
+    "window=firstmate:fm-work-clean" "endpoint_task_id=work-clean" \
+    "worktree=$child/projects/worktree" "project=$child/projects/worktree" \
+    "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
+
+  PATH="$child/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$child" \
+    FM_STATE_OVERRIDE="$child/state" FM_DATA_OVERRIDE="$child/data" \
+    FM_CONFIG_OVERRIDE="$child/config" \
+    expect_failure "a durable record naming a removed parent home must refuse" \
+    env -u FMX_PAIRING_TOKEN "$TEARDOWN" work-clean
+  assert_contains "$EXPECT_OUT" "cannot resolve the primary home for marked secondmate mate" \
+    "a removed parent home must remain an actionable teardown refusal"
+  assert_present "$child/state/work-clean.meta" \
+    "a removed parent home must preserve the child work metadata"
+  pass "a durable record naming a removed parent home still refuses cleanup"
+}
+
 test_secondmate_teardown_durable_record_with_unknown_field_succeeds() {
   local parent parent_alias child parent_resolved rc out
   parent=$(make_home teardown-durable-clean-parent relay-off)
@@ -3972,6 +4007,7 @@ test_local_secondmate_seed_publishes_parent_before_identity
 test_secondmate_teardown_resolves_parent_from_durable_record_when_env_lost
 test_secondmate_teardown_durable_record_missing_parent_registration_still_refuses
 test_secondmate_teardown_unregistered_parent_relay_off_succeeds
+test_secondmate_teardown_removed_parent_home_still_refuses
 test_secondmate_teardown_durable_record_with_unknown_field_succeeds
 test_secondmate_teardown_rejects_conflicting_live_and_durable_parent_bindings
 test_secondmate_teardown_rejects_unsafe_durable_parent_records
