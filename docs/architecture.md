@@ -170,7 +170,7 @@ Same-session claim acquisition follows `bin/fm-lock.sh`'s serialization and unce
 Shared transient lock primitives in `bin/fm-wake-lib.sh` also require namespace agreement before interpreting a PID on Linux.
 Legacy Linux transient locks without those coordinates remain unknown and are preserved; migration must establish that their owners ended before retiring their records.
 These checks preserve ambiguous ownership rather than infer death from age or an absent PID in another namespace.
-Deferred-worker status and reuse follow the process-coordinate contract in `bin/fm-startup-network.sh`; an unknown worker remains reserved until its original process view can establish its state.
+Deferred-worker status and reuse follow the process-coordinate contract in `bin/fm-startup-network.sh`; an unknown worker remains reserved until its original process view can establish its state or its readable start is older than the bounded lifetime its worker recorded, while the acquisition lease keeps old and new mutating sweeps apart.
 Startup completion and refused deferred-stage requests follow the [completion interlock](sessionstart-nudge.md#lock-and-completion-interlock).
 Current empirical commands and platform limits are recorded in [runtime verification](verification/runtime-backends.md#linux-codex-session-identity).
 

@@ -148,7 +148,8 @@ The existing acquisition and foreground-check commands support recovery when the
 The shared claim-lock helper serializes replacement of a dead claim; the startup worker also checks its recorded process birth before replacing a running record.
 Their command headers own the invocation and record formats: [`fm-lock.sh`](../bin/fm-lock.sh) and [`fm-startup-network.sh`](../bin/fm-startup-network.sh).
 Neither a matching session identity nor an old timestamp proves that a sibling sweep finished.
-An unknown foreign-namespace claim or worker record stays intact until positive lifetime evidence is available; bounded refusal is not completed recovery.
+An unknown foreign-namespace claim stays intact until positive lifetime evidence is available; bounded refusal is not completed recovery.
+An unknown deferred-worker status record stops holding its generation once its readable start is older than the bounded lifetime its worker recorded; a record with no readable start stays intact until it is moved aside by hand, and the acquisition lease still keeps old and new mutating sweeps apart.
 Do not infer death from a PID missing in another namespace or from matching namespace inode numbers alone.
 
 Restarting a secondmate is not a supported repair for this primary ownership failure.

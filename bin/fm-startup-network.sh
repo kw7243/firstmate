@@ -54,8 +54,12 @@
 #          worker therefore cannot satisfy a later locked request. When worker
 #          liveness is known, an uncovered request gets a distinct generation
 #          and runs its requested phases. Unknown liveness preserves the current
-#          generation; an uncovered request then exits nonzero and names the
-#          checks it could not schedule. --locked 1 asks
+#          generation until a record with a readable start outlives the
+#          longest bounded run its worker can have; an uncovered request
+#          meanwhile exits nonzero and names the checks it could not schedule
+#          and when the hold ends, or how to clear a record with no readable
+#          start. After that the record no longer holds the generation.
+#          --locked 1 asks
 #          for the inactive-outcome scan and mutating sweeps as well as the
 #          read-only probe; --locked 0 asks for the probe only. --harvest-pid
 #          names the session-start process
@@ -67,7 +71,8 @@
 #          directly to redo the stage by hand from the lock-owning harness.
 #          --harvest-pid prints and acknowledges inline for that live claimant
 #          before the fallback-wake decision, as transient start does.
-#          A running record not proven dead refuses another foreground run.
+#          A running record that is alive, or unknown and not yet past that
+#          bound, refuses another foreground run and prints why to stderr.
 #          Exits non-zero when refused or unable to publish or deliver, including
 #          a lock a live process still held at its deadline. A published timeout
 #          or failed check result can still exit zero; inspect the report.
@@ -87,14 +92,23 @@
 # STATE, all under this home's state/ and gitignored with it:
 #   .startup-network.status   key=value record - generation, lock_pid, state,
 #                             pid, pid_namespace, pid_starttime, started,
-#                             finished, rc, locked, phases, and whether the
+#                             lifetime, finished, rc, locked, phases, and whether the
 #                             report was published. Despite its legacy name,
 #                             lock_pid stores fm_session_lock_generation's
 #                             token, not necessarily a numeric PID.
 #                             Linux liveness requires
 #                             matching namespace and process birth; missing or
 #                             foreign coordinates are unknown. Age does not
-#                             prove the worker stopped. The single
+#                             prove an observed worker stopped, but an unknown
+#                             record whose readable start is older than its
+#                             lifetime is abandoned. A running record's
+#                             lifetime is its worker's own stage plus delivery
+#                             budget plus 30s; a record without one uses this
+#                             process's budgets. No worker runs past its
+#                             lifetime, and the acquisition lease held through
+#                             the mutating sweeps keeps old and new sweeps
+#                             apart. A record with no readable start never
+#                             expires. The single
 #                             source of truth for what ran and how it ended.
 #   .startup-network.report   the sweep output, byte for byte as
 #                             bin/fm-bootstrap.sh produced it, plus a
@@ -220,7 +234,71 @@ held_by() {  # human-readable holder of the lock the last take_lock refused
   printf 'pid %s' "${FM_LOCK_HELD_PID:-unknown}"
 }
 
-worker_state() {
+# The longest any worker this script launches can run: its stage bound covers
+# every lock wait and the sweeps, its delivery bound covers publication and the
+# fallback wake, and the slack absorbs kill grace and clock reads. A worker
+# records its own value as lifetime=, because its budgets came from the
+# environment that launched it, not from the one observing it.
+worker_lifetime() {
+  printf '%s' "$(( $(stage_budget) + $(delivery_budget) + 30 ))"
+}
+
+# Classifies the running record once, so every decision and message reads the
+# same answer. WORKER_STATE is alive or dead when this process view proves it.
+# unknown is a worker this view cannot observe that may still be inside its
+# bounded run; WORKER_LEFT holds the seconds until that bound ends, and stays
+# empty when the record has no readable start, so nothing bounds it. expired is
+# an unobservable worker whose readable start is older than WORKER_LIFETIME, so
+# it can no longer be doing useful work; it does not hold the generation, and
+# the acquisition lease cmd_run holds through the mutating sweeps still keeps
+# any old and new sweeps from running concurrently.
+observe_worker() {
+  local started age
+  WORKER_STATE=$(worker_liveness)
+  WORKER_LIFETIME=$(status_get lifetime)
+  case "$WORKER_LIFETIME" in ''|*[!0-9]*|0) WORKER_LIFETIME=$(worker_lifetime) ;; esac
+  WORKER_LEFT=
+  [ "$WORKER_STATE" = unknown ] || return 0
+  started=$(status_get started)
+  case "$started" in ''|*[!0-9]*) return 0 ;; esac
+  age=$(( $(now) - started ))
+  if [ "$age" -gt "$WORKER_LIFETIME" ]; then
+    WORKER_STATE=expired
+  else
+    WORKER_LEFT=$(( WORKER_LIFETIME - age ))
+  fi
+}
+
+worker_may_run() {
+  observe_worker
+  case "$WORKER_STATE" in alive|unknown) return 0 ;; esac
+  return 1
+}
+
+# How long the unknown worker observe_worker classified keeps the generation,
+# or how to clear a record nothing bounds.
+unknown_worker_hold() {
+  if [ -n "$WORKER_LEFT" ]; then
+    printf 'it is treated as abandoned in %ss, once its record outlives the %ss that worker can run' \
+      "$WORKER_LEFT" "$WORKER_LIFETIME"
+  else
+    printf 'its record has no readable start, so it never expires; once its originating context is confirmed gone, move %s aside to clear it' \
+      "$STATUS_FILE"
+  fi
+}
+
+# Why the running record observe_worker classified still holds the generation,
+# for a refusal to print.
+worker_hold_reason() {
+  case "$WORKER_STATE" in
+    alive) printf 'deferred check worker pid %s (generation %s) is still running' \
+      "$(status_get pid)" "$(status_get generation)" ;;
+    *) printf 'deferred check worker liveness is unknown from this process namespace (generation %s); %s' \
+      "$(status_get generation)" "$(unknown_worker_hold)" ;;
+  esac
+}
+
+worker_liveness() {
   local pid namespace current_namespace recorded_start current_start
   pid=$(status_get pid)
   case "$pid" in ''|*[!0-9]*|0) printf unknown; return ;; esac
@@ -283,7 +361,7 @@ worker_covers_request() {  # <locked> <session-generation>
 }
 
 cmd_start() {  # <locked> <harvest-pid>
-  local locked=$1 harvest_pid=$2 lock_pid generation worker_pid phases started liveness
+  local locked=$1 harvest_pid=$2 lock_pid generation worker_pid phases started
   mkdir -p "$STATE" 2>/dev/null || return 1
   # Captured HERE, at the moment the caller still holds the lock, and carried to
   # the worker: re-reading the lock later would only prove that SOME session
@@ -303,17 +381,16 @@ cmd_start() {  # <locked> <harvest-pid>
 
   take_lock "$PUBLISH_LOCK" "$(delivery_budget)" || return 1
   if [ "$(status_get state)" = running ]; then
-    liveness=$(worker_state)
-    if [ "$liveness" != dead ] && worker_covers_request "$locked" "$lock_pid"; then
+    if worker_may_run && worker_covers_request "$locked" "$lock_pid"; then
       generation=$(status_get generation)
       printf '%s\t%s\n' "$generation" "$harvest_pid" > "$CLAIM_FILE" 2>/dev/null || true
       fm_lock_release "$PUBLISH_LOCK"
       return 0
     fi
-    if [ "$liveness" = unknown ]; then
+    if [ "$WORKER_STATE" = unknown ]; then
       fm_lock_release "$PUBLISH_LOCK"
-      printf 'NETWORK_CHECKS: preserving the existing %s worker whose liveness is unknown; inspect %s/bin/fm-startup-network.sh report from its originating process context before retrying full session start\n' \
-        "$(phase_label "$(status_get phases)")" "$FM_ROOT" >&2
+      printf 'NETWORK_CHECKS: preserving the existing %s worker whose liveness is unknown; %s; inspect %s/bin/fm-startup-network.sh report from its originating process context before retrying full session start\n' \
+        "$(phase_label "$(status_get phases)")" "$(unknown_worker_hold)" "$FM_ROOT" >&2
       return 1
     fi
   fi
@@ -326,6 +403,7 @@ cmd_start() {  # <locked> <harvest-pid>
 state=running
 pid=0
 started=$started
+lifetime=$(worker_lifetime)
 locked=$locked
 phases=$phases
 generation=$generation
@@ -361,6 +439,7 @@ state=running
 pid=$worker_pid
 $(worker_coordinates "$worker_pid")
 started=$started
+lifetime=$(worker_lifetime)
 locked=$locked
 phases=$phases
 generation=$generation
@@ -539,9 +618,9 @@ publish_lock_held() {  # <generation> <phases> <locked> <started> <lockdir> <out
   local generation=$1 phases=$2 locked=$3 started=$4 lockdir=$5 out=$6 timings=${7:-}
   DELIVERY_DEADLINE=${DELIVERY_DEADLINE:-$(( $(now) + $(delivery_budget) ))}
   printf 'NETWORK_CHECKS: the deferred check worker gave up because %s was still held by %s at its deadline, so %s may be incomplete; rerun %s/bin/fm-startup-network.sh run --locked %s once that lock is released\n' \
-    "$lockdir" "$(held_by)" "$(phase_label "$phases")" "$FM_ROOT" "$locked" >> "$out"
+    "$lockdir" "$(held_by)" "$(phase_label "$phases")" "$FM_ROOT" "$locked" | tee -a "$out" >&2
   if [ "$(status_get generation)" != "$generation" ] \
-    && [ "$(status_get state)" = running ] && [ "$(worker_state)" != dead ]; then
+    && [ "$(status_get state)" = running ] && worker_may_run; then
     return 1
   fi
   record_result "$generation" failed "$phases" "$locked" "$started" 124 "$out" "$timings" >/dev/null
@@ -601,7 +680,9 @@ cmd_run() {  # <locked> <session-generation> <worker-generation> [<harvest-pid>]
       run_cleanup "$out" "$timings"
       return 1
     fi
-    if [ "$(status_get state)" = running ] && [ "$(worker_state)" != dead ]; then
+    if [ "$(status_get state)" = running ] && worker_may_run; then
+      printf 'NETWORK_CHECKS: refused to start another run because the %s; read %s/bin/fm-startup-network.sh report for its state\n' \
+        "$(worker_hold_reason)" "$FM_ROOT" >&2
       fm_lock_release "$PUBLISH_LOCK"
       run_cleanup "$out" "$timings"
       return 1
@@ -611,6 +692,7 @@ state=running
 pid=$$
 $(worker_coordinates "$$")
 started=$started
+lifetime=$(worker_lifetime)
 locked=$sweep_locked
 phases=$phases
 generation=$generation
@@ -627,7 +709,7 @@ EOF
       # holder past the budget means no sweep can safely start, so this is a
       # failed stage to rerun, published through the ordinary bounded path.
       printf 'NETWORK_CHECKS: the deferred check worker gave up because %s was still held by %s at its deadline, so %s did not run; rerun %s/bin/fm-startup-network.sh run --locked 1 once that lease is released\n' \
-        "$STATE/.lock.acquire" "$(held_by)" "$(phase_label "$phases")" "$FM_ROOT" >> "$out"
+        "$STATE/.lock.acquire" "$(held_by)" "$(phase_label "$phases")" "$FM_ROOT" | tee -a "$out" >&2
       publish "$generation" failed "$phases" "$sweep_locked" "$started" 124 "$out" "$timings"
       run_cleanup "$out" "$timings"
       return 1
@@ -741,12 +823,18 @@ print_state() {
   case "$(status_get state)" in
     done|timeout|failed) print_finished "$(status_get state)" ;;
     running)
-      case "$(worker_state)" in
+      observe_worker
+      case "$WORKER_STATE" in
         alive) print_pending ;;
         unknown)
           printf 'NETWORK_CHECKS: deferred worker liveness is unknown from this process namespace; %s are not yet confirmed.\n' \
             "$(phase_label "$(status_get phases)")"
-          printf 'The current generation is preserved; read %s/bin/fm-startup-network.sh report from the originating context to check its result.\n' "$FM_ROOT"
+          printf 'The current generation is preserved: %s. Read %s/bin/fm-startup-network.sh report from the originating context to check its result.\n' \
+            "$(unknown_worker_hold)" "$FM_ROOT"
+          ;;
+        expired)
+          printf 'NETWORK_CHECKS: the deferred check worker never published and its record outlived the %ss that worker can run, so %s did not complete; rerun %s/bin/fm-startup-network.sh run --locked %s\n' \
+            "$WORKER_LIFETIME" "$(phase_label "$(status_get phases)")" "$FM_ROOT" "$(status_get locked)"
           ;;
         dead)
           printf 'NETWORK_CHECKS: the deferred check worker stopped before publishing, so %s did not complete; rerun %s/bin/fm-startup-network.sh run --locked %s\n' \
@@ -802,7 +890,7 @@ cmd_wait() {  # <seconds>
   while [ "$waited" -lt "$limit" ]; do
     case "$(status_get state)" in
       done|timeout|failed) return 0 ;;
-      running) [ "$(worker_state)" != dead ] || return 1 ;;
+      running) worker_may_run || return 1 ;;
     esac
     sleep 1
     waited=$((waited + 1))
