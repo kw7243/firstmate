@@ -1,0 +1,5 @@
+ok - fm-startup-network: an unobservable worker record stops blocking the checks after its lifetime
+ok - fm-startup-network: fleet-lock takeover cannot overlap a mutating sweep
+ok - fm-startup-network: same-session entry succeeds without changing an active sweep's owner
+ok - fm-startup-network: a held publish lock ends the worker inside its budget with a failed-rerun record
+# focused rerun: all assertions passed

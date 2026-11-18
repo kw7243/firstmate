@@ -1,0 +1,59 @@
+# Live Codex primary (codex-cli 0.160.0) on private fm-lab tmux socket, cwd = gate worktree
+# Pane capture:
+│ ✨ Update available! 0.160.0 -> 0.169.1                                                             │
+│ Run sh -c 'curl -fsSL https://chatgpt.com/codex/install.sh | CODEX_NON_INTERACTIVE=1 sh' to update. │
+│                                                                                                     │
+│ See full release notes:                                                                             │
+│ https://github.com/openai/codex/releases/latest                                                     │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────╯
+  >_ OpenAI Codex (v0.160.0)
+     ~/.no-mistakes/worktrees/9c45ef16ef2c/01M7P2TWTHSQQF3KJ3AV8FF8WR
+  Got a minute and a mildly unreasonable idea?
+› Session start check: summarize the startup digest you received in one short paragraph, including the NETWORK CHECKS section. Do not run any commands.
+• Captain, no Firstmate startup digest was provided in this session. I received only browser and visual-review tool notices. There was no NETWORK CHECKS section, so I cannot confirm whether those
+  checks ran or passed. I ran no commands.
+  Worked for 9s • 01:07
+› Run exactly this one shell command and nothing else: bin/fm-session-start.sh  — then quote verbatim the lines of its NETWORK CHECKS section.
+• Captain, I will run the command once and quote its NETWORK CHECKS section.
+• Ran bin/fm-session-start.sh
+  └
+    The digest above is complete for this session start. The READ-ONCE CONTRACT
+    section near the top of it governs what may still be read from disk.
+    + 123 lines (ctrl+t to expand)
+• Captain, the NETWORK CHECKS section reads:
+  NETWORK CHECKS
+  ================================================================================
+  completed off the startup path in 1s: GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive
+  terminal-outcome reconciliation.
+  NEEDS_GH_AUTH
+  These ran AFTER the sections above were composed, so re-read any record a line here names.
+  Worked for 20s • 01:10
+› Ask Codex to do anything
+  GPT-6-Astra xhigh · ~/.no-mistakes/worktrees/9c45ef16ef2c/01M7P2TWTHSQQF3KJ3AV8FF8WR · Context 91% left · weekly 7% left · 258K window · 22.2K used
+  ← for agents · ? for shortcuts
+
+# Startup-network status record written by the Codex-run session start:
+state=done
+pid=893
+pid_namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026532283]
+pid_starttime=794657071
+started=1794964224
+finished=1794964225
+rc=0
+locked=1
+phases=probe,sweeps
+generation=1794964224.745.13
+lock_pid=codex:01a1ec31-577c-7b20-8da3-95ba609ca511
+report_published=1
+# report:
+NEEDS_GH_AUTH
+# delivered marker:
+delivered
+# timings:
+v1	phase	gh-auth	841	111	
+v1	phase	fleet-sync	981	3	
+v1	phase	secondmate-liveness	1009	17	
+v1	phase	secondmate-sync	1066	65	
+v1	phase	handoff-delivery	1173	2	
+v1	stage	network-checks	149	1111	probe_sweeps
+# host pid namespace for comparison: pid:[4026531836]

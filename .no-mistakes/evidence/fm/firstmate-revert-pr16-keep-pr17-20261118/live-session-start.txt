@@ -1,0 +1,38 @@
+### Scenario: full session start in a lab home while an abandoned foreign worker record (started 2h ago) sits in state -> session start schedules the deferred checks and prints the digest
+$ fm-session-start.sh   (stdin/stdout piped, as a hook would)
+exit=0 elapsed_ms=12139
+--- digest NETWORK CHECKS section and header lines:
+92:  - the NETWORK CHECKS section reported its checks still IN PROGRESS and this
+93-    turn needs their verdict (bin/fm-startup-network.sh report),
+94-  - or a STARTUP TRUNCATED banner named the stage that would have printed it, in
+95-    which case that stage's sources were never emitted and must be reconciled.
+96-
+97-================================================================================
+98-FLEET STATE
+--
+118:NETWORK CHECKS
+119-================================================================================
+120-completed off the startup path in 3s: GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation.
+121-(silent - no problems found)
+122-
+123-================================================================================
+124-CONTEXT
+--- status record right after session start returned:
+state=done
+locked=1
+phases=probe,sweeps
+generation=1794963960.2182934.2178329
+$ fm-startup-network.sh wait 120
+exit=0
+$ fm-startup-network.sh report
+completed off the startup path in 3s: GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation.
+(silent - no problems found)
+TIMINGS - where the deferred network checks spent their time (ms):
+  phase       gh-auth                                    start=+885     elapsed=361
+  phase       secondmate-liveness                        start=+1302    elapsed=11
+  phase       secondmate-sync                            start=+1340    elapsed=56
+  phase       handoff-delivery                           start=+1431    elapsed=3
+  phase       fleet-sync                                 start=+1279    elapsed=1037
+  stage       network-checks probe_sweeps                start=+131     elapsed=2260
+  slowest: stage network-checks probe_sweeps 2260ms, phase fleet-sync 1037ms, phase gh-auth 361ms
+--- wake queue:

@@ -1,0 +1,6 @@
+ok - Codex identity comes from the tool boundary, rejects override and excludes a competing live session
+ok - proved dead host owner can be replaced and repeated entry keeps its generation
+ok - foreign namespace and unknown leases remain protected regardless of age
+ok - distinct threads sharing one Codex process cannot take each other's lock
+Terminated
+Terminated

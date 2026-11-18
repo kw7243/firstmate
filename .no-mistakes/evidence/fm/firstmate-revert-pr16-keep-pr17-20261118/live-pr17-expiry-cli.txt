@@ -1,0 +1,23 @@
+### Scenario: fresh unobservable worker record (foreign namespace, started 10s ago, lifetime 300) -> manual run refuses and says why
+$ fm-startup-network.sh run --locked 0
+NETWORK_CHECKS: refused to start another run because the deferred check worker liveness is unknown from this process namespace (generation foreign-gen-1); it is treated as abandoned in 289s, once its record outlives the 300s that worker can run; read {run-worktree}/bin/fm-startup-network.sh report for its state
+exit=1
+
+### Scenario: same record, now started 400s ago (older than its 300s lifetime) -> it expires; manual run proceeds and publishes
+$ fm-startup-network.sh report   (before run)
+NETWORK_CHECKS: the deferred check worker never published and its record outlived the 300s that worker can run, so GitHub authentication did not complete; rerun {run-worktree}/bin/fm-startup-network.sh run --locked 0
+exit=0
+$ fm-startup-network.sh run --locked 0
+exit=0
+$ grep state/generation in status after run
+state=done
+pid_namespace=2033171b-9858-4767-ad27-2c59662487fa/pid:[4026531836]
+generation=1794963940.2165083.manual
+$ fm-startup-network.sh report
+completed off the startup path in 1s: GitHub authentication.
+(silent - no problems found)
+TIMINGS - where the deferred network checks spent their time (ms):
+  phase       gh-auth                                    start=+517     elapsed=365
+  stage       network-checks probe                       start=+323     elapsed=582
+  slowest: stage network-checks probe 582ms, phase gh-auth 365ms
+exit=0
