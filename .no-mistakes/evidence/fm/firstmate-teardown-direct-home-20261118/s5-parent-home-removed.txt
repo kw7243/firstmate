@@ -1,0 +1,9 @@
+== s5-parent-home-removed: recorded parent_home no longer exists (moved/renamed) ==
+mutation: rm -rf parent
+$ FM_HOME=/tmp/fm-lab-adv.hyI0rl/child bin/fm-teardown.sh okv-v-select-methods-20261118   (code root: {run-worktree})
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab-adv.hyI0rl/child
+REFUSED: cannot resolve the primary home for marked secondmate research-online-kv; refusing cleanup without its durable parent binding.
+exit=1
+meta present: yes
+report present: yes
+lab tmux windows: firstmate:fm-okv-v-select-methods-20261118 

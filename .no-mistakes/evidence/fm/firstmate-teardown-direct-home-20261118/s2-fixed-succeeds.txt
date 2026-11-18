@@ -1,0 +1,10 @@
+== S2: target commit 232f5b4 (after fix), same fixture ==
+$ FM_HOME=/tmp/fm-lab-s2.yFH12f/child bin/fm-teardown.sh okv-v-select-methods-20261118   (code root: {run-worktree})
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab-s2.yFH12f/child
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+teardown okv-v-select-methods-20261118 complete (window firstmate:fm-okv-v-select-methods-20261118, worktree /tmp/fm-lab-s2.yFH12f/scratch-worktree-gone)
+Backlog: okv-v-select-methods-20261118 just finished (config/backlog-backend selects manual editing). Update /tmp/fm-lab-s2.yFH12f/child/data/backlog.md - move okv-v-select-methods-20261118 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+exit=0
+meta present: no
+report present: yes
+lab tmux windows: 
